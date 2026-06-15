@@ -1,0 +1,99 @@
+@Velonixs.Restaurant.Api_HostAddress = http://localhost:5077
+@RestaurantId = replace-with-id-from-get-restaurants
+@PhoneNumberId = 1196816620181240
+
+GET {{Velonixs.Restaurant.Api_HostAddress}}/health
+Accept: application/json
+
+###
+
+GET {{Velonixs.Restaurant.Api_HostAddress}}/api/restaurants
+Accept: application/json
+
+###
+
+GET {{Velonixs.Restaurant.Api_HostAddress}}/api/restaurants/{{RestaurantId}}/menu
+Accept: application/json
+
+###
+
+GET {{Velonixs.Restaurant.Api_HostAddress}}/api/webhooks/whatsapp?hub.mode=subscribe&hub.verify_token=local-verify-token&hub.challenge=challenge-ok
+
+###
+
+POST {{Velonixs.Restaurant.Api_HostAddress}}/api/webhooks/whatsapp/local-test
+Content-Type: application/json
+
+{
+  "messageText": "Hi",
+  "phoneNumberId": "{{PhoneNumberId}}",
+  "fromPhoneNumber": "+919876543210",
+  "profileName": "Rajesh"
+}
+
+###
+
+POST {{Velonixs.Restaurant.Api_HostAddress}}/api/webhooks/whatsapp/local-test
+Content-Type: application/json
+
+{
+  "messageText": "1",
+  "phoneNumberId": "{{PhoneNumberId}}",
+  "fromPhoneNumber": "+919876543210",
+  "profileName": "Rajesh"
+}
+
+###
+
+POST {{Velonixs.Restaurant.Api_HostAddress}}/api/webhooks/whatsapp/local-test
+Content-Type: application/json
+
+{
+  "messageText": "Order: 1 x 2, 4 x 1",
+  "phoneNumberId": "{{PhoneNumberId}}",
+  "fromPhoneNumber": "+919876543210",
+  "profileName": "Rajesh"
+}
+
+###
+
+POST {{Velonixs.Restaurant.Api_HostAddress}}/api/webhooks/whatsapp/local-test
+Content-Type: application/json
+
+{
+  "messageText": "Rajesh",
+  "phoneNumberId": "{{PhoneNumberId}}",
+  "fromPhoneNumber": "+919876543210",
+  "profileName": "Rajesh"
+}
+
+###
+
+POST {{Velonixs.Restaurant.Api_HostAddress}}/api/webhooks/whatsapp/local-test
+Content-Type: application/json
+
+{
+  "messageText": "Near Station Road, Jamtara",
+  "phoneNumberId": "{{PhoneNumberId}}",
+  "fromPhoneNumber": "+919876543210",
+  "profileName": "Rajesh"
+}
+
+###
+
+POST {{Velonixs.Restaurant.Api_HostAddress}}/api/webhooks/whatsapp/local-test
+Content-Type: application/json
+
+{
+  "messageText": "YES",
+  "phoneNumberId": "{{PhoneNumberId}}",
+  "fromPhoneNumber": "+919876543210",
+  "profileName": "Rajesh"
+}
+
+###
+
+GET {{Velonixs.Restaurant.Api_HostAddress}}/api/restaurants/{{RestaurantId}}/orders
+Accept: application/json
+
+###

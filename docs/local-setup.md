@@ -30,7 +30,7 @@ local-verify-token
 
 ## Local WhatsApp Flow Test
 
-Use `src/Velonixs.Restaurant.Api/Velonixs.Restaurant.Api.http`.
+Use `Velonixs.Restaurant.Api/Velonixs.Restaurant.Api.http`.
 
 Run these requests in order:
 

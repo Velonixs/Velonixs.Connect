@@ -996,28 +996,24 @@ ADMIN_EMAIL=
 ```text
 Velonixs.RestaurantConnect/
 
-src/
-  Velonixs.RestaurantConnect.Api/
+Velonixs.Restaurant.Api/
     Controllers/
       WhatsAppWebhookController.cs
       RestaurantsController.cs
       MenuController.cs
       OrdersController.cs
-    Services/
-      WhatsAppService.cs
-      ConversationService.cs
-      OrderService.cs
-      MenuService.cs
-      NotificationService.cs
-    Models/
-    DTOs/
-    Data/
-    Configuration/
 
-  Velonixs.RestaurantConnect.Web/
-    Pages/
-    Views/
-    wwwroot/
+Velonixs.Restaurant.Application/
+  Abstractions/
+  Models/
+
+Velonixs.Restaurant.Domain/
+  Entities/
+
+Velonixs.Restaurant.Infrastructure/
+  Configuration/
+  Persistence/
+  Services/
 
 tests/
   Velonixs.RestaurantConnect.Tests/

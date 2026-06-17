@@ -1,13 +1,45 @@
-# Velonixs Restaurant Connect - Local Setup
+# Velonixs Connect - Local Setup
 
 ## Run Locally
 
-1. Open `Velonixs.RestaurantConnect.sln` in Visual Studio.
-2. Set `Velonixs.Restaurant.Api` as the startup project.
-3. Run the `http` profile.
+1. Open `Velonixs.Connect.sln` in Visual Studio.
+2. Set `src/Velonixs.Connect.Api` as the startup project for WhatsApp webhooks and REST API.
+3. Run the API `http` profile.
 4. The API starts at `http://localhost:5077`.
+5. Set `src/Velonixs.Connect.Admin` as the startup project for the platform admin UI.
+6. Run the Admin `http` profile.
+7. Open the admin UI at `http://localhost:5080/admin`.
+8. Set `src/Velonixs.Connect.Portal` as the startup project for business staff operations.
+9. Run the Portal `http` profile.
+10. Open the business portal at `http://localhost:5090/portal`.
 
-On startup, the API auto-applies EF Core migrations and seeds a demo restaurant/menu when these settings are enabled:
+You can also configure Visual Studio for multiple startup projects and run both:
+
+- `src/Velonixs.Connect.Api`
+- `src/Velonixs.Connect.Admin`
+- `src/Velonixs.Connect.Portal`
+
+The admin UI is a separate project and is local-only by default. It returns `403` through any non-local host unless you explicitly set this on the Admin project:
+
+```text
+Admin__AllowRemote=true
+```
+
+Admin and Portal browser authentication is optional locally. To require sign-in for the browser UIs, seed a first admin user with the `Auth__DefaultAdmin*` settings below and enable:
+
+```text
+Admin__RequireAuthentication=true
+Portal__RequireAuthentication=true
+```
+
+The browser sign-in pages are:
+
+```text
+http://localhost:5080/admin/login
+http://localhost:5090/portal/login
+```
+
+On startup, the API auto-applies EF Core migrations and seeds a demo business/catalog when these settings are enabled:
 
 ```json
 "RestaurantConnect": {
@@ -30,13 +62,13 @@ local-verify-token
 
 ## Local WhatsApp Flow Test
 
-Use `Velonixs.Restaurant.Api/Velonixs.Restaurant.Api.http`.
+Use `src/Velonixs.Connect.Api/Velonixs.Connect.Api.http`.
 
 Run these requests in order:
 
-1. `GET /api/restaurants`
-2. Copy the restaurant `id` into the `@RestaurantId` variable.
-3. `GET /api/restaurants/{restaurantId}/menu`
+1. `GET /api/businesses`
+2. Copy the business `id` into the `@RestaurantId` variable.
+3. `GET /api/businesses/{restaurantId}/catalog`
 4. Run the `local-test` requests:
    - `Hi`
    - `1`
@@ -44,16 +76,28 @@ Run these requests in order:
    - `Rajesh`
    - `Near Station Road, Jamtara`
    - `YES`
-5. Run `GET /api/restaurants/{restaurantId}/orders`.
+5. Run `GET /api/businesses/{restaurantId}/orders`.
 
-When real WhatsApp sending is enabled, the welcome options and menu are sent as WhatsApp interactive list messages. Customers can tap:
+## Projects
+
+```text
+src/Velonixs.Connect.Api             REST API, WhatsApp webhook, health endpoint
+src/Velonixs.Connect.Admin           Platform admin UI for all businesses
+src/Velonixs.Connect.Portal          Business staff UI for orders and catalog availability
+src/Velonixs.Connect.Application     Service contracts and DTOs
+src/Velonixs.Connect.Domain          Entities and domain constants
+src/Velonixs.Connect.Infrastructure  Messaging, external integrations, application services
+src/Velonixs.Connect.Persistence     EF Core, SQL Server, migrations, database initialization
+```
+
+When real WhatsApp sending is enabled, the welcome options and catalog are sent as WhatsApp interactive list messages. Customers can tap:
 
 - View Menu
 - Place Order
 - Restaurant Location
 - Talk to Staff
 
-The menu list lets a customer tap one menu item, then tap a quantity from 1 to 5. Multi-item orders still use text format, for example:
+The catalog list lets a customer tap one product, then tap a quantity from 1 to 5. Multi-product orders still use text format, for example:
 
 ```text
 Order: 1 x 2, 4 x 1
@@ -62,6 +106,39 @@ Order: 1 x 2, 4 x 1
 ## Required Production Configuration
 
 Set these values in environment variables, user secrets, Azure App Service configuration, or `appsettings.Production.json`.
+
+### Authentication
+
+Authentication plumbing is available but optional locally. To require JWT auth for API controllers, set:
+
+```text
+Auth__RequireAuthentication=true
+Auth__Issuer=Velonixs.Connect
+Auth__Audience=Velonixs.Connect
+Auth__SigningKey=
+Auth__TokenMinutes=120
+```
+
+To seed a first admin user on startup, configure both:
+
+```text
+Auth__DefaultAdminEmail=
+Auth__DefaultAdminPassword=
+Auth__DefaultAdminDisplayName=Velonixs Admin
+```
+
+Then request a bearer token from:
+
+```text
+POST /api/auth/login
+```
+
+Admin and Portal use cookie authentication for browser sessions. To protect the UI apps, set:
+
+```text
+Admin__RequireAuthentication=true
+Portal__RequireAuthentication=true
+```
 
 ### Database
 
@@ -88,7 +165,7 @@ You need these from Meta:
 - Meta app secret
 - WhatsApp phone number id
 
-The phone number id must be saved on the restaurant record as `WhatsAppPhoneNumberId`.
+The phone number id must be saved on the business record as `WhatsAppPhoneNumberId`.
 
 ### SMTP Email Notification
 
@@ -103,7 +180,7 @@ Smtp__DefaultFromEmail=
 Smtp__AdminEmail=
 ```
 
-Each restaurant can also have its own `NotificationEmail`.
+Each business can also have its own `NotificationEmail`.
 
 ## Meta Webhook URLs
 
@@ -119,6 +196,17 @@ Use your configured `WhatsApp__VerifyToken` during webhook verification.
 
 ```text
 GET  /health
+POST /api/auth/login
+GET  /api/businesses
+POST /api/businesses
+GET  /api/businesses/{id}
+PUT  /api/businesses/{id}
+GET  /api/businesses/{restaurantId}/catalog
+POST /api/businesses/{restaurantId}/catalog-categories
+POST /api/businesses/{restaurantId}/catalog-products
+PUT  /api/catalog-products/{id}
+DELETE /api/catalog-products/{id}
+GET  /api/businesses/{restaurantId}/orders
 GET  /api/restaurants
 POST /api/restaurants
 GET  /api/restaurants/{id}

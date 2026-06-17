@@ -1,0 +1,120 @@
+@model PortalDashboardViewModel
+@{
+    ViewData["Title"] = Model.Restaurant.Name;
+}
+
+<section class="page-title">
+    <div>
+        <p class="eyebrow">Live Business</p>
+        <h1>@Model.Restaurant.Name</h1>
+    </div>
+    <span class="pill @(Model.Restaurant.IsActive ? "good" : "muted")">@(Model.Restaurant.IsActive ? "Active" : "Inactive")</span>
+</section>
+
+<section class="metric-grid">
+    <div class="metric urgent">
+        <span>Pending Orders</span>
+        <strong>@Model.PendingOrderCount</strong>
+        <small>Confirmed or notified</small>
+    </div>
+    <div class="metric">
+        <span>Today Orders</span>
+        <strong>@Model.TodayOrderCount</strong>
+        <small>Current business day</small>
+    </div>
+    <div class="metric">
+        <span>Today Revenue</span>
+        <strong>Rs @Model.TodayRevenue.ToString("0.##")</strong>
+        <small>WhatsApp orders</small>
+    </div>
+    <div class="metric">
+        <span>Available Products</span>
+        <strong>@Model.AvailableItemCount</strong>
+        <small>Visible to customers</small>
+    </div>
+</section>
+
+<section class="section-band">
+    <div class="section-heading">
+        <h2>Orders</h2>
+    </div>
+    <div class="table-wrap">
+        <table>
+            <thead>
+                <tr>
+                    <th>Order</th>
+                    <th>Customer</th>
+                    <th>Status</th>
+                    <th>Total</th>
+                    <th>Time</th>
+                    <th></th>
+                </tr>
+            </thead>
+            <tbody>
+            @foreach (var order in Model.Orders)
+            {
+                <tr>
+                    <td><strong>@order.OrderNumber</strong><small>@order.Address</small></td>
+                    <td>@order.CustomerName<small>@order.CustomerPhone</small></td>
+                    <td><span class="pill">@order.OrderStatus</span></td>
+                    <td>Rs @order.TotalAmount.ToString("0.##")</td>
+                    <td>@order.CreatedAt.ToLocalTime().ToString("dd MMM, hh:mm tt")</td>
+                    <td class="right"><a class="button compact" asp-action="Order" asp-route-id="@order.Id">Open</a></td>
+                </tr>
+            }
+            </tbody>
+        </table>
+    </div>
+</section>
+
+<section class="section-band">
+    <div class="section-heading">
+        <h2>Catalog Availability</h2>
+    </div>
+    <div class="menu-grid">
+    @foreach (var item in (Model.Menu?.Items ?? Array.Empty<MenuItemResponse>()).Where(x => x.IsActive).OrderBy(x => x.ItemCode))
+    {
+        <form class="menu-card" asp-action="UpdateAvailability" asp-route-id="@item.Id" method="post">
+            @Html.AntiForgeryToken()
+            <div>
+                <strong>@item.ItemCode. @item.Name</strong>
+                <small>@item.CategoryName - Rs @item.Price.ToString("0.##")</small>
+            </div>
+            <label class="toggle">
+                <input name="IsAvailable" type="checkbox" value="true" checked="@item.IsAvailable" onchange="this.form.submit()" />
+                <input name="IsAvailable" type="hidden" value="false" />
+                <span>@(item.IsAvailable ? "Available" : "Unavailable")</span>
+            </label>
+        </form>
+    }
+    </div>
+</section>
+
+<section class="section-band">
+    <div class="section-heading">
+        <h2>Recent Customers</h2>
+    </div>
+    <div class="table-wrap">
+        <table>
+            <thead>
+                <tr>
+                    <th>Name</th>
+                    <th>Phone</th>
+                    <th>Last Address</th>
+                    <th>Last Active</th>
+                </tr>
+            </thead>
+            <tbody>
+            @foreach (var customer in Model.RecentCustomers)
+            {
+                <tr>
+                    <td>@(customer.Name ?? "WhatsApp Customer")</td>
+                    <td>@customer.PhoneNumber</td>
+                    <td>@customer.LastAddress</td>
+                    <td>@customer.LastInteractionAt.ToLocalTime().ToString("dd MMM, hh:mm tt")</td>
+                </tr>
+            }
+            </tbody>
+        </table>
+    </div>
+</section>

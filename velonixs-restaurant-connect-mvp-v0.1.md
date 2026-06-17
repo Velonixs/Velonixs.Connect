@@ -994,29 +994,41 @@ ADMIN_EMAIL=
 ## 21. Folder Structure Suggestion
 
 ```text
-Velonixs.RestaurantConnect/
+Velonixs.Connect/
 
-Velonixs.Restaurant.Api/
+Velonixs.Connect.Api/
     Controllers/
       WhatsAppWebhookController.cs
       RestaurantsController.cs
       MenuController.cs
       OrdersController.cs
 
-Velonixs.Restaurant.Application/
+Velonixs.Connect.Admin/
+  Controllers/
+  Models/
+  Views/
+  wwwroot/
+
+Velonixs.Connect.Portal/
+  Controllers/
+  Models/
+  Views/
+  wwwroot/
+
+Velonixs.Connect.Application/
   Abstractions/
   Models/
 
-Velonixs.Restaurant.Domain/
+Velonixs.Connect.Domain/
   Entities/
 
-Velonixs.Restaurant.Infrastructure/
+Velonixs.Connect.Infrastructure/
   Configuration/
   Persistence/
   Services/
 
 tests/
-  Velonixs.RestaurantConnect.Tests/
+  Velonixs.Connect.Tests/
 
 docs/
   mvp-v0.1.md

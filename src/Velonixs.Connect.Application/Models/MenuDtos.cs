@@ -1,0 +1,60 @@
+namespace Velonixs.Connect.Application.Models;
+
+public sealed record MenuResponse(
+    Guid RestaurantId,
+    string RestaurantName,
+    IReadOnlyCollection<MenuCategoryResponse> Categories,
+    IReadOnlyCollection<MenuItemResponse> Items)
+{
+    public Guid BusinessId => RestaurantId;
+    public string BusinessName => RestaurantName;
+}
+
+public sealed record MenuCategoryResponse(
+    Guid Id,
+    Guid RestaurantId,
+    string Name,
+    int DisplayOrder,
+    bool IsActive)
+{
+    public Guid BusinessId => RestaurantId;
+}
+
+public sealed record MenuItemResponse(
+    Guid Id,
+    Guid RestaurantId,
+    Guid CategoryId,
+    string CategoryName,
+    int ItemCode,
+    string Name,
+    string? Description,
+    decimal Price,
+    bool IsAvailable,
+    bool IsActive)
+{
+    public Guid BusinessId => RestaurantId;
+    public int ProductCode => ItemCode;
+}
+
+public sealed record CreateMenuCategoryRequest(
+    string Name,
+    int DisplayOrder = 0,
+    bool IsActive = true);
+
+public sealed record CreateMenuItemRequest(
+    Guid CategoryId,
+    int ItemCode,
+    string Name,
+    string? Description,
+    decimal Price,
+    bool IsAvailable = true,
+    bool IsActive = true);
+
+public sealed record UpdateMenuItemRequest(
+    Guid CategoryId,
+    int ItemCode,
+    string Name,
+    string? Description,
+    decimal Price,
+    bool IsAvailable,
+    bool IsActive);

@@ -1,0 +1,260 @@
+@model RestaurantManageViewModel
+@{
+    ViewData["Title"] = Model.Restaurant.Name;
+}
+
+<section class="page-title">
+    <div>
+        <p class="eyebrow">@Model.Restaurant.BusinessType</p>
+        <h1>@Model.Restaurant.Name</h1>
+    </div>
+    <a class="button secondary" asp-action="Index">All businesses</a>
+</section>
+
+<section class="metric-grid">
+    <div class="metric">
+        <span>Orders</span>
+        <strong>@Model.Orders.Count</strong>
+        <small>@Model.PendingOrderCount needs attention</small>
+    </div>
+    <div class="metric">
+        <span>Revenue</span>
+        <strong>Rs @Model.Revenue.ToString("0.##")</strong>
+        <small>All recorded orders</small>
+    </div>
+    <div class="metric">
+        <span>Catalog</span>
+        <strong>@Model.ActiveMenuItemCount</strong>
+        <small>Available products</small>
+    </div>
+    <div class="metric">
+        <span>Customers</span>
+        <strong>@Model.Customers.Count</strong>
+        <small>Recent contacts</small>
+    </div>
+</section>
+
+<section class="section-band">
+    <div class="section-heading">
+        <h2>Business Settings</h2>
+    </div>
+
+    <form class="form-grid" asp-action="UpdateRestaurant" asp-route-id="@Model.Restaurant.Id" method="post">
+        @Html.AntiForgeryToken()
+        <label>
+            <span>Name</span>
+            <input asp-for="RestaurantForm.Name" name="Name" required />
+        </label>
+        <label>
+            <span>Business Type</span>
+            <select asp-for="RestaurantForm.BusinessType" name="BusinessType">
+                @foreach (var businessType in Model.BusinessTypeOptions)
+                {
+                    if (businessType == Model.RestaurantForm.BusinessType)
+                    {
+                        <option value="@businessType" selected>@businessType</option>
+                    }
+                    else
+                    {
+                        <option value="@businessType">@businessType</option>
+                    }
+                }
+            </select>
+        </label>
+        <label>
+            <span>WhatsApp Phone Number ID</span>
+            <input asp-for="RestaurantForm.WhatsAppPhoneNumberId" name="WhatsAppPhoneNumberId" required />
+        </label>
+        <label>
+            <span>Business Phone</span>
+            <input asp-for="RestaurantForm.BusinessPhone" name="BusinessPhone" />
+        </label>
+        <label>
+            <span>Notification Email</span>
+            <input asp-for="RestaurantForm.NotificationEmail" name="NotificationEmail" type="email" />
+        </label>
+        <label>
+            <span>Staff WhatsApp Number</span>
+            <input asp-for="RestaurantForm.StaffWhatsAppNumber" name="StaffWhatsAppNumber" />
+        </label>
+        <label class="wide">
+            <span>Address</span>
+            <textarea asp-for="RestaurantForm.Address" name="Address" rows="3"></textarea>
+        </label>
+        <label class="checkline">
+            <input asp-for="RestaurantForm.IsActive" name="IsActive" />
+            <span>Active</span>
+        </label>
+        <div class="form-actions">
+            <button class="button" type="submit">Save settings</button>
+        </div>
+    </form>
+</section>
+
+<section class="section-band">
+    <div class="section-heading">
+        <h2>Orders</h2>
+    </div>
+
+    <div class="table-wrap">
+        <table>
+            <thead>
+                <tr>
+                    <th>Order</th>
+                    <th>Customer</th>
+                    <th>Status</th>
+                    <th>Total</th>
+                    <th>Created</th>
+                    <th></th>
+                </tr>
+            </thead>
+            <tbody>
+            @foreach (var order in Model.Orders)
+            {
+                <tr>
+                    <td><strong>@order.OrderNumber</strong><small>@order.Source</small></td>
+                    <td>@order.CustomerName<small>@order.CustomerPhone</small></td>
+                    <td><span class="pill">@order.OrderStatus</span></td>
+                    <td>Rs @order.TotalAmount.ToString("0.##")</td>
+                    <td>@order.CreatedAt.ToLocalTime().ToString("dd MMM yyyy, hh:mm tt")</td>
+                    <td class="right"><a class="button compact" asp-action="Order" asp-route-id="@order.Id">Open</a></td>
+                </tr>
+            }
+            </tbody>
+        </table>
+    </div>
+</section>
+
+<section class="section-band">
+    <div class="section-heading">
+        <h2>Catalog</h2>
+    </div>
+
+    <div class="split-grid">
+        <form class="panel-form" asp-action="CreateCategory" asp-route-restaurantId="@Model.Restaurant.Id" method="post">
+            @Html.AntiForgeryToken()
+            <h3>Add Category</h3>
+            <label>
+                <span>Name</span>
+                <input asp-for="NewCategory.Name" name="Name" required />
+            </label>
+            <label>
+                <span>Display Order</span>
+                <input asp-for="NewCategory.DisplayOrder" name="DisplayOrder" type="number" />
+            </label>
+            <label class="checkline">
+                <input asp-for="NewCategory.IsActive" name="IsActive" />
+                <span>Active</span>
+            </label>
+            <button class="button" type="submit">Add category</button>
+        </form>
+
+        <form class="panel-form" asp-action="CreateItem" asp-route-restaurantId="@Model.Restaurant.Id" method="post">
+            @Html.AntiForgeryToken()
+            <h3>Add Product</h3>
+            <label>
+                <span>Category</span>
+                <select asp-for="NewItem.CategoryId" name="CategoryId" required>
+                    @foreach (var category in Model.Menu?.Categories ?? Array.Empty<MenuCategoryResponse>())
+                    {
+                        <option value="@category.Id">@category.Name</option>
+                    }
+                </select>
+            </label>
+            <label>
+                <span>Product Code</span>
+                <input asp-for="NewItem.ItemCode" name="ItemCode" type="number" required />
+            </label>
+            <label>
+                <span>Product Name</span>
+                <input asp-for="NewItem.Name" name="Name" required />
+            </label>
+            <label>
+                <span>Price</span>
+                <input asp-for="NewItem.Price" name="Price" type="number" step="0.01" min="0" required />
+            </label>
+            <label class="wide">
+                <span>Description</span>
+                <textarea asp-for="NewItem.Description" name="Description" rows="2"></textarea>
+            </label>
+            <label class="checkline">
+                <input asp-for="NewItem.IsAvailable" name="IsAvailable" />
+                <span>Available</span>
+            </label>
+            <label class="checkline">
+                <input asp-for="NewItem.IsActive" name="IsActive" />
+                <span>Active</span>
+            </label>
+            <button class="button" type="submit">Add product</button>
+        </form>
+    </div>
+
+    <div class="menu-list">
+        @foreach (var item in (Model.Menu?.Items ?? Array.Empty<MenuItemResponse>()).OrderBy(x => x.ItemCode))
+        {
+            <form class="menu-row" asp-action="UpdateItem" asp-route-restaurantId="@Model.Restaurant.Id" asp-route-id="@item.Id" method="post">
+                @Html.AntiForgeryToken()
+                <input name="ItemCode" value="@item.ItemCode" type="number" aria-label="Item code" />
+                <select name="CategoryId" aria-label="Category">
+                    @foreach (var category in Model.Menu?.Categories ?? Array.Empty<MenuCategoryResponse>())
+                    {
+                        if (category.Id == item.CategoryId)
+                        {
+                            <option value="@category.Id" selected>@category.Name</option>
+                        }
+                        else
+                        {
+                            <option value="@category.Id">@category.Name</option>
+                        }
+                    }
+                </select>
+                <input name="Name" value="@item.Name" aria-label="Item name" />
+                <input name="Price" value="@item.Price.ToString("0.##")" type="number" step="0.01" min="0" aria-label="Price" />
+                <input name="Description" value="@item.Description" aria-label="Description" />
+                <label class="checkline">
+                    <input name="IsAvailable" type="checkbox" value="true" checked="@item.IsAvailable" />
+                    <input name="IsAvailable" type="hidden" value="false" />
+                    <span>Available</span>
+                </label>
+                <label class="checkline">
+                    <input name="IsActive" type="checkbox" value="true" checked="@item.IsActive" />
+                    <input name="IsActive" type="hidden" value="false" />
+                    <span>Active</span>
+                </label>
+                <button class="button compact" type="submit">Save</button>
+                <button class="button compact danger" type="submit" formaction="@Url.Action("DeactivateItem", "Admin", new { restaurantId = Model.Restaurant.Id, id = item.Id })">Deactivate</button>
+            </form>
+        }
+    </div>
+</section>
+
+<section class="section-band">
+    <div class="section-heading">
+        <h2>Customers</h2>
+    </div>
+    <div class="table-wrap">
+        <table>
+            <thead>
+                <tr>
+                    <th>Customer</th>
+                    <th>Phone</th>
+                    <th>Orders</th>
+                    <th>Last Address</th>
+                    <th>Last Active</th>
+                </tr>
+            </thead>
+            <tbody>
+            @foreach (var customer in Model.Customers)
+            {
+                <tr>
+                    <td>@(customer.Name ?? "WhatsApp Customer")</td>
+                    <td>@customer.PhoneNumber</td>
+                    <td>@customer.OrderCount</td>
+                    <td>@customer.LastAddress</td>
+                    <td>@customer.LastInteractionAt.ToLocalTime().ToString("dd MMM yyyy, hh:mm tt")</td>
+                </tr>
+            }
+            </tbody>
+        </table>
+    </div>
+</section>

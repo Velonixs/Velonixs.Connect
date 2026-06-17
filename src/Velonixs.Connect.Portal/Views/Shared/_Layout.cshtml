@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>@ViewData["Title"] - Velonixs Connect Portal</title>
+    <link rel="stylesheet" href="~/css/portal.css" asp-append-version="true" />
+</head>
+<body>
+    <header class="app-header">
+        <a class="brand" asp-controller="Portal" asp-action="Index">
+            <span class="brand-mark">V</span>
+            <span>
+                <strong>Velonixs Connect Portal</strong>
+                <small>Orders, catalog, customers</small>
+            </span>
+        </a>
+        <nav class="top-nav">
+            <a asp-controller="Portal" asp-action="Index">Dashboard</a>
+            <a href="/health">Health</a>
+            @if (User.Identity?.IsAuthenticated == true)
+            {
+                <span class="nav-user">@User.Identity.Name</span>
+                <form class="nav-form" method="post" action="/portal/logout">
+                    @Html.AntiForgeryToken()
+                    <button class="nav-button" type="submit">Sign out</button>
+                </form>
+            }
+            else
+            {
+                <a href="/portal/login">Sign in</a>
+            }
+        </nav>
+    </header>
+
+    <main class="page-shell">
+        @if (TempData["Success"] is string success)
+        {
+            <div class="notice success">@success</div>
+        }
+        @if (TempData["Error"] is string error)
+        {
+            <div class="notice error">@error</div>
+        }
+
+        @RenderBody()
+    </main>
+</body>
+</html>

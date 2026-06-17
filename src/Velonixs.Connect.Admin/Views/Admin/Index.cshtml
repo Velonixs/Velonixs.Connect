@@ -1,0 +1,123 @@
+@model AdminIndexViewModel
+@{
+    ViewData["Title"] = "Admin";
+}
+
+<section class="page-title">
+    <div>
+        <p class="eyebrow">Admin</p>
+        <h1>Business Operations</h1>
+    </div>
+    <a class="button secondary" href="#create-restaurant">Add business</a>
+</section>
+
+<section class="metric-grid">
+    <div class="metric">
+        <span>Businesses</span>
+        <strong>@Model.TotalRestaurants</strong>
+        <small>@Model.ActiveRestaurants active</small>
+    </div>
+    <div class="metric">
+        <span>Orders</span>
+        <strong>@Model.TotalOrders</strong>
+        <small>Across all businesses</small>
+    </div>
+    <div class="metric">
+        <span>Revenue</span>
+        <strong>Rs @Model.TotalRevenue.ToString("0.##")</strong>
+        <small>Recorded orders</small>
+    </div>
+</section>
+
+<section class="section-band">
+    <div class="section-heading">
+        <h2>Businesses</h2>
+    </div>
+
+    <div class="table-wrap">
+        <table>
+            <thead>
+                <tr>
+                    <th>Name</th>
+                    <th>Type</th>
+                    <th>WhatsApp phone id</th>
+                    <th>Catalog</th>
+                    <th>Customers</th>
+                    <th>Orders</th>
+                    <th>Revenue</th>
+                    <th>Status</th>
+                    <th></th>
+                </tr>
+            </thead>
+            <tbody>
+            @foreach (var item in Model.Restaurants)
+            {
+                <tr>
+                    <td>
+                        <strong>@item.Restaurant.Name</strong>
+                        <small>@item.Restaurant.BusinessPhone</small>
+                    </td>
+                    <td>@item.Restaurant.BusinessType</td>
+                    <td><code>@item.Restaurant.WhatsAppPhoneNumberId</code></td>
+                    <td>@item.MenuItemCount</td>
+                    <td>@item.CustomerCount</td>
+                    <td>@item.OrderCount</td>
+                    <td>Rs @item.Revenue.ToString("0.##")</td>
+                    <td><span class="pill @(item.Restaurant.IsActive ? "good" : "muted")">@(item.Restaurant.IsActive ? "Active" : "Inactive")</span></td>
+                    <td class="right"><a class="button compact" asp-action="Restaurant" asp-route-id="@item.Restaurant.Id">Manage</a></td>
+                </tr>
+            }
+            </tbody>
+        </table>
+    </div>
+</section>
+
+<section id="create-restaurant" class="section-band">
+    <div class="section-heading">
+        <h2>Add Business</h2>
+    </div>
+
+    <form class="form-grid" asp-action="CreateRestaurant" method="post">
+        @Html.AntiForgeryToken()
+        <label>
+            <span>Name</span>
+            <input asp-for="NewRestaurant.Name" name="Name" required />
+        </label>
+        <label>
+            <span>Business Type</span>
+            <select asp-for="NewRestaurant.BusinessType" name="BusinessType">
+                @foreach (var businessType in Model.BusinessTypeOptions)
+                {
+                    <option value="@businessType">@businessType</option>
+                }
+            </select>
+        </label>
+        <label>
+            <span>WhatsApp Phone Number ID</span>
+            <input asp-for="NewRestaurant.WhatsAppPhoneNumberId" name="WhatsAppPhoneNumberId" required />
+        </label>
+        <label>
+            <span>Business Phone</span>
+            <input asp-for="NewRestaurant.BusinessPhone" name="BusinessPhone" />
+        </label>
+        <label>
+            <span>Notification Email</span>
+            <input asp-for="NewRestaurant.NotificationEmail" name="NotificationEmail" type="email" />
+        </label>
+        <label>
+            <span>Staff WhatsApp Number</span>
+            <input asp-for="NewRestaurant.StaffWhatsAppNumber" name="StaffWhatsAppNumber" />
+        </label>
+        <label class="wide">
+            <span>Address</span>
+            <textarea asp-for="NewRestaurant.Address" name="Address" rows="3"></textarea>
+        </label>
+        <label class="checkline">
+            <input asp-for="NewRestaurant.IsActive" name="IsActive" />
+            <span>Active</span>
+        </label>
+        <div class="form-actions">
+            <button class="button" type="submit">Create business</button>
+        </div>
+    </form>
+</section>

@@ -1,0 +1,93 @@
+using System.Text;
+using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.Identity;
+using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.IdentityModel.Tokens;
+using Velonixs.Connect.Application.Abstractions;
+using Velonixs.Connect.Infrastructure.Configuration;
+using Velonixs.Connect.Infrastructure.Services;
+using Velonixs.Connect.Persistence;
+using Velonixs.Connect.Persistence.Configuration;
+using Velonixs.Connect.Persistence.Identity;
+using Velonixs.Connect.Persistence.Persistence;
+
+namespace Velonixs.Connect.Infrastructure;
+
+public static class DependencyInjection
+{
+    public static IServiceCollection AddInfrastructure(
+        this IServiceCollection services,
+        IConfiguration configuration)
+    {
+        services.AddPersistence(configuration);
+        services.Configure<AuthOptions>(configuration.GetSection("Auth"));
+        services.Configure<IdentitySeedOptions>(configuration.GetSection("Auth"));
+        services.Configure<WhatsAppOptions>(options =>
+        {
+            configuration.GetSection("WhatsApp").Bind(options);
+            options.AccessToken ??= configuration["WHATSAPP_ACCESS_TOKEN"];
+            options.VerifyToken ??= configuration["WHATSAPP_VERIFY_TOKEN"];
+            options.AppSecret ??= configuration["META_APP_SECRET"];
+            options.ApiVersion = configuration["WHATSAPP_API_VERSION"] ?? options.ApiVersion;
+        });
+        services.Configure<SmtpOptions>(options =>
+        {
+            configuration.GetSection("Smtp").Bind(options);
+            options.Host ??= configuration["SMTP_HOST"];
+            options.Username ??= configuration["SMTP_USERNAME"];
+            options.Password ??= configuration["SMTP_PASSWORD"];
+            options.DefaultFromEmail ??= configuration["DEFAULT_FROM_EMAIL"];
+            options.AdminEmail ??= configuration["ADMIN_EMAIL"];
+
+            if (int.TryParse(configuration["SMTP_PORT"], out var smtpPort))
+            {
+                options.Port = smtpPort;
+            }
+        });
+
+        var authOptions = configuration.GetSection("Auth").Get<AuthOptions>() ?? new AuthOptions();
+        var signingKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(authOptions.SigningKey));
+
+        services
+            .AddIdentityCore<ApplicationUser>(options =>
+            {
+                options.User.RequireUniqueEmail = true;
+                options.Password.RequiredLength = 8;
+                options.Password.RequireNonAlphanumeric = false;
+            })
+            .AddRoles<IdentityRole<Guid>>()
+            .AddEntityFrameworkStores<RestaurantConnectDbContext>();
+
+        services
+            .AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
+            .AddJwtBearer(options =>
+            {
+                options.TokenValidationParameters = new TokenValidationParameters
+                {
+                    ValidateIssuer = true,
+                    ValidateAudience = true,
+                    ValidateIssuerSigningKey = true,
+                    ValidateLifetime = true,
+                    ValidIssuer = authOptions.Issuer,
+                    ValidAudience = authOptions.Audience,
+                    IssuerSigningKey = signingKey,
+                    ClockSkew = TimeSpan.FromMinutes(1)
+                };
+            });
+
+        services.AddAuthorization();
+
+        services.AddScoped<IRestaurantService, RestaurantService>();
+        services.AddScoped<IBusinessService, BusinessService>();
+        services.AddScoped<IMenuService, MenuService>();
+        services.AddScoped<ICatalogService, CatalogService>();
+        services.AddScoped<IOrderService, OrderService>();
+        services.AddScoped<IConversationService, ConversationService>();
+        services.AddScoped<INotificationService, NotificationService>();
+        services.AddScoped<IAuthTokenService, AuthTokenService>();
+        services.AddHttpClient<IWhatsAppMessageSender, WhatsAppCloudMessageSender>();
+
+        return services;
+    }
+}

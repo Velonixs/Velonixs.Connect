@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>@ViewData["Title"] - Velonixs Connect</title>
+    <link rel="stylesheet" href="~/css/admin.css" asp-append-version="true" />
+</head>
+<body>
+    <header class="app-header">
+        <a class="brand" asp-controller="Admin" asp-action="Index">
+            <span class="brand-mark">V</span>
+            <span>
+                <strong>Velonixs Connect</strong>
+                <small>WhatsApp business operations</small>
+            </span>
+        </a>
+        <nav class="top-nav" aria-label="Primary navigation">
+            <a asp-controller="Admin" asp-action="Index">Businesses</a>
+            <a href="/health">Health</a>
+            <a href="/api/businesses">API</a>
+            @if (User.Identity?.IsAuthenticated == true)
+            {
+                <span class="nav-user">@User.Identity.Name</span>
+                <form class="nav-form" method="post" action="/admin/logout">
+                    @Html.AntiForgeryToken()
+                    <button class="nav-button" type="submit">Sign out</button>
+                </form>
+            }
+            else
+            {
+                <a href="/admin/login">Sign in</a>
+            }
+        </nav>
+    </header>
+
+    <main class="page-shell">
+        @if (TempData["Success"] is string success)
+        {
+            <div class="notice success">@success</div>
+        }
+        @if (TempData["Error"] is string error)
+        {
+            <div class="notice error">@error</div>
+        }
+
+        @RenderBody()
+    </main>
+</body>
+</html>

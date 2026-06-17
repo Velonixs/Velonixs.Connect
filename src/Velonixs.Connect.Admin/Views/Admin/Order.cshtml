@@ -1,0 +1,101 @@
+@model OrderAdminViewModel
+@{
+    ViewData["Title"] = Model.Order.OrderNumber;
+}
+
+<section class="page-title">
+    <div>
+        <p class="eyebrow">Order</p>
+        <h1>@Model.Order.OrderNumber</h1>
+    </div>
+    @if (Model.Restaurant is not null)
+    {
+        <a class="button secondary" asp-action="Restaurant" asp-route-id="@Model.Restaurant.Id">Back to business</a>
+    }
+</section>
+
+<section class="metric-grid">
+    <div class="metric">
+        <span>Status</span>
+        <strong>@Model.Order.OrderStatus</strong>
+        <small>@Model.Order.CreatedAt.ToLocalTime().ToString("dd MMM yyyy, hh:mm tt")</small>
+    </div>
+    <div class="metric">
+        <span>Total</span>
+        <strong>Rs @Model.Order.TotalAmount.ToString("0.##")</strong>
+        <small>@Model.Order.Source</small>
+    </div>
+    <div class="metric">
+        <span>Customer</span>
+        <strong>@Model.Order.CustomerName</strong>
+        <small>@Model.Order.CustomerPhone</small>
+    </div>
+</section>
+
+<section class="section-band">
+    <div class="section-heading">
+        <h2>Order Details</h2>
+    </div>
+
+    <div class="split-grid">
+        <div class="detail-block">
+            <h3>Products</h3>
+            @foreach (var item in Model.Order.Items)
+            {
+                <div class="line-item">
+                    <span>@item.Quantity x @item.ItemName</span>
+                    <strong>Rs @item.LineTotal.ToString("0.##")</strong>
+                </div>
+            }
+            <div class="line-item total">
+                <span>Total</span>
+                <strong>Rs @Model.Order.TotalAmount.ToString("0.##")</strong>
+            </div>
+        </div>
+
+        <form class="panel-form" asp-action="UpdateOrderStatus" asp-route-id="@Model.Order.Id" method="post">
+            @Html.AntiForgeryToken()
+            <h3>Status</h3>
+            <label>
+                <span>Order status</span>
+                <select name="Status">
+                    @foreach (var status in Model.StatusOptions)
+                    {
+                        if (status == Model.Order.OrderStatus)
+                        {
+                            <option value="@status" selected>@status</option>
+                        }
+                        else
+                        {
+                            <option value="@status">@status</option>
+                        }
+                    }
+                </select>
+            </label>
+            <button class="button" type="submit">Update status</button>
+        </form>
+    </div>
+
+    <div class="detail-block">
+        <h3>Delivery</h3>
+        <p>@Model.Order.Address</p>
+    </div>
+</section>
+
+<section class="section-band">
+    <div class="section-heading">
+        <h2>Conversation Log</h2>
+    </div>
+    <div class="message-list">
+        @foreach (var message in Model.Order.Messages.OrderByDescending(x => x.CreatedAt).Take(40))
+        {
+            <article class="message @(message.Direction == "Incoming" ? "incoming" : "outgoing")">
+                <div>
+                    <strong>@message.Direction</strong>
+                    <small>@message.CreatedAt.ToLocalTime().ToString("dd MMM yyyy, hh:mm tt") - @message.Status</small>
+                </div>
+                <p>@message.MessageText</p>
+            </article>
+        }
+    </div>
+</section>

@@ -18,6 +18,7 @@ public sealed class WhatsAppWebhookController(
     IConversationService conversationService,
     IOptions<WhatsAppOptions> whatsAppOptions,
     IOptions<RestaurantConnectOptions> restaurantConnectOptions,
+    IWebHostEnvironment environment,
     ILogger<WhatsAppWebhookController> logger) : ControllerBase
 {
     private readonly WhatsAppOptions _whatsAppOptions = whatsAppOptions.Value;
@@ -70,6 +71,11 @@ public sealed class WhatsAppWebhookController(
         [FromBody] LocalWhatsAppMessageRequest request,
         CancellationToken cancellationToken)
     {
+        if (!environment.IsDevelopment())
+        {
+            return NotFound();
+        }
+
         var message = new IncomingWhatsAppMessage(
             string.IsNullOrWhiteSpace(request.PhoneNumberId) ? _restaurantConnectOptions.DemoWhatsAppPhoneNumberId : request.PhoneNumberId,
             string.IsNullOrWhiteSpace(request.FromPhoneNumber) ? "+919876543210" : request.FromPhoneNumber,

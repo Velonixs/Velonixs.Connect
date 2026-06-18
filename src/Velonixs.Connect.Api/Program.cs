@@ -1,4 +1,5 @@
 using Velonixs.Connect.Application;
+using Velonixs.Connect.Api.Security;
 using Velonixs.Connect.Infrastructure;
 using Velonixs.Connect.Infrastructure.Configuration;
 using Velonixs.Connect.Persistence.Persistence;
@@ -8,6 +9,8 @@ var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddApplication();
 builder.Services.AddInfrastructure(builder.Configuration);
 builder.Services.AddControllers();
+builder.Services.AddHttpContextAccessor();
+builder.Services.AddScoped<ApiBusinessAccessService>();
 builder.Services.AddHealthChecks();
 builder.Services.AddOpenApi();
 

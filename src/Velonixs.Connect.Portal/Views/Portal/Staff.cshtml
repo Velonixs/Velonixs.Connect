@@ -1,0 +1,94 @@
+@model StaffIndexViewModel
+
+@{
+    ViewData["Title"] = "Staff Users";
+}
+
+<section class="d-flex flex-column flex-sm-row align-items-sm-center justify-content-between gap-3 mb-4">
+    <div>
+        <p class="eyebrow">@Model.Business.Name</p>
+        <h1>Staff Users</h1>
+    </div>
+    <a class="btn btn-outline-primary" asp-action="Index">Dashboard</a>
+</section>
+
+<div class="row g-4">
+    <div class="col-12 col-xl-7">
+        <section class="card shadow-sm">
+            <div class="card-body">
+                <h2 class="h5 mb-3">Current users</h2>
+                <div class="table-responsive">
+                    <table class="table table-hover align-middle mb-0">
+                        <thead>
+                            <tr>
+                                <th>Name</th>
+                                <th>Email</th>
+                                <th>Role</th>
+                                <th>Status</th>
+                                <th></th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                        @foreach (var user in Model.Users)
+                        {
+                            <tr>
+                                <td>@user.DisplayName</td>
+                                <td>@user.Email</td>
+                                <td><span class="badge text-bg-light border">@user.Role</span></td>
+                                <td><span class="badge @(user.IsActive ? "text-bg-success" : "text-bg-secondary")">@(user.IsActive ? "Active" : "Inactive")</span></td>
+                                <td class="text-end">
+                                    @if (user.Role != Velonixs.Connect.Shared.Security.AppRoles.BusinessOwner)
+                                    {
+                                        <form asp-action="UpdateStaffStatus" asp-route-id="@user.Id" method="post">
+                                            @Html.AntiForgeryToken()
+                                            <input type="hidden" name="isActive" value="@(user.IsActive ? "false" : "true")" />
+                                            <button class="btn btn-sm @(user.IsActive ? "btn-outline-danger" : "btn-outline-success")" type="submit">
+                                                @(user.IsActive ? "Disable" : "Enable")
+                                            </button>
+                                        </form>
+                                    }
+                                </td>
+                            </tr>
+                        }
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </section>
+    </div>
+
+    <div class="col-12 col-xl-5">
+        <section class="card shadow-sm">
+            <div class="card-body">
+                <h2 class="h5 mb-3">Create staff login</h2>
+                <form class="row g-3" asp-action="CreateStaff" method="post">
+                    @Html.AntiForgeryToken()
+                    <div class="col-12">
+                        <label class="form-label">Name</label>
+                        <input class="form-control" asp-for="NewUser.DisplayName" name="DisplayName" required />
+                    </div>
+                    <div class="col-12">
+                        <label class="form-label">Email</label>
+                        <input class="form-control" asp-for="NewUser.Email" name="Email" type="email" required />
+                    </div>
+                    <div class="col-12">
+                        <label class="form-label">Temporary Password</label>
+                        <input class="form-control" asp-for="NewUser.Password" name="Password" type="password" minlength="8" required />
+                    </div>
+                    <div class="col-12">
+                        <label class="form-label">Role</label>
+                        <select class="form-select" asp-for="NewUser.Role" name="Role">
+                            @foreach (var role in Model.RoleOptions)
+                            {
+                                <option value="@role">@role</option>
+                            }
+                        </select>
+                    </div>
+                    <div class="col-12">
+                        <button class="btn btn-primary w-100" type="submit">Create staff account</button>
+                    </div>
+                </form>
+            </div>
+        </section>
+    </div>
+</div>

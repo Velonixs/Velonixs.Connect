@@ -1,12 +1,16 @@
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Velonixs.Connect.Domain.Entities;
 using Velonixs.Connect.Persistence.Identity;
+using Velonixs.Connect.Persistence.Security;
 
 namespace Velonixs.Connect.Persistence.Persistence;
 
-public sealed class RestaurantConnectDbContext(DbContextOptions<RestaurantConnectDbContext> options)
+public sealed class RestaurantConnectDbContext(
+    DbContextOptions<RestaurantConnectDbContext> options,
+    IFieldEncryptionService fieldEncryption)
     : IdentityDbContext<ApplicationUser, IdentityRole<Guid>, Guid>(options)
 {
     public DbSet<Domain.Entities.Restaurant> Restaurants => Set<Domain.Entities.Restaurant>();
@@ -17,19 +21,38 @@ public sealed class RestaurantConnectDbContext(DbContextOptions<RestaurantConnec
     public DbSet<Order> Orders => Set<Order>();
     public DbSet<OrderItem> OrderItems => Set<OrderItem>();
     public DbSet<MessageLog> MessageLogs => Set<MessageLog>();
+    public DbSet<DataProtectionState> DataProtectionStates => Set<DataProtectionState>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         base.OnModelCreating(modelBuilder);
+        var encryptedStringConverter = new ValueConverter<string, string>(
+            value => fieldEncryption.Encrypt(value),
+            value => fieldEncryption.Decrypt(value));
+        var nullableEncryptedStringConverter = new ValueConverter<string?, string?>(
+            value => value == null ? null : fieldEncryption.Encrypt(value),
+            value => value == null ? null : fieldEncryption.Decrypt(value));
+
         ConfigureIdentity(modelBuilder);
-        ConfigureRestaurant(modelBuilder);
+        ConfigureDataProtectionState(modelBuilder);
+        ConfigureRestaurant(modelBuilder, nullableEncryptedStringConverter);
         ConfigureMenuCategory(modelBuilder);
         ConfigureMenuItem(modelBuilder);
-        ConfigureCustomer(modelBuilder);
-        ConfigureConversation(modelBuilder);
-        ConfigureOrder(modelBuilder);
+        ConfigureCustomer(modelBuilder, nullableEncryptedStringConverter);
+        ConfigureConversation(modelBuilder, encryptedStringConverter, nullableEncryptedStringConverter);
+        ConfigureOrder(modelBuilder, encryptedStringConverter);
         ConfigureOrderItem(modelBuilder);
-        ConfigureMessageLog(modelBuilder);
+        ConfigureMessageLog(modelBuilder, encryptedStringConverter);
+    }
+
+    private static void ConfigureDataProtectionState(ModelBuilder modelBuilder)
+    {
+        modelBuilder.Entity<DataProtectionState>(entity =>
+        {
+            entity.ToTable("DataProtectionState");
+            entity.HasKey(x => x.Id);
+            entity.Property(x => x.Id).HasMaxLength(100);
+        });
     }
 
     private static void ConfigureIdentity(ModelBuilder modelBuilder)
@@ -38,6 +61,11 @@ public sealed class RestaurantConnectDbContext(DbContextOptions<RestaurantConnec
         {
             entity.ToTable("AuthUser");
             entity.Property(x => x.DisplayName).HasMaxLength(200);
+            entity.HasIndex(x => x.BusinessId);
+            entity.HasOne(x => x.Business)
+                .WithMany()
+                .HasForeignKey(x => x.BusinessId)
+                .OnDelete(DeleteBehavior.Restrict);
         });
 
         modelBuilder.Entity<IdentityRole<Guid>>().ToTable("AuthRole");
@@ -48,7 +76,7 @@ public sealed class RestaurantConnectDbContext(DbContextOptions<RestaurantConnec
         modelBuilder.Entity<IdentityUserToken<Guid>>().ToTable("AuthUserToken");
     }
 
-    private static void ConfigureRestaurant(ModelBuilder modelBuilder)
+    private static void ConfigureRestaurant(ModelBuilder modelBuilder, ValueConverter<string?, string?> encryptedStringConverter)
     {
         modelBuilder.Entity<Domain.Entities.Restaurant>(entity =>
         {
@@ -58,10 +86,10 @@ public sealed class RestaurantConnectDbContext(DbContextOptions<RestaurantConnec
             entity.Property(x => x.Name).HasMaxLength(200).IsRequired();
             entity.Property(x => x.BusinessType).HasMaxLength(50).IsRequired();
             entity.Property(x => x.WhatsAppPhoneNumberId).HasMaxLength(100).IsRequired();
-            entity.Property(x => x.BusinessPhone).HasMaxLength(30);
-            entity.Property(x => x.NotificationEmail).HasMaxLength(254);
-            entity.Property(x => x.StaffWhatsAppNumber).HasMaxLength(30);
-            entity.Property(x => x.Address).HasMaxLength(1000);
+            entity.Property(x => x.BusinessPhone).HasColumnType("nvarchar(max)").HasConversion(encryptedStringConverter);
+            entity.Property(x => x.NotificationEmail).HasColumnType("nvarchar(max)").HasConversion(encryptedStringConverter);
+            entity.Property(x => x.StaffWhatsAppNumber).HasColumnType("nvarchar(max)").HasConversion(encryptedStringConverter);
+            entity.Property(x => x.Address).HasColumnType("nvarchar(max)").HasConversion(encryptedStringConverter);
 
             entity.HasIndex(x => x.WhatsAppPhoneNumberId).IsUnique();
         });
@@ -107,7 +135,7 @@ public sealed class RestaurantConnectDbContext(DbContextOptions<RestaurantConnec
         });
     }
 
-    private static void ConfigureCustomer(ModelBuilder modelBuilder)
+    private static void ConfigureCustomer(ModelBuilder modelBuilder, ValueConverter<string?, string?> encryptedStringConverter)
     {
         modelBuilder.Entity<Customer>(entity =>
         {
@@ -115,8 +143,8 @@ public sealed class RestaurantConnectDbContext(DbContextOptions<RestaurantConnec
             entity.HasKey(x => x.Id);
 
             entity.Property(x => x.PhoneNumber).HasMaxLength(30).IsRequired();
-            entity.Property(x => x.Name).HasMaxLength(200);
-            entity.Property(x => x.LastAddress).HasMaxLength(1000);
+            entity.Property(x => x.Name).HasColumnType("nvarchar(max)").HasConversion(encryptedStringConverter);
+            entity.Property(x => x.LastAddress).HasColumnType("nvarchar(max)").HasConversion(encryptedStringConverter);
 
             entity.HasIndex(x => new { x.RestaurantId, x.PhoneNumber }).IsUnique();
             entity.HasOne(x => x.Restaurant)
@@ -126,16 +154,19 @@ public sealed class RestaurantConnectDbContext(DbContextOptions<RestaurantConnec
         });
     }
 
-    private static void ConfigureConversation(ModelBuilder modelBuilder)
+    private static void ConfigureConversation(
+        ModelBuilder modelBuilder,
+        ValueConverter<string, string> encryptedStringConverter,
+        ValueConverter<string?, string?> nullableEncryptedStringConverter)
     {
         modelBuilder.Entity<Conversation>(entity =>
         {
             entity.ToTable("Conversation");
             entity.HasKey(x => x.Id);
 
-            entity.Property(x => x.WhatsAppNumber).HasMaxLength(30).IsRequired();
+            entity.Property(x => x.WhatsAppNumber).HasColumnType("nvarchar(max)").HasConversion(encryptedStringConverter).IsRequired();
             entity.Property(x => x.CurrentState).HasMaxLength(50).IsRequired();
-            entity.Property(x => x.TempOrderJson).HasColumnType("nvarchar(max)");
+            entity.Property(x => x.TempOrderJson).HasColumnType("nvarchar(max)").HasConversion(nullableEncryptedStringConverter);
 
             entity.HasIndex(x => new { x.RestaurantId, x.CustomerId, x.IsActive });
             entity.HasOne(x => x.Restaurant)
@@ -149,7 +180,7 @@ public sealed class RestaurantConnectDbContext(DbContextOptions<RestaurantConnec
         });
     }
 
-    private static void ConfigureOrder(ModelBuilder modelBuilder)
+    private static void ConfigureOrder(ModelBuilder modelBuilder, ValueConverter<string, string> encryptedStringConverter)
     {
         modelBuilder.Entity<Order>(entity =>
         {
@@ -157,9 +188,9 @@ public sealed class RestaurantConnectDbContext(DbContextOptions<RestaurantConnec
             entity.HasKey(x => x.Id);
 
             entity.Property(x => x.OrderNumber).HasMaxLength(30).IsRequired();
-            entity.Property(x => x.CustomerName).HasMaxLength(200).IsRequired();
-            entity.Property(x => x.CustomerPhone).HasMaxLength(30).IsRequired();
-            entity.Property(x => x.Address).HasMaxLength(1000).IsRequired();
+            entity.Property(x => x.CustomerName).HasColumnType("nvarchar(max)").HasConversion(encryptedStringConverter).IsRequired();
+            entity.Property(x => x.CustomerPhone).HasColumnType("nvarchar(max)").HasConversion(encryptedStringConverter).IsRequired();
+            entity.Property(x => x.Address).HasColumnType("nvarchar(max)").HasConversion(encryptedStringConverter).IsRequired();
             entity.Property(x => x.OrderStatus).HasMaxLength(50).IsRequired();
             entity.Property(x => x.TotalAmount).HasPrecision(18, 2);
             entity.Property(x => x.Source).HasMaxLength(30).IsRequired();
@@ -198,7 +229,7 @@ public sealed class RestaurantConnectDbContext(DbContextOptions<RestaurantConnec
         });
     }
 
-    private static void ConfigureMessageLog(ModelBuilder modelBuilder)
+    private static void ConfigureMessageLog(ModelBuilder modelBuilder, ValueConverter<string, string> encryptedStringConverter)
     {
         modelBuilder.Entity<MessageLog>(entity =>
         {
@@ -206,7 +237,7 @@ public sealed class RestaurantConnectDbContext(DbContextOptions<RestaurantConnec
             entity.HasKey(x => x.Id);
 
             entity.Property(x => x.Direction).HasMaxLength(20).IsRequired();
-            entity.Property(x => x.MessageText).HasColumnType("nvarchar(max)").IsRequired();
+            entity.Property(x => x.MessageText).HasColumnType("nvarchar(max)").HasConversion(encryptedStringConverter).IsRequired();
             entity.Property(x => x.WhatsAppMessageId).HasMaxLength(512);
             entity.Property(x => x.Status).HasMaxLength(30).IsRequired();
 

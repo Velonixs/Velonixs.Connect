@@ -3,33 +3,33 @@
     ViewData["Title"] = Model.Order.OrderNumber;
 }
 
-<section class="page-title">
+<section class="d-flex flex-column flex-sm-row align-items-sm-center justify-content-between gap-3 mb-4">
     <div>
         <p class="eyebrow">Order</p>
         <h1>@Model.Order.OrderNumber</h1>
     </div>
     @if (Model.Restaurant is not null)
     {
-        <a class="button secondary" asp-action="Restaurant" asp-route-id="@Model.Restaurant.Id">Back to business</a>
+        <a class="btn btn-outline-success" asp-action="Restaurant" asp-route-id="@Model.Restaurant.Id">Back to business</a>
     }
 </section>
 
-<section class="metric-grid">
-    <div class="metric">
+<section class="row g-3 mb-4">
+    <div class="col-12 col-md-4"><div class="metric h-100">
         <span>Status</span>
         <strong>@Model.Order.OrderStatus</strong>
         <small>@Model.Order.CreatedAt.ToLocalTime().ToString("dd MMM yyyy, hh:mm tt")</small>
-    </div>
-    <div class="metric">
+    </div></div>
+    <div class="col-12 col-md-4"><div class="metric h-100">
         <span>Total</span>
         <strong>Rs @Model.Order.TotalAmount.ToString("0.##")</strong>
         <small>@Model.Order.Source</small>
-    </div>
-    <div class="metric">
+    </div></div>
+    <div class="col-12 col-md-4"><div class="metric h-100">
         <span>Customer</span>
         <strong>@Model.Order.CustomerName</strong>
         <small>@Model.Order.CustomerPhone</small>
-    </div>
+    </div></div>
 </section>
 
 <section class="section-band">
@@ -37,8 +37,8 @@
         <h2>Order Details</h2>
     </div>
 
-    <div class="split-grid">
-        <div class="detail-block">
+    <div class="row g-3">
+        <div class="col-12 col-lg-8"><div class="detail-block h-100">
             <h3>Products</h3>
             @foreach (var item in Model.Order.Items)
             {
@@ -51,14 +51,15 @@
                 <span>Total</span>
                 <strong>Rs @Model.Order.TotalAmount.ToString("0.##")</strong>
             </div>
-        </div>
+        </div></div>
 
-        <form class="panel-form" asp-action="UpdateOrderStatus" asp-route-id="@Model.Order.Id" method="post">
+        <form class="col-12 col-lg-4" asp-action="UpdateOrderStatus" asp-route-id="@Model.Order.Id" method="post">
+            <div class="panel-form h-100">
             @Html.AntiForgeryToken()
             <h3>Status</h3>
             <label>
                 <span>Order status</span>
-                <select name="Status">
+                <select class="form-select" name="Status">
                     @foreach (var status in Model.StatusOptions)
                     {
                         if (status == Model.Order.OrderStatus)
@@ -72,7 +73,8 @@
                     }
                 </select>
             </label>
-            <button class="button" type="submit">Update status</button>
+            <button class="btn btn-success" type="submit">Update status</button>
+            </div>
         </form>
     </div>
 

@@ -6,6 +6,7 @@ using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 using Velonixs.Connect.Persistence.Identity;
 using Velonixs.Connect.Portal.Models;
+using Velonixs.Connect.Shared.Security;
 
 namespace Velonixs.Connect.Portal.Controllers;
 
@@ -29,15 +30,21 @@ public sealed class AccountController(UserManager<ApplicationUser> userManager) 
 
         var user = await userManager.FindByEmailAsync(model.Email.Trim());
 
-        if (user is null || !await userManager.CheckPasswordAsync(user, model.Password))
+        var roles = user is null ? [] : await userManager.GetRolesAsync(user);
+
+        if (user is null ||
+            !user.IsActive ||
+            user.BusinessId is null ||
+            !await userManager.CheckPasswordAsync(user, model.Password) ||
+            !roles.Any(role => AppRoles.StaffAssignable.Contains(role) || role == AppRoles.BusinessOwner))
         {
-            TempData["Error"] = "Invalid email or password.";
+            TempData["Error"] = "This account cannot access the Business Portal.";
             return View(model);
         }
 
         await HttpContext.SignInAsync(
             CookieAuthenticationDefaults.AuthenticationScheme,
-            BuildPrincipal(user),
+            BuildPrincipal(user, roles),
             new AuthenticationProperties
             {
                 IsPersistent = true,
@@ -59,15 +66,17 @@ public sealed class AccountController(UserManager<ApplicationUser> userManager) 
         return RedirectToAction(nameof(Login));
     }
 
-    private static ClaimsPrincipal BuildPrincipal(ApplicationUser user)
+    private static ClaimsPrincipal BuildPrincipal(ApplicationUser user, IEnumerable<string> roles)
     {
-        var claims = new[]
+        var claims = new List<Claim>
         {
             new Claim(ClaimTypes.NameIdentifier, user.Id.ToString()),
             new Claim(ClaimTypes.Name, string.IsNullOrWhiteSpace(user.DisplayName) ? user.Email ?? string.Empty : user.DisplayName),
-            new Claim(ClaimTypes.Email, user.Email ?? string.Empty)
+            new Claim(ClaimTypes.Email, user.Email ?? string.Empty),
+            new Claim(AppClaimTypes.BusinessId, user.BusinessId!.Value.ToString())
         };
 
+        claims.AddRange(roles.Select(role => new Claim(ClaimTypes.Role, role)));
         return new ClaimsPrincipal(new ClaimsIdentity(claims, CookieAuthenticationDefaults.AuthenticationScheme));
     }
 }

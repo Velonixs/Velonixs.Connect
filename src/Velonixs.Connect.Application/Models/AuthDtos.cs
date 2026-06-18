@@ -9,4 +9,6 @@ public sealed record AuthTokenResponse(
     string TokenType,
     DateTimeOffset ExpiresAt,
     string Email,
-    string DisplayName);
+    string DisplayName,
+    Guid? BusinessId,
+    IReadOnlyCollection<string> Roles);

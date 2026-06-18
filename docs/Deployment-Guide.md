@@ -26,13 +26,14 @@ Required authentication settings for protected deployments:
 
 ```text
 Auth__RequireAuthentication=true
-Admin__RequireAuthentication=true
-Portal__RequireAuthentication=true
 Auth__Issuer=
 Auth__Audience=
 Auth__SigningKey=
 Auth__DefaultAdminEmail=
 Auth__DefaultAdminPassword=
+DataEncryption__Key=
 ```
 
-Use a strong signing key and first-user password stored outside source control. API clients use `POST /api/auth/login` for bearer tokens. Admin and Portal users sign in through `/admin/login` and `/portal/login`.
+Use a strong signing key and first-user password stored outside source control. API clients use `POST /api/auth/login` for bearer tokens. Admin and Portal are always login-protected; users sign in through `/admin/login` and `/portal/login`.
+
+`DataEncryption__Key` must be the same Base64-encoded 32-byte key for API, Admin, and Portal. Store it in Azure Key Vault and back it up separately from the database. Do not replace it without a key-rotation migration.

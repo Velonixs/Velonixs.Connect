@@ -3,39 +3,40 @@
     ViewData["Title"] = "Admin";
 }
 
-<section class="page-title">
+<section class="d-flex flex-column flex-sm-row align-items-sm-center justify-content-between gap-3 mb-4">
     <div>
         <p class="eyebrow">Admin</p>
         <h1>Business Operations</h1>
     </div>
-    <a class="button secondary" href="#create-restaurant">Add business</a>
+    <a class="btn btn-outline-success" href="#create-restaurant">Add business</a>
 </section>
 
-<section class="metric-grid">
-    <div class="metric">
+<section class="row g-3 mb-4">
+    <div class="col-12 col-sm-6 col-xl-4"><div class="metric h-100">
         <span>Businesses</span>
         <strong>@Model.TotalRestaurants</strong>
         <small>@Model.ActiveRestaurants active</small>
-    </div>
-    <div class="metric">
+    </div></div>
+    <div class="col-12 col-sm-6 col-xl-4"><div class="metric h-100">
         <span>Orders</span>
         <strong>@Model.TotalOrders</strong>
         <small>Across all businesses</small>
-    </div>
-    <div class="metric">
+    </div></div>
+    <div class="col-12 col-sm-6 col-xl-4"><div class="metric h-100">
         <span>Revenue</span>
         <strong>Rs @Model.TotalRevenue.ToString("0.##")</strong>
         <small>Recorded orders</small>
-    </div>
+    </div></div>
 </section>
 
-<section class="section-band">
+<section class="card shadow-sm mb-4">
+    <div class="card-body">
     <div class="section-heading">
         <h2>Businesses</h2>
     </div>
 
-    <div class="table-wrap">
-        <table>
+    <div class="table-responsive">
+        <table class="table table-hover align-middle mb-0">
             <thead>
                 <tr>
                     <th>Name</th>
@@ -64,60 +65,79 @@
                     <td>@item.OrderCount</td>
                     <td>Rs @item.Revenue.ToString("0.##")</td>
                     <td><span class="pill @(item.Restaurant.IsActive ? "good" : "muted")">@(item.Restaurant.IsActive ? "Active" : "Inactive")</span></td>
-                    <td class="right"><a class="button compact" asp-action="Restaurant" asp-route-id="@item.Restaurant.Id">Manage</a></td>
+                    <td class="text-end"><a class="btn btn-sm btn-success" asp-action="Restaurant" asp-route-id="@item.Restaurant.Id">Manage</a></td>
                 </tr>
             }
             </tbody>
         </table>
     </div>
+    </div>
 </section>
 
-<section id="create-restaurant" class="section-band">
+<section id="create-restaurant" class="card shadow-sm">
+    <div class="card-body">
     <div class="section-heading">
         <h2>Add Business</h2>
     </div>
 
-    <form class="form-grid" asp-action="CreateRestaurant" method="post">
+    <form class="row g-3" asp-action="CreateRestaurant" method="post">
         @Html.AntiForgeryToken()
-        <label>
-            <span>Name</span>
-            <input asp-for="NewRestaurant.Name" name="Name" required />
-        </label>
-        <label>
-            <span>Business Type</span>
-            <select asp-for="NewRestaurant.BusinessType" name="BusinessType">
+        <div class="col-12 col-md-6">
+            <label class="form-label">Name</label>
+            <input class="form-control" asp-for="NewRestaurant.Name" name="Name" required />
+        </div>
+        <div class="col-12 col-md-6">
+            <label class="form-label">Business Type</label>
+            <select class="form-select" asp-for="NewRestaurant.BusinessType" name="BusinessType">
                 @foreach (var businessType in Model.BusinessTypeOptions)
                 {
                     <option value="@businessType">@businessType</option>
                 }
             </select>
-        </label>
-        <label>
-            <span>WhatsApp Phone Number ID</span>
-            <input asp-for="NewRestaurant.WhatsAppPhoneNumberId" name="WhatsAppPhoneNumberId" required />
-        </label>
-        <label>
-            <span>Business Phone</span>
-            <input asp-for="NewRestaurant.BusinessPhone" name="BusinessPhone" />
-        </label>
-        <label>
-            <span>Notification Email</span>
-            <input asp-for="NewRestaurant.NotificationEmail" name="NotificationEmail" type="email" />
-        </label>
-        <label>
-            <span>Staff WhatsApp Number</span>
-            <input asp-for="NewRestaurant.StaffWhatsAppNumber" name="StaffWhatsAppNumber" />
-        </label>
-        <label class="wide">
-            <span>Address</span>
-            <textarea asp-for="NewRestaurant.Address" name="Address" rows="3"></textarea>
-        </label>
-        <label class="checkline">
-            <input asp-for="NewRestaurant.IsActive" name="IsActive" />
-            <span>Active</span>
-        </label>
-        <div class="form-actions">
-            <button class="button" type="submit">Create business</button>
+        </div>
+        <div class="col-12 col-md-6">
+            <label class="form-label">WhatsApp Phone Number ID</label>
+            <input class="form-control" asp-for="NewRestaurant.WhatsAppPhoneNumberId" name="WhatsAppPhoneNumberId" required />
+        </div>
+        <div class="col-12 col-md-6">
+            <label class="form-label">Business Phone</label>
+            <input class="form-control" asp-for="NewRestaurant.BusinessPhone" name="BusinessPhone" />
+        </div>
+        <div class="col-12 col-md-6">
+            <label class="form-label">Notification Email</label>
+            <input class="form-control" asp-for="NewRestaurant.NotificationEmail" name="NotificationEmail" type="email" />
+        </div>
+        <div class="col-12 col-md-6">
+            <label class="form-label">Staff WhatsApp Number</label>
+            <input class="form-control" asp-for="NewRestaurant.StaffWhatsAppNumber" name="StaffWhatsAppNumber" />
+        </div>
+        <div class="col-12">
+            <label class="form-label">Address</label>
+            <textarea class="form-control" asp-for="NewRestaurant.Address" name="Address" rows="3"></textarea>
+        </div>
+
+        <div class="col-12"><hr /><h3 class="h5">Business owner login</h3></div>
+        <div class="col-12 col-md-4">
+            <label class="form-label">Owner Name</label>
+            <input class="form-control" asp-for="NewRestaurant.OwnerName" name="OwnerName" required />
+        </div>
+        <div class="col-12 col-md-4">
+            <label class="form-label">Owner Email</label>
+            <input class="form-control" asp-for="NewRestaurant.OwnerEmail" name="OwnerEmail" type="email" required />
+        </div>
+        <div class="col-12 col-md-4">
+            <label class="form-label">Temporary Password</label>
+            <input class="form-control" asp-for="NewRestaurant.OwnerPassword" name="OwnerPassword" type="password" minlength="8" required />
+        </div>
+        <div class="col-12">
+            <div class="form-check">
+                <input class="form-check-input" asp-for="NewRestaurant.IsActive" name="IsActive" />
+                <label class="form-check-label">Active business</label>
+            </div>
+        </div>
+        <div class="col-12">
+            <button class="btn btn-success" type="submit">Create business and owner</button>
         </div>
     </form>
+    </div>
 </section>

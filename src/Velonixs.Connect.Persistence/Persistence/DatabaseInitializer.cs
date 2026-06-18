@@ -5,6 +5,7 @@ using Microsoft.Extensions.Options;
 using Velonixs.Connect.Domain.Entities;
 using Velonixs.Connect.Persistence.Configuration;
 using Velonixs.Connect.Persistence.Identity;
+using Velonixs.Connect.Shared.Security;
 
 namespace Velonixs.Connect.Persistence.Persistence;
 
@@ -13,8 +14,10 @@ public sealed class DatabaseInitializer(
     IOptions<RestaurantConnectOptions> options,
     IOptions<IdentitySeedOptions> identitySeedOptions,
     UserManager<ApplicationUser> userManager,
+    RoleManager<IdentityRole<Guid>> roleManager,
     ILogger<DatabaseInitializer> logger)
 {
+    private const string FieldEncryptionMigrationId = "field-encryption-v1";
     private readonly RestaurantConnectOptions _options = options.Value;
     private readonly IdentitySeedOptions _identitySeedOptions = identitySeedOptions.Value;
 
@@ -30,7 +33,83 @@ public sealed class DatabaseInitializer(
             await SeedDemoDataAsync(cancellationToken);
         }
 
+        await EncryptExistingSensitiveDataAsync(cancellationToken);
+        await SeedRolesAsync();
         await SeedDefaultAdminAsync(cancellationToken);
+    }
+
+    private async Task EncryptExistingSensitiveDataAsync(CancellationToken cancellationToken)
+    {
+        if (await dbContext.DataProtectionStates.AnyAsync(
+                x => x.Id == FieldEncryptionMigrationId,
+                cancellationToken))
+        {
+            return;
+        }
+
+        var restaurants = await dbContext.Restaurants.ToArrayAsync(cancellationToken);
+        var customers = await dbContext.Customers.ToArrayAsync(cancellationToken);
+        var conversations = await dbContext.Conversations.ToArrayAsync(cancellationToken);
+        var orders = await dbContext.Orders.ToArrayAsync(cancellationToken);
+        var messages = await dbContext.MessageLogs.ToArrayAsync(cancellationToken);
+
+        foreach (var restaurant in restaurants)
+        {
+            MarkModified(restaurant, nameof(Restaurant.BusinessPhone));
+            MarkModified(restaurant, nameof(Restaurant.NotificationEmail));
+            MarkModified(restaurant, nameof(Restaurant.StaffWhatsAppNumber));
+            MarkModified(restaurant, nameof(Restaurant.Address));
+        }
+
+        foreach (var customer in customers)
+        {
+            MarkModified(customer, nameof(Customer.Name));
+            MarkModified(customer, nameof(Customer.LastAddress));
+        }
+
+        foreach (var conversation in conversations)
+        {
+            MarkModified(conversation, nameof(Conversation.WhatsAppNumber));
+            MarkModified(conversation, nameof(Conversation.TempOrderJson));
+        }
+
+        foreach (var order in orders)
+        {
+            MarkModified(order, nameof(Order.CustomerName));
+            MarkModified(order, nameof(Order.CustomerPhone));
+            MarkModified(order, nameof(Order.Address));
+        }
+
+        foreach (var message in messages)
+        {
+            MarkModified(message, nameof(MessageLog.MessageText));
+        }
+
+        dbContext.DataProtectionStates.Add(new DataProtectionState
+        {
+            Id = FieldEncryptionMigrationId,
+            CompletedAt = DateTimeOffset.UtcNow
+        });
+
+        await dbContext.SaveChangesAsync(cancellationToken);
+        logger.LogInformation("Existing sensitive database fields were encrypted.");
+    }
+
+    private void MarkModified<TEntity>(TEntity entity, string propertyName)
+        where TEntity : class
+    {
+        dbContext.Entry(entity).Property(propertyName).IsModified = true;
+    }
+
+    private async Task SeedRolesAsync()
+    {
+        foreach (var roleName in AppRoles.All)
+        {
+            if (!await roleManager.RoleExistsAsync(roleName))
+            {
+                await roleManager.CreateAsync(new IdentityRole<Guid>(roleName));
+            }
+        }
     }
 
     private async Task SeedDefaultAdminAsync(CancellationToken cancellationToken)
@@ -43,8 +122,21 @@ public sealed class DatabaseInitializer(
 
         var email = _identitySeedOptions.DefaultAdminEmail.Trim();
 
-        if (await userManager.FindByEmailAsync(email) is not null)
+        var existingUser = await userManager.FindByEmailAsync(email);
+
+        if (existingUser is not null)
         {
+            if (!existingUser.IsActive)
+            {
+                existingUser.IsActive = true;
+                await userManager.UpdateAsync(existingUser);
+            }
+
+            if (!await userManager.IsInRoleAsync(existingUser, AppRoles.PlatformAdmin))
+            {
+                await userManager.AddToRoleAsync(existingUser, AppRoles.PlatformAdmin);
+            }
+
             return;
         }
 
@@ -67,6 +159,8 @@ public sealed class DatabaseInitializer(
                 string.Join("; ", result.Errors.Select(x => x.Description)));
             return;
         }
+
+        await userManager.AddToRoleAsync(user, AppRoles.PlatformAdmin);
 
         logger.LogInformation("Seeded default admin user '{Email}'.", email);
     }
@@ -170,8 +264,7 @@ public sealed class DatabaseInitializer(
         await dbContext.SaveChangesAsync(cancellationToken);
 
         logger.LogInformation(
-            "Seeded demo restaurant '{RestaurantName}' with WhatsApp phone number id '{PhoneNumberId}'.",
-            restaurant.Name,
-            restaurant.WhatsAppPhoneNumberId);
+            "Seeded demo business '{BusinessName}'.",
+            restaurant.Name);
     }
 }

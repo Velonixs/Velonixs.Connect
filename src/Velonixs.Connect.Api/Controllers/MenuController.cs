@@ -1,15 +1,25 @@
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Velonixs.Connect.Api.Security;
 using Velonixs.Connect.Application.Abstractions;
 using Velonixs.Connect.Application.Models;
 
 namespace Velonixs.Connect.Api.Controllers;
 
 [ApiController]
-public sealed class MenuController(IMenuService menuService) : ControllerBase
+[Authorize]
+public sealed class MenuController(
+    IMenuService menuService,
+    ApiBusinessAccessService access) : ControllerBase
 {
     [HttpGet("api/restaurants/{restaurantId:guid}/menu")]
     public async Task<IActionResult> GetMenu(Guid restaurantId, CancellationToken cancellationToken)
     {
+        if (!access.CanReadBusiness(restaurantId))
+        {
+            return Forbid();
+        }
+
         var menu = await menuService.GetMenuAsync(restaurantId, cancellationToken);
         return menu is null ? NotFound() : Ok(menu);
     }
@@ -20,6 +30,11 @@ public sealed class MenuController(IMenuService menuService) : ControllerBase
         [FromBody] CreateMenuCategoryRequest request,
         CancellationToken cancellationToken)
     {
+        if (!access.CanManageCatalog(restaurantId))
+        {
+            return Forbid();
+        }
+
         var category = await menuService.CreateCategoryAsync(restaurantId, request, cancellationToken);
         return Ok(category);
     }
@@ -30,6 +45,11 @@ public sealed class MenuController(IMenuService menuService) : ControllerBase
         [FromBody] CreateMenuItemRequest request,
         CancellationToken cancellationToken)
     {
+        if (!access.CanManageCatalog(restaurantId))
+        {
+            return Forbid();
+        }
+
         var item = await menuService.CreateItemAsync(restaurantId, request, cancellationToken);
         return Ok(item);
     }
@@ -40,6 +60,11 @@ public sealed class MenuController(IMenuService menuService) : ControllerBase
         [FromBody] UpdateMenuItemRequest request,
         CancellationToken cancellationToken)
     {
+        if (!await access.CanManageProductAsync(id, cancellationToken))
+        {
+            return Forbid();
+        }
+
         var item = await menuService.UpdateItemAsync(id, request, cancellationToken);
         return item is null ? NotFound() : Ok(item);
     }
@@ -47,6 +72,11 @@ public sealed class MenuController(IMenuService menuService) : ControllerBase
     [HttpDelete("api/menu-items/{id:guid}")]
     public async Task<IActionResult> DeactivateItem(Guid id, CancellationToken cancellationToken)
     {
+        if (!await access.CanManageProductAsync(id, cancellationToken))
+        {
+            return Forbid();
+        }
+
         var wasUpdated = await menuService.DeactivateItemAsync(id, cancellationToken);
         return wasUpdated ? NoContent() : NotFound();
     }

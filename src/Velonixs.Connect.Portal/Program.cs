@@ -1,10 +1,14 @@
+using System.Security.Claims;
 using Microsoft.AspNetCore.Authentication.Cookies;
+using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc.Authorization;
 using Velonixs.Connect.Application;
 using Velonixs.Connect.Infrastructure;
+using Velonixs.Connect.Persistence.Identity;
+using Velonixs.Connect.Persistence.Persistence;
+using Velonixs.Connect.Shared.Security;
 
 var builder = WebApplication.CreateBuilder(args);
-var requirePortalAuthentication = builder.Configuration.GetValue<bool>("Portal:RequireAuthentication");
 
 builder.Services.AddApplication();
 builder.Services.AddInfrastructure(builder.Configuration);
@@ -16,17 +20,34 @@ builder.Services
         options.LoginPath = "/portal/login";
         options.LogoutPath = "/portal/logout";
         options.AccessDeniedPath = "/portal/login";
+        options.Events.OnValidatePrincipal = async context =>
+        {
+            var userId = context.Principal?.FindFirstValue(ClaimTypes.NameIdentifier);
+            var businessClaim = context.Principal?.FindFirstValue(AppClaimTypes.BusinessId);
+            var userManager = context.HttpContext.RequestServices.GetRequiredService<UserManager<ApplicationUser>>();
+            var user = string.IsNullOrWhiteSpace(userId) ? null : await userManager.FindByIdAsync(userId);
+
+            if (user is null ||
+                !user.IsActive ||
+                user.BusinessId is null ||
+                !string.Equals(user.BusinessId.Value.ToString(), businessClaim, StringComparison.OrdinalIgnoreCase))
+            {
+                context.RejectPrincipal();
+            }
+        };
     });
 builder.Services.AddControllersWithViews(options =>
 {
-    if (requirePortalAuthentication)
-    {
-        options.Filters.Add(new AuthorizeFilter());
-    }
+    options.Filters.Add(new AuthorizeFilter());
 });
 builder.Services.AddHealthChecks();
 
 var app = builder.Build();
+
+using (var scope = app.Services.CreateScope())
+{
+    await scope.ServiceProvider.GetRequiredService<DatabaseInitializer>().InitializeAsync();
+}
 
 if (!app.Environment.IsDevelopment())
 {

@@ -4,6 +4,7 @@
     <ProjectReference Include="..\Velonixs.Connect.Application\Velonixs.Connect.Application.csproj" />
     <ProjectReference Include="..\Velonixs.Connect.Domain\Velonixs.Connect.Domain.csproj" />
     <ProjectReference Include="..\Velonixs.Connect.Persistence\Velonixs.Connect.Persistence.csproj" />
+    <ProjectReference Include="..\Velonixs.Connect.Shared\Velonixs.Connect.Shared.csproj" />
   </ItemGroup>
 
   <ItemGroup>

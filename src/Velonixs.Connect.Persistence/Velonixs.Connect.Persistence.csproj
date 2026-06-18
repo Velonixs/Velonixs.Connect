@@ -2,6 +2,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\Velonixs.Connect.Domain\Velonixs.Connect.Domain.csproj" />
+    <ProjectReference Include="..\Velonixs.Connect.Shared\Velonixs.Connect.Shared.csproj" />
   </ItemGroup>
 
   <ItemGroup>

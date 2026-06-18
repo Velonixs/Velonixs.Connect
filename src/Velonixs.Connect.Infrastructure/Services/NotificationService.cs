@@ -86,10 +86,7 @@ public sealed class NotificationService(
             string.IsNullOrWhiteSpace(to))
         {
             logger.LogInformation(
-                "Email notification skipped. To={To}, Subject={Subject}, Body={Body}",
-                to,
-                subject,
-                body);
+                "Email notification skipped because SMTP configuration or recipient is missing.");
 
             return;
         }

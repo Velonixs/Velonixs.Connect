@@ -3,6 +3,7 @@ using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Velonixs.Connect.Persistence.Persistence;
 
@@ -11,9 +12,11 @@ using Velonixs.Connect.Persistence.Persistence;
 namespace Velonixs.Connect.Persistence.Persistence.Migrations
 {
     [DbContext(typeof(RestaurantConnectDbContext))]
-    partial class RestaurantConnectDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260618060602_AddBusinessScopedIdentity")]
+    partial class AddBusinessScopedIdentity
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -184,7 +187,8 @@ namespace Velonixs.Connect.Persistence.Persistence.Migrations
 
                     b.Property<string>("WhatsAppNumber")
                         .IsRequired()
-                        .HasColumnType("nvarchar(max)");
+                        .HasMaxLength(30)
+                        .HasColumnType("nvarchar(30)");
 
                     b.HasKey("Id");
 
@@ -205,13 +209,15 @@ namespace Velonixs.Connect.Persistence.Persistence.Migrations
                         .HasColumnType("datetimeoffset");
 
                     b.Property<string>("LastAddress")
-                        .HasColumnType("nvarchar(max)");
+                        .HasMaxLength(1000)
+                        .HasColumnType("nvarchar(1000)");
 
                     b.Property<DateTimeOffset>("LastInteractionAt")
                         .HasColumnType("datetimeoffset");
 
                     b.Property<string>("Name")
-                        .HasColumnType("nvarchar(max)");
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
 
                     b.Property<string>("PhoneNumber")
                         .IsRequired()
@@ -358,7 +364,8 @@ namespace Velonixs.Connect.Persistence.Persistence.Migrations
 
                     b.Property<string>("Address")
                         .IsRequired()
-                        .HasColumnType("nvarchar(max)");
+                        .HasMaxLength(1000)
+                        .HasColumnType("nvarchar(1000)");
 
                     b.Property<DateTimeOffset>("CreatedAt")
                         .HasColumnType("datetimeoffset");
@@ -368,11 +375,13 @@ namespace Velonixs.Connect.Persistence.Persistence.Migrations
 
                     b.Property<string>("CustomerName")
                         .IsRequired()
-                        .HasColumnType("nvarchar(max)");
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
 
                     b.Property<string>("CustomerPhone")
                         .IsRequired()
-                        .HasColumnType("nvarchar(max)");
+                        .HasMaxLength(30)
+                        .HasColumnType("nvarchar(30)");
 
                     b.Property<string>("OrderNumber")
                         .IsRequired()
@@ -452,10 +461,12 @@ namespace Velonixs.Connect.Persistence.Persistence.Migrations
                         .HasColumnType("uniqueidentifier");
 
                     b.Property<string>("Address")
-                        .HasColumnType("nvarchar(max)");
+                        .HasMaxLength(1000)
+                        .HasColumnType("nvarchar(1000)");
 
                     b.Property<string>("BusinessPhone")
-                        .HasColumnType("nvarchar(max)");
+                        .HasMaxLength(30)
+                        .HasColumnType("nvarchar(30)");
 
                     b.Property<string>("BusinessType")
                         .IsRequired()
@@ -474,10 +485,12 @@ namespace Velonixs.Connect.Persistence.Persistence.Migrations
                         .HasColumnType("nvarchar(200)");
 
                     b.Property<string>("NotificationEmail")
-                        .HasColumnType("nvarchar(max)");
+                        .HasMaxLength(254)
+                        .HasColumnType("nvarchar(254)");
 
                     b.Property<string>("StaffWhatsAppNumber")
-                        .HasColumnType("nvarchar(max)");
+                        .HasMaxLength(30)
+                        .HasColumnType("nvarchar(30)");
 
                     b.Property<string>("WhatsAppPhoneNumberId")
                         .IsRequired()
@@ -572,20 +585,6 @@ namespace Velonixs.Connect.Persistence.Persistence.Migrations
                         .HasFilter("[NormalizedUserName] IS NOT NULL");
 
                     b.ToTable("AuthUser", (string)null);
-                });
-
-            modelBuilder.Entity("Velonixs.Connect.Persistence.Persistence.DataProtectionState", b =>
-                {
-                    b.Property<string>("Id")
-                        .HasMaxLength(100)
-                        .HasColumnType("nvarchar(100)");
-
-                    b.Property<DateTimeOffset>("CompletedAt")
-                        .HasColumnType("datetimeoffset");
-
-                    b.HasKey("Id");
-
-                    b.ToTable("DataProtectionState", (string)null);
                 });
 
             modelBuilder.Entity("Microsoft.AspNetCore.Identity.IdentityRoleClaim<System.Guid>", b =>

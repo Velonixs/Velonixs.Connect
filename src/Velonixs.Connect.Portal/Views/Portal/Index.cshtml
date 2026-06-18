@@ -3,43 +3,47 @@
     ViewData["Title"] = Model.Restaurant.Name;
 }
 
-<section class="page-title">
+<section class="d-flex flex-column flex-sm-row align-items-sm-center justify-content-between gap-3 mb-4">
     <div>
         <p class="eyebrow">Live Business</p>
         <h1>@Model.Restaurant.Name</h1>
     </div>
-    <span class="pill @(Model.Restaurant.IsActive ? "good" : "muted")">@(Model.Restaurant.IsActive ? "Active" : "Inactive")</span>
+    <div class="d-flex align-items-center gap-2">
+        <span class="badge text-bg-light border">@Model.CurrentRole</span>
+        <span class="badge @(Model.Restaurant.IsActive ? "text-bg-success" : "text-bg-secondary")">@(Model.Restaurant.IsActive ? "Active" : "Inactive")</span>
+    </div>
 </section>
 
-<section class="metric-grid">
-    <div class="metric urgent">
+<section class="row g-3 mb-4">
+    <div class="col-12 col-sm-6 col-xl-3"><div class="metric urgent h-100">
         <span>Pending Orders</span>
         <strong>@Model.PendingOrderCount</strong>
         <small>Confirmed or notified</small>
-    </div>
-    <div class="metric">
+    </div></div>
+    <div class="col-12 col-sm-6 col-xl-3"><div class="metric h-100">
         <span>Today Orders</span>
         <strong>@Model.TodayOrderCount</strong>
         <small>Current business day</small>
-    </div>
-    <div class="metric">
+    </div></div>
+    <div class="col-12 col-sm-6 col-xl-3"><div class="metric h-100">
         <span>Today Revenue</span>
         <strong>Rs @Model.TodayRevenue.ToString("0.##")</strong>
         <small>WhatsApp orders</small>
-    </div>
-    <div class="metric">
+    </div></div>
+    <div class="col-12 col-sm-6 col-xl-3"><div class="metric h-100">
         <span>Available Products</span>
         <strong>@Model.AvailableItemCount</strong>
         <small>Visible to customers</small>
-    </div>
+    </div></div>
 </section>
 
-<section class="section-band">
+<section class="card shadow-sm mb-4">
+    <div class="card-body">
     <div class="section-heading">
         <h2>Orders</h2>
     </div>
-    <div class="table-wrap">
-        <table>
+    <div class="table-responsive">
+        <table class="table table-hover align-middle mb-0">
             <thead>
                 <tr>
                     <th>Order</th>
@@ -59,43 +63,56 @@
                     <td><span class="pill">@order.OrderStatus</span></td>
                     <td>Rs @order.TotalAmount.ToString("0.##")</td>
                     <td>@order.CreatedAt.ToLocalTime().ToString("dd MMM, hh:mm tt")</td>
-                    <td class="right"><a class="button compact" asp-action="Order" asp-route-id="@order.Id">Open</a></td>
+                    <td class="text-end"><a class="btn btn-sm btn-primary" asp-action="Order" asp-route-id="@order.Id">Open</a></td>
                 </tr>
             }
             </tbody>
         </table>
     </div>
+    </div>
 </section>
 
-<section class="section-band">
+<section class="card shadow-sm mb-4">
+    <div class="card-body">
     <div class="section-heading">
         <h2>Catalog Availability</h2>
     </div>
-    <div class="menu-grid">
+    <div class="row g-3">
     @foreach (var item in (Model.Menu?.Items ?? Array.Empty<MenuItemResponse>()).Where(x => x.IsActive).OrderBy(x => x.ItemCode))
     {
-        <form class="menu-card" asp-action="UpdateAvailability" asp-route-id="@item.Id" method="post">
+        <div class="col-12 col-md-6 col-xl-4">
+        <form class="card h-100 bg-light border-0 p-3 d-flex flex-row align-items-center justify-content-between gap-3" asp-action="UpdateAvailability" asp-route-id="@item.Id" method="post">
             @Html.AntiForgeryToken()
             <div>
                 <strong>@item.ItemCode. @item.Name</strong>
                 <small>@item.CategoryName - Rs @item.Price.ToString("0.##")</small>
             </div>
-            <label class="toggle">
-                <input name="IsAvailable" type="checkbox" value="true" checked="@item.IsAvailable" onchange="this.form.submit()" />
-                <input name="IsAvailable" type="hidden" value="false" />
-                <span>@(item.IsAvailable ? "Available" : "Unavailable")</span>
-            </label>
+            @if (User.IsInRole(Velonixs.Connect.Shared.Security.AppRoles.BusinessOwner) ||
+                 User.IsInRole(Velonixs.Connect.Shared.Security.AppRoles.BusinessManager))
+            {
+                <div class="form-check form-switch mb-0">
+                    <input class="form-check-input" name="IsAvailable" type="checkbox" value="true" checked="@item.IsAvailable" onchange="this.form.submit()" aria-label="Toggle @item.Name availability" />
+                    <input name="IsAvailable" type="hidden" value="false" />
+                </div>
+            }
+            else
+            {
+                <span class="badge @(item.IsAvailable ? "text-bg-success" : "text-bg-secondary")">@(item.IsAvailable ? "Available" : "Unavailable")</span>
+            }
         </form>
+        </div>
     }
+    </div>
     </div>
 </section>
 
-<section class="section-band">
+<section class="card shadow-sm">
+    <div class="card-body">
     <div class="section-heading">
         <h2>Recent Customers</h2>
     </div>
-    <div class="table-wrap">
-        <table>
+    <div class="table-responsive">
+        <table class="table table-hover align-middle mb-0">
             <thead>
                 <tr>
                     <th>Name</th>
@@ -116,5 +133,6 @@
             }
             </tbody>
         </table>
+    </div>
     </div>
 </section>

@@ -5,7 +5,7 @@
 }
 
 <section class="auth-shell">
-    <form class="panel-form auth-panel" asp-action="Login" asp-controller="Account" method="post">
+    <form class="card shadow-sm auth-panel p-4" asp-action="Login" asp-controller="Account" method="post">
         @Html.AntiForgeryToken()
         <input asp-for="ReturnUrl" type="hidden" />
 
@@ -14,20 +14,20 @@
             <h1>Sign in to Velonixs Connect</h1>
         </div>
 
-        <div asp-validation-summary="ModelOnly" class="validation-summary"></div>
+        <div asp-validation-summary="ModelOnly" class="text-danger"></div>
 
-        <label>
-            <span>Email</span>
-            <input asp-for="Email" autocomplete="username" />
-            <span asp-validation-for="Email" class="field-error"></span>
-        </label>
+        <div>
+            <label asp-for="Email" class="form-label"></label>
+            <input asp-for="Email" class="form-control" autocomplete="username" />
+            <span asp-validation-for="Email" class="text-danger"></span>
+        </div>
 
-        <label>
-            <span>Password</span>
-            <input asp-for="Password" autocomplete="current-password" />
-            <span asp-validation-for="Password" class="field-error"></span>
-        </label>
+        <div>
+            <label asp-for="Password" class="form-label"></label>
+            <input asp-for="Password" class="form-control" autocomplete="current-password" />
+            <span asp-validation-for="Password" class="text-danger"></span>
+        </div>
 
-        <button class="button" type="submit">Sign in</button>
+        <button class="btn btn-success w-100" type="submit">Sign in</button>
     </form>
 </section>

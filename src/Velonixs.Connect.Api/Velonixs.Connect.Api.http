@@ -2,29 +2,44 @@
 @BusinessId = replace-with-id-from-get-businesses
 @RestaurantId = {{BusinessId}}
 @PhoneNumberId = 1196816620181240
+@AccessToken = paste-access-token-from-login-response
 
 GET {{Velonixs.Connect.Api_HostAddress}}/health
 Accept: application/json
 
 ###
 
+POST {{Velonixs.Connect.Api_HostAddress}}/api/auth/login
+Content-Type: application/json
+
+{
+  "email": "your-user@example.com",
+  "password": "your-password"
+}
+
+###
+
 GET {{Velonixs.Connect.Api_HostAddress}}/api/businesses
 Accept: application/json
+Authorization: Bearer {{AccessToken}}
 
 ###
 
 GET {{Velonixs.Connect.Api_HostAddress}}/api/businesses/{{BusinessId}}/catalog
 Accept: application/json
+Authorization: Bearer {{AccessToken}}
 
 ###
 
 GET {{Velonixs.Connect.Api_HostAddress}}/api/businesses/{{BusinessId}}/orders
 Accept: application/json
+Authorization: Bearer {{AccessToken}}
 
 ###
 
 GET {{Velonixs.Connect.Api_HostAddress}}/api/restaurants/{{RestaurantId}}/menu
 Accept: application/json
+Authorization: Bearer {{AccessToken}}
 
 ###
 

@@ -1,3 +1,4 @@
+using System.ComponentModel.DataAnnotations;
 using Velonixs.Connect.Application.Models;
 using Velonixs.Connect.Domain.Entities;
 
@@ -37,6 +38,31 @@ public sealed class RestaurantManageViewModel
     public int ActiveMenuItemCount { get; set; }
     public int PendingOrderCount { get; set; }
     public decimal Revenue { get; set; }
+    public IReadOnlyCollection<BusinessUserSummary> Users { get; set; } = Array.Empty<BusinessUserSummary>();
+    public OwnerAccountFormModel NewOwner { get; set; } = new();
+}
+
+public sealed class BusinessUserSummary
+{
+    public string DisplayName { get; set; } = string.Empty;
+    public string Email { get; set; } = string.Empty;
+    public string Role { get; set; } = string.Empty;
+    public bool IsActive { get; set; }
+}
+
+public sealed class OwnerAccountFormModel
+{
+    [Required]
+    public string DisplayName { get; set; } = string.Empty;
+
+    [Required]
+    [EmailAddress]
+    public string Email { get; set; } = string.Empty;
+
+    [Required]
+    [MinLength(8)]
+    [DataType(DataType.Password)]
+    public string Password { get; set; } = string.Empty;
 }
 
 public sealed class CustomerAdminSummary
@@ -57,14 +83,29 @@ public sealed class OrderAdminViewModel
 
 public sealed class RestaurantFormModel
 {
+    [Required]
     public string Name { get; set; } = string.Empty;
     public string BusinessType { get; set; } = BusinessTypes.Restaurant;
+
+    [Required]
     public string WhatsAppPhoneNumberId { get; set; } = string.Empty;
     public string? BusinessPhone { get; set; }
     public string? NotificationEmail { get; set; }
     public string? StaffWhatsAppNumber { get; set; }
     public string? Address { get; set; }
     public bool IsActive { get; set; } = true;
+
+    [Required]
+    public string OwnerName { get; set; } = string.Empty;
+
+    [Required]
+    [EmailAddress]
+    public string OwnerEmail { get; set; } = string.Empty;
+
+    [Required]
+    [MinLength(8)]
+    [DataType(DataType.Password)]
+    public string OwnerPassword { get; set; } = string.Empty;
 }
 
 public sealed class MenuCategoryFormModel

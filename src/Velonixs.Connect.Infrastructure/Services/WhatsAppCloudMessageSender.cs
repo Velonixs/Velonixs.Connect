@@ -114,10 +114,7 @@ public sealed class WhatsAppCloudMessageSender(
         if (_options.DisableSending || string.IsNullOrWhiteSpace(_options.AccessToken))
         {
             logger.LogInformation(
-                "WhatsApp sending skipped. PhoneNumberId={PhoneNumberId}, To={To}, Message={Message}",
-                phoneNumberId,
-                recipientPhoneNumber,
-                logMessage);
+                "WhatsApp sending skipped because sending is disabled or credentials are missing.");
 
             return new WhatsAppSendResult(true, true);
         }
@@ -133,9 +130,8 @@ public sealed class WhatsAppCloudMessageSender(
         if (!response.IsSuccessStatusCode)
         {
             logger.LogWarning(
-                "WhatsApp send failed. StatusCode={StatusCode}, Response={Response}",
-                response.StatusCode,
-                responseText);
+                "WhatsApp send failed. StatusCode={StatusCode}",
+                response.StatusCode);
 
             return new WhatsAppSendResult(false, false, Error: responseText);
         }

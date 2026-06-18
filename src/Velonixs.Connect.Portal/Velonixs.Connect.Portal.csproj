@@ -1,15 +1,17 @@
-<Project Sdk="Microsoft.NET.Sdk.Web">
+﻿<Project Sdk="Microsoft.NET.Sdk.Web">
 
   <PropertyGroup>
     <TargetFramework>net10.0</TargetFramework>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
+    <UserSecretsId>50f5c207-fbec-4876-9e57-5a4b1bcd5ecd</UserSecretsId>
   </PropertyGroup>
 
   <ItemGroup>
     <ProjectReference Include="..\Velonixs.Connect.Application\Velonixs.Connect.Application.csproj" />
     <ProjectReference Include="..\Velonixs.Connect.Infrastructure\Velonixs.Connect.Infrastructure.csproj" />
     <ProjectReference Include="..\Velonixs.Connect.Persistence\Velonixs.Connect.Persistence.csproj" />
+    <ProjectReference Include="..\Velonixs.Connect.Shared\Velonixs.Connect.Shared.csproj" />
   </ItemGroup>
 
 </Project>

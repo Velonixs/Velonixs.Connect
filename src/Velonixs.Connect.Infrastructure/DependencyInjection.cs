@@ -47,6 +47,13 @@ public static class DependencyInjection
         });
 
         var authOptions = configuration.GetSection("Auth").Get<AuthOptions>() ?? new AuthOptions();
+
+        if (string.IsNullOrWhiteSpace(authOptions.SigningKey) || authOptions.SigningKey.Length < 32)
+        {
+            throw new InvalidOperationException(
+                "Auth signing key is not configured or is too short. Set Auth:SigningKey to at least 32 characters.");
+        }
+
         var signingKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(authOptions.SigningKey));
 
         services

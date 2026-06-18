@@ -6,6 +6,7 @@ using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 using Velonixs.Connect.Admin.Models;
 using Velonixs.Connect.Persistence.Identity;
+using Velonixs.Connect.Shared.Security;
 
 namespace Velonixs.Connect.Admin.Controllers;
 
@@ -29,15 +30,18 @@ public sealed class AccountController(UserManager<ApplicationUser> userManager) 
 
         var user = await userManager.FindByEmailAsync(model.Email.Trim());
 
-        if (user is null || !await userManager.CheckPasswordAsync(user, model.Password))
+        if (user is null ||
+            !user.IsActive ||
+            !await userManager.CheckPasswordAsync(user, model.Password) ||
+            !await userManager.IsInRoleAsync(user, AppRoles.PlatformAdmin))
         {
-            TempData["Error"] = "Invalid email or password.";
+            TempData["Error"] = "This account cannot access the Admin Portal.";
             return View(model);
         }
 
         await HttpContext.SignInAsync(
             CookieAuthenticationDefaults.AuthenticationScheme,
-            BuildPrincipal(user),
+            await BuildPrincipalAsync(user),
             new AuthenticationProperties
             {
                 IsPersistent = true,
@@ -59,15 +63,16 @@ public sealed class AccountController(UserManager<ApplicationUser> userManager) 
         return RedirectToAction(nameof(Login));
     }
 
-    private static ClaimsPrincipal BuildPrincipal(ApplicationUser user)
+    private async Task<ClaimsPrincipal> BuildPrincipalAsync(ApplicationUser user)
     {
-        var claims = new[]
+        var claims = new List<Claim>
         {
             new Claim(ClaimTypes.NameIdentifier, user.Id.ToString()),
             new Claim(ClaimTypes.Name, string.IsNullOrWhiteSpace(user.DisplayName) ? user.Email ?? string.Empty : user.DisplayName),
             new Claim(ClaimTypes.Email, user.Email ?? string.Empty)
         };
 
+        claims.AddRange((await userManager.GetRolesAsync(user)).Select(role => new Claim(ClaimTypes.Role, role)));
         return new ClaimsPrincipal(new ClaimsIdentity(claims, CookieAuthenticationDefaults.AuthenticationScheme));
     }
 }

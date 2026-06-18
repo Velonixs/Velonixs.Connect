@@ -25,12 +25,7 @@ The admin UI is a separate project and is local-only by default. It returns `403
 Admin__AllowRemote=true
 ```
 
-Admin and Portal browser authentication is optional locally. To require sign-in for the browser UIs, seed a first admin user with the `Auth__DefaultAdmin*` settings below and enable:
-
-```text
-Admin__RequireAuthentication=true
-Portal__RequireAuthentication=true
-```
+Admin and Portal browser authentication is mandatory. Anonymous requests are redirected to the appropriate login page.
 
 The browser sign-in pages are:
 
@@ -38,6 +33,26 @@ The browser sign-in pages are:
 http://localhost:5080/admin/login
 http://localhost:5090/portal/login
 ```
+
+Configure the local database connection, data-encryption key, JWT signing key, and first platform-admin credentials with .NET Secret Manager. Never commit these values to `appsettings*.json`.
+
+Generate a 32-byte random key and configure the same Base64 value for all three executable projects:
+
+```text
+DataEncryption__Key=
+```
+
+Also configure:
+
+```text
+ConnectionStrings__RestaurantConnect=
+Auth__SigningKey=
+Auth__DefaultAdminEmail=
+Auth__DefaultAdminPassword=
+WhatsApp__VerifyToken=
+```
+
+See `docs/Data-Security.md` for the encryption scope and production key-management requirements.
 
 On startup, the API auto-applies EF Core migrations and seeds a demo business/catalog when these settings are enabled:
 
@@ -88,6 +103,7 @@ src/Velonixs.Connect.Application     Service contracts and DTOs
 src/Velonixs.Connect.Domain          Entities and domain constants
 src/Velonixs.Connect.Infrastructure  Messaging, external integrations, application services
 src/Velonixs.Connect.Persistence     EF Core, SQL Server, migrations, database initialization
+src/Velonixs.Connect.Shared          Shared role and claim constants
 ```
 
 When real WhatsApp sending is enabled, the welcome options and catalog are sent as WhatsApp interactive list messages. Customers can tap:
@@ -109,7 +125,7 @@ Set these values in environment variables, user secrets, Azure App Service confi
 
 ### Authentication
 
-Authentication plumbing is available but optional locally. To require JWT auth for API controllers, set:
+JWT authentication is enabled for API controllers. Configure:
 
 ```text
 Auth__RequireAuthentication=true
@@ -133,12 +149,19 @@ Then request a bearer token from:
 POST /api/auth/login
 ```
 
-Admin and Portal use cookie authentication for browser sessions. To protect the UI apps, set:
+Admin and Portal always use protected cookie-authenticated sessions.
+
+Roles:
 
 ```text
-Admin__RequireAuthentication=true
-Portal__RequireAuthentication=true
+PlatformAdmin     Accesses the Admin Portal and all businesses
+BusinessOwner     Accesses one business and manages its staff users
+BusinessManager   Manages business operations and catalog availability
+Cashier           Views orders and updates order status
+Staff             Views the business dashboard and operational data
 ```
+
+The platform admin creates a business owner account in the Admin Portal. The business owner then creates manager, cashier, and staff accounts from `Business Portal > Staff Users`. Every Portal account is assigned to one business, and all Portal data is filtered by that assignment.
 
 ### Database
 

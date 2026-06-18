@@ -1,10 +1,14 @@
+using System.Security.Claims;
 using Microsoft.AspNetCore.Authentication.Cookies;
+using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc.Authorization;
 using Velonixs.Connect.Application;
 using Velonixs.Connect.Infrastructure;
+using Velonixs.Connect.Persistence.Identity;
+using Velonixs.Connect.Persistence.Persistence;
+using Velonixs.Connect.Shared.Security;
 
 var builder = WebApplication.CreateBuilder(args);
-var requireAdminAuthentication = builder.Configuration.GetValue<bool>("Admin:RequireAuthentication");
 
 builder.Services.AddApplication();
 builder.Services.AddInfrastructure(builder.Configuration);
@@ -16,18 +20,31 @@ builder.Services
         options.LoginPath = "/admin/login";
         options.LogoutPath = "/admin/logout";
         options.AccessDeniedPath = "/admin/login";
+        options.Events.OnValidatePrincipal = async context =>
+        {
+            var userId = context.Principal?.FindFirstValue(ClaimTypes.NameIdentifier);
+            var userManager = context.HttpContext.RequestServices.GetRequiredService<UserManager<ApplicationUser>>();
+            var user = string.IsNullOrWhiteSpace(userId) ? null : await userManager.FindByIdAsync(userId);
+
+            if (user is null || !user.IsActive || !await userManager.IsInRoleAsync(user, AppRoles.PlatformAdmin))
+            {
+                context.RejectPrincipal();
+            }
+        };
     });
 builder.Services.AddControllersWithViews(options =>
 {
-    if (requireAdminAuthentication)
-    {
-        options.Filters.Add(new AuthorizeFilter());
-    }
+    options.Filters.Add(new AuthorizeFilter());
 });
 builder.Services.AddHealthChecks();
 
 var app = builder.Build();
 var allowRemoteAdmin = builder.Configuration.GetValue<bool>("Admin:AllowRemote");
+
+using (var scope = app.Services.CreateScope())
+{
+    await scope.ServiceProvider.GetRequiredService<DatabaseInitializer>().InitializeAsync();
+}
 
 if (!app.Environment.IsDevelopment())
 {

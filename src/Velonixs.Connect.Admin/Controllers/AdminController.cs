@@ -1,18 +1,24 @@
+using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Velonixs.Connect.Admin.Models;
 using Velonixs.Connect.Application.Abstractions;
 using Velonixs.Connect.Application.Models;
 using Velonixs.Connect.Domain.Entities;
+using Velonixs.Connect.Persistence.Identity;
 using Velonixs.Connect.Persistence.Persistence;
+using Velonixs.Connect.Shared.Security;
 
 namespace Velonixs.Connect.Admin.Controllers;
 
+[Authorize(Roles = AppRoles.PlatformAdmin)]
 public sealed class AdminController(
     IRestaurantService restaurantService,
     IMenuService menuService,
     IOrderService orderService,
-    RestaurantConnectDbContext dbContext) : Controller
+    RestaurantConnectDbContext dbContext,
+    UserManager<ApplicationUser> userManager) : Controller
 {
     private static readonly string[] OrderStatusOptions =
     [
@@ -67,25 +73,65 @@ public sealed class AdminController(
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> CreateRestaurant(RestaurantFormModel form, CancellationToken cancellationToken)
     {
-        if (string.IsNullOrWhiteSpace(form.Name) || string.IsNullOrWhiteSpace(form.WhatsAppPhoneNumberId))
+        if (!ModelState.IsValid)
         {
-            TempData["Error"] = "Restaurant name and WhatsApp phone number id are required.";
+            TempData["Error"] = "Business and owner account details are required. Passwords must be at least 8 characters.";
             return RedirectToAction(nameof(Index));
         }
 
-        var restaurant = await restaurantService.CreateRestaurantAsync(
-            new CreateRestaurantRequest(
-                form.Name,
-                form.BusinessType,
-                form.WhatsAppPhoneNumberId,
-                form.BusinessPhone,
-                form.NotificationEmail,
-                form.StaffWhatsAppNumber,
-                form.Address,
-                form.IsActive),
-            cancellationToken);
+        var ownerEmail = form.OwnerEmail.Trim();
 
-        TempData["Success"] = $"Created {restaurant.Name}.";
+        if (await userManager.FindByEmailAsync(ownerEmail) is not null)
+        {
+            TempData["Error"] = "An account already exists for the owner email.";
+            return RedirectToAction(nameof(Index));
+        }
+
+        await using var transaction = await dbContext.Database.BeginTransactionAsync(cancellationToken);
+
+        var restaurant = await restaurantService.CreateRestaurantAsync(
+                new CreateRestaurantRequest(
+                    form.Name,
+                    form.BusinessType,
+                    form.WhatsAppPhoneNumberId,
+                    form.BusinessPhone,
+                    form.NotificationEmail,
+                    form.StaffWhatsAppNumber,
+                    form.Address,
+                    form.IsActive),
+                cancellationToken);
+
+        var owner = new ApplicationUser
+        {
+            UserName = ownerEmail,
+            Email = ownerEmail,
+            EmailConfirmed = true,
+            DisplayName = form.OwnerName.Trim(),
+            BusinessId = restaurant.Id,
+            IsActive = true
+        };
+
+        var createResult = await userManager.CreateAsync(owner, form.OwnerPassword);
+
+        if (!createResult.Succeeded)
+        {
+            await transaction.RollbackAsync(cancellationToken);
+            TempData["Error"] = string.Join(" ", createResult.Errors.Select(error => error.Description));
+            return RedirectToAction(nameof(Index));
+        }
+
+        var roleResult = await userManager.AddToRoleAsync(owner, AppRoles.BusinessOwner);
+
+        if (!roleResult.Succeeded)
+        {
+            await transaction.RollbackAsync(cancellationToken);
+            TempData["Error"] = string.Join(" ", roleResult.Errors.Select(error => error.Description));
+            return RedirectToAction(nameof(Index));
+        }
+
+        await transaction.CommitAsync(cancellationToken);
+
+        TempData["Success"] = $"Created {restaurant.Name} and owner account {ownerEmail}.";
         return RedirectToAction(nameof(Restaurant), new { id = restaurant.Id });
     }
 
@@ -115,6 +161,23 @@ public sealed class AdminController(
             })
             .Take(20)
             .ToArrayAsync(cancellationToken);
+        var businessUsers = await userManager.Users
+            .AsNoTracking()
+            .Where(x => x.BusinessId == id)
+            .OrderBy(x => x.DisplayName)
+            .ToArrayAsync(cancellationToken);
+        var userSummaries = new List<BusinessUserSummary>();
+
+        foreach (var user in businessUsers)
+        {
+            userSummaries.Add(new BusinessUserSummary
+            {
+                DisplayName = user.DisplayName,
+                Email = user.Email ?? string.Empty,
+                Role = (await userManager.GetRolesAsync(user)).FirstOrDefault() ?? "Unassigned",
+                IsActive = user.IsActive
+            });
+        }
 
         var model = new RestaurantManageViewModel
         {
@@ -125,7 +188,8 @@ public sealed class AdminController(
             Customers = customers,
             ActiveMenuItemCount = menu?.Items.Count(x => x.IsActive && x.IsAvailable) ?? 0,
             PendingOrderCount = orders.Count(x => x.OrderStatus is OrderStatuses.Confirmed or OrderStatuses.Notified),
-            Revenue = orders.Sum(x => x.TotalAmount)
+            Revenue = orders.Sum(x => x.TotalAmount),
+            Users = userSummaries
         };
 
         model.NewItem.ItemCode = (menu?.Items.Select(x => x.ItemCode).DefaultIfEmpty().Max() ?? 0) + 1;
@@ -157,6 +221,51 @@ public sealed class AdminController(
         }
 
         TempData["Success"] = "Restaurant settings saved.";
+        return RedirectToAction(nameof(Restaurant), new { id });
+    }
+
+    [HttpPost("admin/restaurants/{id:guid}/owner")]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> CreateOwner(Guid id, OwnerAccountFormModel form, CancellationToken cancellationToken)
+    {
+        if (!ModelState.IsValid || await restaurantService.GetRestaurantAsync(id, cancellationToken) is null)
+        {
+            TempData["Error"] = "Enter valid owner details. Passwords must be at least 8 characters.";
+            return RedirectToAction(nameof(Restaurant), new { id });
+        }
+
+        var email = form.Email.Trim();
+
+        if (await userManager.FindByEmailAsync(email) is not null)
+        {
+            TempData["Error"] = "An account already exists for this email.";
+            return RedirectToAction(nameof(Restaurant), new { id });
+        }
+
+        var owner = new ApplicationUser
+        {
+            UserName = email,
+            Email = email,
+            EmailConfirmed = true,
+            DisplayName = form.DisplayName.Trim(),
+            BusinessId = id,
+            IsActive = true
+        };
+
+        var result = await userManager.CreateAsync(owner, form.Password);
+
+        if (result.Succeeded)
+        {
+            result = await userManager.AddToRoleAsync(owner, AppRoles.BusinessOwner);
+        }
+
+        if (!result.Succeeded)
+        {
+            TempData["Error"] = string.Join(" ", result.Errors.Select(error => error.Description));
+            return RedirectToAction(nameof(Restaurant), new { id });
+        }
+
+        TempData["Success"] = $"Created owner account {email}.";
         return RedirectToAction(nameof(Restaurant), new { id });
     }
 

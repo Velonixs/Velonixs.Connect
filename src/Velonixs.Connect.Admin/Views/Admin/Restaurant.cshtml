@@ -3,35 +3,35 @@
     ViewData["Title"] = Model.Restaurant.Name;
 }
 
-<section class="page-title">
+<section class="d-flex flex-column flex-sm-row align-items-sm-center justify-content-between gap-3 mb-4">
     <div>
         <p class="eyebrow">@Model.Restaurant.BusinessType</p>
         <h1>@Model.Restaurant.Name</h1>
     </div>
-    <a class="button secondary" asp-action="Index">All businesses</a>
+    <a class="btn btn-outline-success" asp-action="Index">All businesses</a>
 </section>
 
-<section class="metric-grid">
-    <div class="metric">
+<section class="row g-3 mb-4">
+    <div class="col-12 col-sm-6 col-xl-3"><div class="metric h-100">
         <span>Orders</span>
         <strong>@Model.Orders.Count</strong>
         <small>@Model.PendingOrderCount needs attention</small>
-    </div>
-    <div class="metric">
+    </div></div>
+    <div class="col-12 col-sm-6 col-xl-3"><div class="metric h-100">
         <span>Revenue</span>
         <strong>Rs @Model.Revenue.ToString("0.##")</strong>
         <small>All recorded orders</small>
-    </div>
-    <div class="metric">
+    </div></div>
+    <div class="col-12 col-sm-6 col-xl-3"><div class="metric h-100">
         <span>Catalog</span>
         <strong>@Model.ActiveMenuItemCount</strong>
         <small>Available products</small>
-    </div>
-    <div class="metric">
+    </div></div>
+    <div class="col-12 col-sm-6 col-xl-3"><div class="metric h-100">
         <span>Customers</span>
         <strong>@Model.Customers.Count</strong>
         <small>Recent contacts</small>
-    </div>
+    </div></div>
 </section>
 
 <section class="section-band">
@@ -96,8 +96,8 @@
         <h2>Orders</h2>
     </div>
 
-    <div class="table-wrap">
-        <table>
+    <div class="table-responsive">
+        <table class="table table-hover align-middle mb-0">
             <thead>
                 <tr>
                     <th>Order</th>
@@ -117,7 +117,7 @@
                     <td><span class="pill">@order.OrderStatus</span></td>
                     <td>Rs @order.TotalAmount.ToString("0.##")</td>
                     <td>@order.CreatedAt.ToLocalTime().ToString("dd MMM yyyy, hh:mm tt")</td>
-                    <td class="right"><a class="button compact" asp-action="Order" asp-route-id="@order.Id">Open</a></td>
+                    <td class="text-end"><a class="btn btn-sm btn-success" asp-action="Order" asp-route-id="@order.Id">Open</a></td>
                 </tr>
             }
             </tbody>
@@ -232,8 +232,8 @@
     <div class="section-heading">
         <h2>Customers</h2>
     </div>
-    <div class="table-wrap">
-        <table>
+    <div class="table-responsive">
+        <table class="table table-hover align-middle mb-0">
             <thead>
                 <tr>
                     <th>Customer</th>
@@ -252,6 +252,57 @@
                     <td>@customer.OrderCount</td>
                     <td>@customer.LastAddress</td>
                     <td>@customer.LastInteractionAt.ToLocalTime().ToString("dd MMM yyyy, hh:mm tt")</td>
+                </tr>
+            }
+            </tbody>
+        </table>
+    </div>
+</section>
+
+<section class="section-band">
+    <div class="section-heading">
+        <h2>Portal Users</h2>
+    </div>
+    @if (!Model.Users.Any(user => user.Role == Velonixs.Connect.Shared.Security.AppRoles.BusinessOwner))
+    {
+        <form class="row g-3 mb-4" asp-action="CreateOwner" asp-route-id="@Model.Restaurant.Id" method="post">
+            @Html.AntiForgeryToken()
+            <div class="col-12"><p class="text-secondary mb-0">This business has no owner login yet.</p></div>
+            <div class="col-12 col-md-4">
+                <label class="form-label">Owner Name</label>
+                <input class="form-control" asp-for="NewOwner.DisplayName" name="DisplayName" required />
+            </div>
+            <div class="col-12 col-md-4">
+                <label class="form-label">Owner Email</label>
+                <input class="form-control" asp-for="NewOwner.Email" name="Email" type="email" required />
+            </div>
+            <div class="col-12 col-md-4">
+                <label class="form-label">Temporary Password</label>
+                <input class="form-control" asp-for="NewOwner.Password" name="Password" type="password" minlength="8" required />
+            </div>
+            <div class="col-12">
+                <button class="btn btn-success" type="submit">Create owner login</button>
+            </div>
+        </form>
+    }
+    <div class="table-responsive">
+        <table class="table table-hover align-middle mb-0">
+            <thead>
+                <tr>
+                    <th>Name</th>
+                    <th>Email</th>
+                    <th>Role</th>
+                    <th>Status</th>
+                </tr>
+            </thead>
+            <tbody>
+            @foreach (var user in Model.Users)
+            {
+                <tr>
+                    <td>@user.DisplayName</td>
+                    <td>@user.Email</td>
+                    <td><span class="badge text-bg-light border">@user.Role</span></td>
+                    <td><span class="badge @(user.IsActive ? "text-bg-success" : "text-bg-secondary")">@(user.IsActive ? "Active" : "Inactive")</span></td>
                 </tr>
             }
             </tbody>

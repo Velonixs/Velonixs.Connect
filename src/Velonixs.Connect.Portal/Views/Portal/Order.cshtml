@@ -3,34 +3,35 @@
     ViewData["Title"] = Model.Order.OrderNumber;
 }
 
-<section class="page-title">
+<section class="d-flex flex-column flex-sm-row align-items-sm-center justify-content-between gap-3 mb-4">
     <div>
         <p class="eyebrow">@Model.Restaurant.Name</p>
         <h1>@Model.Order.OrderNumber</h1>
     </div>
-    <a class="button secondary" asp-action="Index">Back to dashboard</a>
+    <a class="btn btn-outline-primary" asp-action="Index">Back to dashboard</a>
 </section>
 
-<section class="metric-grid three">
-    <div class="metric">
+<section class="row g-3 mb-4">
+    <div class="col-12 col-md-4"><div class="metric h-100">
         <span>Status</span>
         <strong>@Model.Order.OrderStatus</strong>
         <small>@Model.Order.CreatedAt.ToLocalTime().ToString("dd MMM yyyy, hh:mm tt")</small>
-    </div>
-    <div class="metric">
+    </div></div>
+    <div class="col-12 col-md-4"><div class="metric h-100">
         <span>Total</span>
         <strong>Rs @Model.Order.TotalAmount.ToString("0.##")</strong>
         <small>@Model.Order.Source</small>
-    </div>
-    <div class="metric">
+    </div></div>
+    <div class="col-12 col-md-4"><div class="metric h-100">
         <span>Customer</span>
         <strong>@Model.Order.CustomerName</strong>
         <small>@Model.Order.CustomerPhone</small>
-    </div>
+    </div></div>
 </section>
 
-<section class="section-band split">
-    <div>
+<section class="card shadow-sm mb-4">
+    <div class="card-body row g-4">
+    <div class="col-12 col-lg-8">
         <h2>Products</h2>
         @foreach (var item in Model.Order.Items)
         {
@@ -47,10 +48,11 @@
         <p>@Model.Order.Address</p>
     </div>
 
-    <form class="status-panel" asp-action="UpdateOrderStatus" asp-route-id="@Model.Order.Id" method="post">
+    <form class="col-12 col-lg-4" asp-action="UpdateOrderStatus" asp-route-id="@Model.Order.Id" method="post">
         @Html.AntiForgeryToken()
-        <h2>Update Status</h2>
-        <select name="Status">
+        <div class="card bg-light border-0 p-3">
+        <h2 class="h5">Update Status</h2>
+        <select class="form-select mb-3" name="Status">
             @foreach (var status in Model.StatusOptions)
             {
                 if (status == Model.Order.OrderStatus)
@@ -63,11 +65,14 @@
                 }
             }
         </select>
-        <button class="button" type="submit">Save status</button>
+        <button class="btn btn-primary" type="submit">Save status</button>
+        </div>
     </form>
+    </div>
 </section>
 
-<section class="section-band">
+<section class="card shadow-sm">
+    <div class="card-body">
     <div class="section-heading">
         <h2>Conversation</h2>
     </div>
@@ -82,5 +87,6 @@
             <p>@message.MessageText</p>
         </article>
     }
+    </div>
     </div>
 </section>

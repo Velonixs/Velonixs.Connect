@@ -1,4 +1,6 @@
+using System.ComponentModel.DataAnnotations;
 using Velonixs.Connect.Application.Models;
+using Velonixs.Connect.Shared.Security;
 
 namespace Velonixs.Connect.Portal.Models;
 
@@ -12,6 +14,7 @@ public sealed class PortalDashboardViewModel
     public decimal TodayRevenue { get; set; }
     public int AvailableItemCount { get; set; }
     public IReadOnlyCollection<CustomerPortalSummary> RecentCustomers { get; set; } = Array.Empty<CustomerPortalSummary>();
+    public string CurrentRole { get; set; } = string.Empty;
 }
 
 public sealed class CustomerPortalSummary
@@ -37,4 +40,39 @@ public sealed class PortalOrderStatusFormModel
 public sealed class MenuAvailabilityFormModel
 {
     public bool IsAvailable { get; set; }
+}
+
+public sealed class StaffIndexViewModel
+{
+    public RestaurantResponse Business { get; set; } = null!;
+    public IReadOnlyCollection<StaffUserSummary> Users { get; set; } = Array.Empty<StaffUserSummary>();
+    public CreateStaffUserModel NewUser { get; set; } = new();
+    public IReadOnlyCollection<string> RoleOptions { get; set; } = AppRoles.StaffAssignable;
+}
+
+public sealed class StaffUserSummary
+{
+    public Guid Id { get; set; }
+    public string DisplayName { get; set; } = string.Empty;
+    public string Email { get; set; } = string.Empty;
+    public string Role { get; set; } = string.Empty;
+    public bool IsActive { get; set; }
+}
+
+public sealed class CreateStaffUserModel
+{
+    [Required]
+    public string DisplayName { get; set; } = string.Empty;
+
+    [Required]
+    [EmailAddress]
+    public string Email { get; set; } = string.Empty;
+
+    [Required]
+    [MinLength(8)]
+    [DataType(DataType.Password)]
+    public string Password { get; set; } = string.Empty;
+
+    [Required]
+    public string Role { get; set; } = AppRoles.Staff;
 }

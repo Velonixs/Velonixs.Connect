@@ -16,6 +16,9 @@ Version 1.0 focuses on restaurants while keeping the architecture open for groce
 - Admin dashboard for operations
 - ASP.NET Identity user store
 - JWT login endpoint
+- Role-based Admin and Business Portal access
+- Business-scoped owner, manager, cashier, and staff accounts
+- Bootstrap-responsive browser interfaces
 
 ## Current Implementation Note
 

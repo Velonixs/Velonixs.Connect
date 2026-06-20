@@ -1,0 +1,66 @@
+name: Build and Deploy Velonixs Connect
+
+on:
+  push:
+    branches:
+      - master  # Updated from main to track your master branch
+
+permissions:
+  id-token: write
+  contents: read
+
+jobs:
+  build-and-deploy:
+    runs-on: windows-latest
+
+    steps:
+    - name: Checkout Code
+      uses: actions/checkout@v4
+
+    # Configured to pull the .NET 10 SDK environment natively
+    - name: Setup .NET 10 SDK
+      uses: actions/setup-dotnet@v4
+      with:
+        dotnet-version: '10.0.x'  
+
+    - name: Restore and Build
+      run: |
+        dotnet restore
+        dotnet build --configuration Release
+
+    # 1. Log into Azure securely using your single master credential
+    - name: Log in to Azure
+      uses: azure/login@v2
+      with:
+        creds: ${{ secrets.AZURE_CREDENTIALS }}
+
+    # 2. Compile and Publish all 3 Layers matching your solution files
+    - name: Publish API Layer
+      run: dotnet publish src/Velonixs.Connect.Api/Velonixs.Connect.Api.csproj --configuration Release --output ./publish-api
+
+    - name: Publish Portal Layer
+      run: dotnet publish src/Velonixs.Connect.Portal/Velonixs.Connect.Portal.csproj --configuration Release --output ./publish-portal
+
+    - name: Publish Admin Layer
+      run: dotnet publish src/Velonixs.Connect.Admin/Velonixs.Connect.Admin.csproj --configuration Release --output ./publish-admin
+
+    # 3. Deploy API to Subdomain (api.velonixs.com)
+    - name: Deploy API to Azure
+      uses: azure/webapps-deploy@v3
+      with:
+        app-name: 'velonixs-api'  
+        package: ./publish-api
+
+    # 4. Deploy Portal to Subdomain (portal.velonixs.com)
+    - name: Deploy Portal to Azure
+      uses: azure/webapps-deploy@v3
+      with:
+        app-name: 'velonixs-portal'  
+        package: ./publish-portal
+
+    # 5. Deploy Admin Console to Subdomain (admin.velonixs.com)
+    - name: Deploy Admin to Azure
+      uses: azure/webapps-deploy@v3
+      with:
+        app-name: 'velonixs-admin'  
+        package: ./publish-admin

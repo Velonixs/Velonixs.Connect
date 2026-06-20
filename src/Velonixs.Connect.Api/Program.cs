@@ -13,6 +13,20 @@ builder.Services.AddHttpContextAccessor();
 builder.Services.AddScoped<ApiBusinessAccessService>();
 builder.Services.AddHealthChecks();
 builder.Services.AddOpenApi();
+builder.Services.AddCors(options =>
+{
+    options.AddPolicy("FrontendApps", policy =>
+    {
+        var allowedOrigins = builder.Configuration
+            .GetSection("Cors:AllowedOrigins")
+            .Get<string[]>() ?? [];
+
+        policy
+            .WithOrigins(allowedOrigins)
+            .AllowAnyHeader()
+            .AllowAnyMethod();
+    });
+});
 
 var app = builder.Build();
 
@@ -28,6 +42,8 @@ using (var scope = app.Services.CreateScope())
 }
 
 app.UseHttpsRedirection();
+app.UseRouting();
+app.UseCors("FrontendApps");
 app.UseAuthentication();
 app.UseAuthorization();
 

@@ -52,6 +52,16 @@ Auth__DefaultAdminPassword=
 WhatsApp__VerifyToken=
 ```
 
+For the Azure SQL database, use this connection-string template and replace
+`{your_password}` only in local secrets or Azure App Service configuration:
+
+```text
+Server=tcp:velonixs-sqlserver.database.windows.net,1433;Initial Catalog=velonixsconnect-db;Persist Security Info=False;User ID=velonixsadmin;Password={your_password};MultipleActiveResultSets=False;Encrypt=True;TrustServerCertificate=False;Connection Timeout=30;
+```
+
+EF Core design-time commands read the same `ConnectionStrings__RestaurantConnect`
+and `DataEncryption__Key` variables used by the running application.
+
 See `docs/Data-Security.md` for the encryption scope and production key-management requirements.
 
 On startup, the API auto-applies EF Core migrations and seeds a demo business/catalog when these settings are enabled:

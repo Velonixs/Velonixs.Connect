@@ -8,10 +8,16 @@ public sealed class RestaurantConnectDbContextFactory : IDesignTimeDbContextFact
 {
     public RestaurantConnectDbContext CreateDbContext(string[] args)
     {
-        var connectionString = Environment.GetEnvironmentVariable("DATABASE_CONNECTION_STRING")
-            ?? throw new InvalidOperationException("Set DATABASE_CONNECTION_STRING before running EF design-time commands.");
-        var encryptionKey = Environment.GetEnvironmentVariable("DATA_ENCRYPTION_KEY")
-            ?? throw new InvalidOperationException("Set DATA_ENCRYPTION_KEY before running EF design-time commands.");
+        var connectionString =
+            Environment.GetEnvironmentVariable("ConnectionStrings__RestaurantConnect")
+            ?? Environment.GetEnvironmentVariable("DATABASE_CONNECTION_STRING")
+            ?? throw new InvalidOperationException(
+                "Set ConnectionStrings__RestaurantConnect before running EF design-time commands.");
+        var encryptionKey =
+            Environment.GetEnvironmentVariable("DataEncryption__Key")
+            ?? Environment.GetEnvironmentVariable("DATA_ENCRYPTION_KEY")
+            ?? throw new InvalidOperationException(
+                "Set DataEncryption__Key before running EF design-time commands.");
 
         var options = new DbContextOptionsBuilder<RestaurantConnectDbContext>()
             .UseSqlServer(connectionString)

@@ -17,11 +17,11 @@ jobs:
     - name: Checkout Code
       uses: actions/checkout@v4
 
-    # Configured to pull the .NET 10 SDK environment natively
-    - name: Setup .NET 10 SDK
+    # Configured to pull the .NET 8 SDK environment natively
+    - name: Setup .NET 8 SDK
       uses: actions/setup-dotnet@v4
       with:
-        dotnet-version: '10.0.x'  
+        dotnet-version: '8.0.x'
 
     - name: Restore and Build
       run: |

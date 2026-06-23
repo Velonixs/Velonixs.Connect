@@ -274,6 +274,17 @@ public sealed partial class ConversationService(
         if (normalized == "checkout.delivery")
         {
             draft.IsPickup = false;
+
+            var savedAddress = ResolveSavedDeliveryAddress(customer, draft);
+            if (!string.IsNullOrWhiteSpace(savedAddress))
+            {
+                draft.Address = savedAddress;
+                draft.CheckoutState = "CONFIRMATION_PENDING";
+                SaveDraft(conversation, draft);
+                conversation.CurrentState = ConversationStates.ConfirmationPending;
+                return BuildConfirmationReply(draft);
+            }
+
             draft.CheckoutState = "ADDRESS_PENDING";
             SaveDraft(conversation, draft);
             conversation.CurrentState = ConversationStates.AddressPending;
@@ -287,7 +298,7 @@ public sealed partial class ConversationService(
             draft.CheckoutState = "CONFIRMATION_PENDING";
             SaveDraft(conversation, draft);
             conversation.CurrentState = ConversationStates.ConfirmationPending;
-            return OutgoingReply.TextOnly(MenuTextFormatter.BuildFinalConfirmation(draft));
+            return BuildConfirmationReply(draft);
         }
 
         if (conversation.CurrentState == ConversationStates.AddressPending)
@@ -298,7 +309,7 @@ public sealed partial class ConversationService(
             customer.LastAddress = text;
             SaveDraft(conversation, draft);
             conversation.CurrentState = ConversationStates.ConfirmationPending;
-            return OutgoingReply.TextOnly(MenuTextFormatter.BuildFinalConfirmation(draft));
+            return BuildConfirmationReply(draft);
         }
 
         if (conversation.CurrentState == ConversationStates.ConfirmationPending)
@@ -342,7 +353,8 @@ public sealed partial class ConversationService(
                 : restaurant.Address);
         }
 
-        if (normalized is "main.staff" or "4" or "staff" or "help" or "talk to staff")
+        if (normalized is "main.staff" or "4" or "staff" or "help" or "talk to staff" or
+            "connect restaurant" or "connect to restaurant" or "connect to restaurent")
         {
             conversation.CurrentState = ConversationStates.StaffHandover;
             await notificationService.NotifyStaffHandoverAsync(
@@ -661,6 +673,26 @@ public sealed partial class ConversationService(
         OutgoingReply.ButtonReply(
             "Is this order for delivery or pickup?",
             WhatsAppOrderingMessageBuilder.BuildFulfilmentButtons());
+
+    private static OutgoingReply BuildConfirmationReply(PendingOrderDraft draft) =>
+        OutgoingReply.ButtonReply(
+            MenuTextFormatter.BuildFinalConfirmation(draft),
+            WhatsAppOrderingMessageBuilder.BuildConfirmationButtons());
+
+    private static string? ResolveSavedDeliveryAddress(
+        Customer customer,
+        PendingOrderDraft draft)
+    {
+        if (!string.IsNullOrWhiteSpace(draft.Address) &&
+            !string.Equals(draft.Address, "Pickup", StringComparison.OrdinalIgnoreCase))
+        {
+            return draft.Address;
+        }
+
+        return string.IsNullOrWhiteSpace(customer.LastAddress)
+            ? null
+            : customer.LastAddress;
+    }
 
     private async Task<string> ConfirmOrCancelAsync(
         Domain.Entities.Restaurant restaurant,

@@ -133,7 +133,7 @@ public static class MenuTextFormatter
         builder.AppendLine($"*Total: Rs {FormatAmount(draft.TotalAmount)}*");
         builder.AppendLine($"Address: {draft.Address}");
         builder.AppendLine();
-        builder.AppendLine("Reply YES to confirm or NO to cancel.");
+        builder.AppendLine("Please confirm using the buttons below.");
 
         return builder.ToString().Trim();
     }

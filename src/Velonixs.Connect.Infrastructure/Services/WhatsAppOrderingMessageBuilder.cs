@@ -144,7 +144,7 @@ public static class WhatsAppOrderingMessageBuilder
         {
             new WhatsAppReplyButton("category.list", "Browse Menu"),
             new WhatsAppReplyButton("cart.view", "View Cart"),
-            new WhatsAppReplyButton("main.staff", "Help")
+            new WhatsAppReplyButton("main.staff", "Connect Restaurant")
         };
 
     public static IReadOnlyCollection<WhatsAppReplyButton> BuildCartButtons() =>
@@ -161,6 +161,13 @@ public static class WhatsAppOrderingMessageBuilder
             new WhatsAppReplyButton("checkout.delivery", "Delivery"),
             new WhatsAppReplyButton("checkout.pickup", "Pickup"),
             new WhatsAppReplyButton("cart.cancel", "Cancel")
+        };
+
+    public static IReadOnlyCollection<WhatsAppReplyButton> BuildConfirmationButtons() =>
+        new[]
+        {
+            new WhatsAppReplyButton("yes", "Yes"),
+            new WhatsAppReplyButton("no", "No")
         };
 
     private static string Truncate(string value, int length) =>

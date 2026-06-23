@@ -1,4 +1,3 @@
-using Velonixs.Connect.Application.Models;
 using Velonixs.Connect.Domain.Entities;
 using Velonixs.Connect.Infrastructure.Services;
 using Xunit;
@@ -14,7 +13,7 @@ public sealed class InteractiveOrderingTests
             .Select(index => new MenuCategory { Name = $"Category {index}" })
             .ToArray();
 
-        var sections = new CategoryMessageBuilder().BuildSections(categories, 0, false);
+        var sections = WhatsAppOrderingMessageBuilder.BuildCategorySections(categories, 0, false);
 
         Assert.Single(sections);
         Assert.Equal(9, sections.Single().Rows.Count);
@@ -30,7 +29,7 @@ public sealed class InteractiveOrderingTests
             .Select(index => Item($"Pizza {index}", index * 10, categoryId))
             .ToArray();
 
-        var sections = new MenuMessageBuilder().BuildSections(categoryId, items, 1, true);
+        var sections = WhatsAppOrderingMessageBuilder.BuildItemSections(categoryId, items, 1, true);
         var rows = sections.Single().Rows;
 
         Assert.Equal(10, rows.Count);
@@ -45,63 +44,10 @@ public sealed class InteractiveOrderingTests
     {
         var item = Item("Paneer Pizza", 249);
 
-        var rows = new QuantityMessageBuilder().BuildSections(item).Single().Rows;
+        var rows = WhatsAppOrderingMessageBuilder.BuildQuantitySections(item).Single().Rows;
 
-        Assert.Equal(8, rows.Count);
-        Assert.Equal(
-            new[] { "1", "2", "3", "4", "5", "Custom quantity", "Back to menu", "Back to categories" },
-            rows.Select(x => x.Title));
-    }
-
-    [Fact]
-    public void ItemAddedNavigation_OffersAllFourContinuationChoices()
-    {
-        var selection = new MenuSelection
-        {
-            CurrentCategoryId = Guid.NewGuid(),
-            CurrentCategoryName = "Pizza",
-            CurrentMenuPage = 2,
-            CartId = Guid.NewGuid(),
-            LastSelectedMenuItem = new MenuSelectionItem
-            {
-                MenuItemId = Guid.NewGuid(),
-                MenuItemName = "Paneer Pizza",
-                Quantity = 2
-            }
-        };
-
-        var rows = new CartNavigationMessageBuilder()
-            .BuildItemAddedSections(selection)
-            .Single()
-            .Rows;
-
-        Assert.Equal(4, rows.Count);
-        Assert.Equal(
-            new[] { "menu.continue", "category.list", "cart.view", "cart.checkout" },
-            rows.Select(x => x.Id));
-        Assert.Contains(rows, row => row.Title == "More Pizza");
-    }
-
-    [Fact]
-    public void MenuSelection_KeepsCategoryPageAndCartContext()
-    {
-        var categoryId = Guid.NewGuid();
-        var cartId = Guid.NewGuid();
-        var draft = new PendingOrderDraft
-        {
-            MenuSelection = new MenuSelection
-            {
-                CurrentCategoryId = categoryId,
-                CurrentCategoryName = "Pizza",
-                CurrentMenuPage = 3,
-                CartId = cartId
-            }
-        };
-
-        Assert.Equal(categoryId, draft.SelectedCategoryId);
-        Assert.Equal("Pizza", draft.SelectedCategoryName);
-        Assert.Equal(3, draft.ItemPage);
-        Assert.Equal(cartId, draft.MenuSelection.CartId);
+        Assert.Equal(6, rows.Count);
+        Assert.Equal(new[] { "1", "2", "3", "4", "5", "Custom quantity" }, rows.Select(x => x.Title));
     }
 
     [Fact]

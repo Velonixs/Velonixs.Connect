@@ -93,10 +93,6 @@ public static class DependencyInjection
         services.AddScoped<MenuSearchService>();
         services.AddScoped<FreeTextOrderParser>();
         services.AddScoped<OrderingCartService>();
-        services.AddScoped<ICategoryMessageBuilder, CategoryMessageBuilder>();
-        services.AddScoped<IMenuMessageBuilder, MenuMessageBuilder>();
-        services.AddScoped<IQuantityMessageBuilder, QuantityMessageBuilder>();
-        services.AddScoped<ICartNavigationMessageBuilder, CartNavigationMessageBuilder>();
         services.AddScoped<IConversationService, ConversationService>();
         services.AddScoped<INotificationService, NotificationService>();
         services.AddScoped<IAuthTokenService, AuthTokenService>();

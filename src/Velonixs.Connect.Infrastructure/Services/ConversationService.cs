@@ -180,7 +180,7 @@ public sealed partial class ConversationService(
                 cancellationToken);
         }
 
-        if (normalized is "menu.back" or "back to menu")
+        if (normalized is "menu.continue" or "menu.back" or "back to menu")
         {
             return await BuildCurrentCategoryReplyAsync(
                 restaurant,
@@ -252,12 +252,18 @@ public sealed partial class ConversationService(
 
         if (normalized is "cart.add_more" or "add more" or "more")
         {
-            return await BuildCategoryReplyAsync(
-                restaurant,
-                conversation,
-                draft,
-                0,
-                cancellationToken);
+            return draft.MenuSelection.CurrentCategoryId.HasValue
+                ? await BuildCurrentCategoryReplyAsync(
+                    restaurant,
+                    conversation,
+                    draft,
+                    cancellationToken)
+                : await BuildCategoryReplyAsync(
+                    restaurant,
+                    conversation,
+                    draft,
+                    0,
+                    cancellationToken);
         }
 
         if (normalized is "cart.cancel" or "cancel" or "stop")
@@ -613,10 +619,12 @@ public sealed partial class ConversationService(
         AddToDraft(draft, item, quantity);
         draft.SelectedMenuItemId = null;
         SaveDraft(conversation, draft);
-        return BuildCartReply(
-            conversation,
-            draft,
-            $"✓ {item.Name} x{quantity} added.");
+        conversation.CurrentState = ConversationStates.ItemSelection;
+        return OutgoingReply.List(
+            $"✓ {item.Name} x{quantity} added.\n\nWhat would you like to do?",
+            "Continue",
+            cartNavigationMessageBuilder.BuildItemAddedSections(draft.MenuSelection),
+            $"Cart total: Rs {draft.TotalAmount:0.##}");
     }
 
     private void AddToDraft(PendingOrderDraft draft, MenuItem item, int quantity)
@@ -648,8 +656,7 @@ public sealed partial class ConversationService(
 
     private OutgoingReply BuildCartReply(
         Conversation conversation,
-        PendingOrderDraft draft,
-        string? prefix = null)
+        PendingOrderDraft draft)
     {
         if (draft.Items.Count == 0)
         {
@@ -660,13 +667,8 @@ public sealed partial class ConversationService(
         }
 
         conversation.CurrentState = ConversationStates.CartReview;
-        var cartText = MenuTextFormatter.BuildCartSummary(draft);
-        var bodyText = string.IsNullOrWhiteSpace(prefix)
-            ? cartText
-            : $"{prefix}\n\n{cartText}";
-
         return OutgoingReply.ButtonReply(
-            bodyText,
+            MenuTextFormatter.BuildCartSummary(draft),
             cartNavigationMessageBuilder.BuildCartButtons());
     }
 

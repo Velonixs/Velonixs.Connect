@@ -127,7 +127,7 @@ public sealed class QuantityMessageBuilder : IQuantityMessageBuilder
     }
 }
 
-/// <summary>Builds cart, checkout, and add-more navigation controls.</summary>
+/// <summary>Builds cart, checkout, and continue-shopping navigation controls.</summary>
 public sealed class CartNavigationMessageBuilder : ICartNavigationMessageBuilder
 {
     public IReadOnlyCollection<WhatsAppReplyButton> BuildMainMenuButtons() =>
@@ -153,6 +153,33 @@ public sealed class CartNavigationMessageBuilder : ICartNavigationMessageBuilder
             new WhatsAppReplyButton("checkout.pickup", "Pickup"),
             new WhatsAppReplyButton("cart.cancel", "Cancel")
         };
+
+    public IReadOnlyCollection<WhatsAppInteractiveListSection> BuildItemAddedSections(
+        MenuSelection selection)
+    {
+        var currentCategory = string.IsNullOrWhiteSpace(selection.CurrentCategoryName)
+            ? "Current Category"
+            : selection.CurrentCategoryName;
+
+        return new[]
+        {
+            new WhatsAppInteractiveListSection(
+                "Continue shopping",
+                new[]
+                {
+                    new WhatsAppInteractiveListRow(
+                        "menu.continue",
+                        MessageText.Truncate($"More {currentCategory}"),
+                        "Continue in this category"),
+                    new WhatsAppInteractiveListRow(
+                        "category.list",
+                        "Other categories",
+                        "Browse another category"),
+                    new WhatsAppInteractiveListRow("cart.view", "View cart"),
+                    new WhatsAppInteractiveListRow("cart.checkout", "Checkout")
+                })
+        };
+    }
 }
 
 internal static class MessageText

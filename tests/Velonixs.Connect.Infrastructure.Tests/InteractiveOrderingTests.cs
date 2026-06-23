@@ -54,13 +54,32 @@ public sealed class InteractiveOrderingTests
     }
 
     [Fact]
-    public void CartNavigation_OffersAddMoreCheckoutAndCancel()
+    public void ItemAddedNavigation_OffersAllFourContinuationChoices()
     {
-        var buttons = new CartNavigationMessageBuilder().BuildCartButtons();
+        var selection = new MenuSelection
+        {
+            CurrentCategoryId = Guid.NewGuid(),
+            CurrentCategoryName = "Pizza",
+            CurrentMenuPage = 2,
+            CartId = Guid.NewGuid(),
+            LastSelectedMenuItem = new MenuSelectionItem
+            {
+                MenuItemId = Guid.NewGuid(),
+                MenuItemName = "Paneer Pizza",
+                Quantity = 2
+            }
+        };
 
+        var rows = new CartNavigationMessageBuilder()
+            .BuildItemAddedSections(selection)
+            .Single()
+            .Rows;
+
+        Assert.Equal(4, rows.Count);
         Assert.Equal(
-            new[] { "cart.add_more", "cart.checkout", "cart.cancel" },
-            buttons.Select(x => x.Id));
+            new[] { "menu.continue", "category.list", "cart.view", "cart.checkout" },
+            rows.Select(x => x.Id));
+        Assert.Contains(rows, row => row.Title == "More Pizza");
     }
 
     [Fact]

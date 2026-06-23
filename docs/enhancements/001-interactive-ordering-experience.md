@@ -10,8 +10,8 @@ The previous WhatsApp flow rendered the restaurant's complete menu as a long tex
 2. Paginated category list containing only categories with active, available items.
 3. Paginated item list for the selected category.
 4. Quantity list with quick choices 1-5, a custom quantity option, and back navigation.
-5. After quantity selection, the cart summary is shown immediately with the item-added confirmation.
-6. Cart summary with Add More, Checkout, and Cancel reply buttons. Add More returns to the category list.
+5. Item-added navigation that keeps the current category and page expanded, allowing the customer to continue in that category, change category, view the cart, or checkout.
+6. Cart summary with Add More, Checkout, and Cancel reply buttons. Add More resumes the current category when context exists.
 7. Customer name collection when the WhatsApp profile does not provide one.
 8. Delivery or Pickup selection, followed by address collection for delivery.
 9. Final summary requiring an explicit YES or NO.
@@ -41,7 +41,7 @@ The full text menu is sent only when the customer explicitly types `Full Menu`.
 - `category.list`, `category.page:{page}`, `category.select:{categoryId}`
 - `item.page:{categoryId}:{page}`, `item.select:{itemId}`
 - `quantity.select:{itemId}:{quantity}`, `quantity.custom:{itemId}`
-- `menu.back`
+- `menu.continue`, `menu.back`
 - `cart.view`, `cart.add_more`, `cart.checkout`, `cart.cancel`
 - `checkout.delivery`, `checkout.pickup`
 
@@ -61,7 +61,7 @@ The webhook passes these identifiers to the conversation service as command text
 - [x] Item pagination includes previous/next/category/cart actions.
 - [x] Quantity selection includes 1-5 and custom quantity.
 - [x] Quantity selection includes Back to Menu and Back to Categories without clearing the cart.
-- [x] Quantity selection immediately shows the cart with Add More, Checkout, and Cancel.
+- [x] Item-added navigation exposes continue category, other categories, cart, and checkout.
 - [x] Current category, page, last selected item, and cart identity are retained in selection state.
 - [x] Cart merges duplicate items and recalculates line and grand totals.
 - [x] Search filters inactive/unavailable items and ranks exact matches.

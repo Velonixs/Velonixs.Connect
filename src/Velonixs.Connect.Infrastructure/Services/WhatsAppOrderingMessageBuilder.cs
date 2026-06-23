@@ -112,6 +112,33 @@ public static class WhatsAppOrderingMessageBuilder
         return new[] { new WhatsAppInteractiveListSection("Quantity", rows) };
     }
 
+    public static IReadOnlyCollection<WhatsAppInteractiveListSection> BuildItemAddedSections(
+        string? categoryName)
+    {
+        var currentCategory = string.IsNullOrWhiteSpace(categoryName)
+            ? "Current category"
+            : categoryName;
+
+        return new[]
+        {
+            new WhatsAppInteractiveListSection(
+                "Continue",
+                new[]
+                {
+                    new WhatsAppInteractiveListRow(
+                        "menu.continue",
+                        Truncate($"More {currentCategory}", 24),
+                        "Select another item"),
+                    new WhatsAppInteractiveListRow(
+                        "category.list",
+                        "Change category",
+                        "Browse other items"),
+                    new WhatsAppInteractiveListRow("cart.view", "View cart"),
+                    new WhatsAppInteractiveListRow("cart.checkout", "Checkout")
+                })
+        };
+    }
+
     public static IReadOnlyCollection<WhatsAppReplyButton> BuildMainMenuButtons() =>
         new[]
         {

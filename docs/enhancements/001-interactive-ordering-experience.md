@@ -10,11 +10,13 @@ The previous WhatsApp flow rendered the restaurant's complete menu as a long tex
 2. Paginated category list containing only categories with active, available items.
 3. Paginated item list for the selected category.
 4. Quantity list with quick choices 1-5 and a custom quantity option.
-5. Cart summary with Add More, Checkout, and Cancel reply buttons.
-6. Customer name collection when the WhatsApp profile does not provide one.
-7. Delivery or Pickup selection, followed by address collection for delivery.
-8. Final summary requiring an explicit YES or NO.
-9. Order creation and existing restaurant staff notification after YES.
+5. Item-added confirmation with a Continue list.
+6. Continue lets the customer select another item in the same category, change category, view the cart, or checkout.
+7. Cart summary with Add More, Checkout, and Cancel reply buttons.
+8. Customer name collection when the WhatsApp profile does not provide one.
+9. Delivery or Pickup selection, followed by address collection for delivery.
+10. Final summary requiring an explicit YES or NO.
+11. Order creation and existing restaurant staff notification after YES.
 
 Customers may also type an item name at any point. Exact or strong single matches proceed to quantity selection; multiple matches are returned as a selectable list. Natural messages such as `2 Paneer Pizza and 1 Veg Burger` populate the cart when every item is matched confidently.
 
@@ -38,6 +40,7 @@ The full text menu is sent only when the customer explicitly types `Full Menu`.
 - `category.list`, `category.page:{page}`, `category.select:{categoryId}`
 - `item.page:{categoryId}:{page}`, `item.select:{itemId}`
 - `quantity.select:{itemId}:{quantity}`, `quantity.custom:{itemId}`
+- `menu.continue`
 - `cart.view`, `cart.add_more`, `cart.checkout`, `cart.cancel`
 - `checkout.delivery`, `checkout.pickup`
 
@@ -56,6 +59,7 @@ The webhook passes these identifiers to the conversation service as command text
 - [x] Category list generation and pagination stay within ten rows.
 - [x] Item pagination includes previous/next/category/cart actions.
 - [x] Quantity selection includes 1-5 and custom quantity.
+- [x] Item-added confirmation exposes Continue choices for another item, category change, cart, and checkout.
 - [x] Cart merges duplicate items and recalculates line and grand totals.
 - [x] Search filters inactive/unavailable items and ranks exact matches.
 - [x] Free-text parsing handles multi-item natural order messages.

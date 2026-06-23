@@ -63,6 +63,25 @@ public sealed class InteractiveOrderingTests
     }
 
     [Fact]
+    public void ConfirmationNavigation_OffersYesAndNoButtons()
+    {
+        var buttons = WhatsAppOrderingMessageBuilder.BuildConfirmationButtons();
+
+        Assert.Equal(new[] { "yes", "no" }, buttons.Select(x => x.Id));
+        Assert.Equal(new[] { "Yes", "No" }, buttons.Select(x => x.Title));
+    }
+
+    [Fact]
+    public void MainMenuNavigation_UsesConnectRestaurantButton()
+    {
+        var buttons = WhatsAppOrderingMessageBuilder.BuildMainMenuButtons();
+
+        Assert.Contains(buttons, button =>
+            button.Id == "main.staff" && button.Title == "Connect Restaurant");
+        Assert.All(buttons, button => Assert.True(button.Title.Length <= 20));
+    }
+
+    [Fact]
     public void CartCalculation_MergesItemsAndRecalculatesTotals()
     {
         var draft = new PendingOrderDraft();
@@ -143,7 +162,7 @@ public sealed class InteractiveOrderingTests
         Assert.Contains("3 x Paneer Pizza", message);
         Assert.Contains("Rs 747", message);
         Assert.Contains("Address: Pickup", message);
-        Assert.Contains("Reply YES", message);
+        Assert.Contains("buttons below", message);
     }
 
     private static MenuItem Item(

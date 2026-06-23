@@ -121,7 +121,7 @@ When real WhatsApp sending is enabled, the welcome options and catalog are sent 
 - View Menu
 - Place Order
 - Restaurant Location
-- Talk to Staff
+- Connect Restaurant
 
 The catalog list lets a customer tap one product, then tap a quantity from 1 to 5. Multi-product orders still use text format, for example:
 

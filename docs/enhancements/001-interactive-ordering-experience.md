@@ -6,7 +6,7 @@ The previous WhatsApp flow rendered the restaurant's complete menu as a long tex
 
 ## Proposed customer flow
 
-1. Welcome message with Browse Menu, View Cart, and Help reply buttons.
+1. Welcome message with Browse Menu, View Cart, and Connect Restaurant reply buttons.
 2. Paginated category list containing only categories with active, available items.
 3. Paginated item list for the selected category.
 4. Quantity list with quick choices 1-5 and a custom quantity option.
@@ -14,8 +14,8 @@ The previous WhatsApp flow rendered the restaurant's complete menu as a long tex
 6. Continue lets the customer select another item in the same category, change category, view the cart, or checkout.
 7. Cart summary with Add More, Checkout, and Cancel reply buttons.
 8. Customer name collection when the WhatsApp profile does not provide one.
-9. Delivery or Pickup selection, followed by address collection for delivery.
-10. Final summary requiring an explicit YES or NO.
+9. Delivery or Pickup selection. Delivery reuses the customer's saved address when one exists; otherwise the address is collected and saved.
+10. Final summary with explicit Yes and No reply buttons.
 11. Order creation and existing restaurant staff notification after YES.
 
 Customers may also type an item name at any point. Exact or strong single matches proceed to quantity selection; multiple matches are returned as a selectable list. Natural messages such as `2 Paneer Pizza and 1 Veg Burger` populate the cart when every item is matched confidently.
@@ -43,6 +43,7 @@ The full text menu is sent only when the customer explicitly types `Full Menu`.
 - `menu.continue`
 - `cart.view`, `cart.add_more`, `cart.checkout`, `cart.cancel`
 - `checkout.delivery`, `checkout.pickup`
+- `yes`, `no`
 
 The webhook passes these identifiers to the conversation service as command text. Legacy identifiers are still translated as before.
 
@@ -64,6 +65,8 @@ The webhook passes these identifiers to the conversation service as command text
 - [x] Search filters inactive/unavailable items and ranks exact matches.
 - [x] Free-text parsing handles multi-item natural order messages.
 - [x] Checkout confirmation includes customer, items, quantities, line totals, grand total, and delivery/pickup.
+- [x] Delivery checkout saves the first address and reuses it for future orders.
+- [x] Order confirmation is sent with Yes and No reply buttons.
 - [ ] Exercise the Meta test number with real list and reply-button payloads.
 - [ ] Confirm staff WhatsApp/email notification using production-like credentials.
 - [ ] Verify concurrent conversations for two restaurants use isolated menus and carts.

@@ -69,6 +69,92 @@ public sealed class ConversationContinuationFlowTests
         Assert.Contains(finalDraft.Items, item => item.ItemName == "Farmhouse Pizza" && item.Quantity == 1);
     }
 
+    [Fact]
+    public async Task DeliveryCheckout_WithSavedAddress_SkipsAddressPromptAndShowsYesNoButtons()
+    {
+        await using var dbContext = CreateDbContext();
+        var restaurant = new Restaurant
+        {
+            Name = "99 Restaurant",
+            WhatsAppPhoneNumberId = "phone-id"
+        };
+        var category = new MenuCategory
+        {
+            Restaurant = restaurant,
+            Name = "Main",
+            DisplayOrder = 1
+        };
+        var item = MenuItem(restaurant, category, "Paneer Butter Masala", 220, 1);
+        var customer = new Customer
+        {
+            Restaurant = restaurant,
+            PhoneNumber = "919999999999",
+            Name = "Rajesh Pandit",
+            LastAddress = "Saved Street 123"
+        };
+
+        dbContext.AddRange(restaurant, category, item, customer);
+        await dbContext.SaveChangesAsync();
+
+        var sender = new FakeMessageSender();
+        var service = CreateService(dbContext, sender);
+
+        await AddOneItemToCart(service, category, item, 4);
+        await Send(service, "cart.checkout");
+        var confirmation = await Send(service, "checkout.delivery");
+
+        Assert.DoesNotContain("Please share your delivery address", confirmation.ReplyText);
+        Assert.Contains("Please confirm your order", confirmation.ReplyText);
+        Assert.Contains("Address: Saved Street 123", confirmation.ReplyText);
+        Assert.Equal(new[] { "yes", "no" }, sender.LastButtons.Select(x => x.Id));
+
+        var conversation = await dbContext.Conversations.SingleAsync();
+        var draft = ReadDraft(conversation);
+
+        Assert.Equal("Saved Street 123", draft.Address);
+        Assert.Equal(ConversationStates.ConfirmationPending, conversation.CurrentState);
+    }
+
+    [Fact]
+    public async Task DeliveryCheckout_FirstAddressEntry_SavesAddressAndShowsYesNoButtons()
+    {
+        await using var dbContext = CreateDbContext();
+        var restaurant = new Restaurant
+        {
+            Name = "99 Restaurant",
+            WhatsAppPhoneNumberId = "phone-id"
+        };
+        var category = new MenuCategory
+        {
+            Restaurant = restaurant,
+            Name = "Main",
+            DisplayOrder = 1
+        };
+        var item = MenuItem(restaurant, category, "Paneer Butter Masala", 220, 1);
+
+        dbContext.AddRange(restaurant, category, item);
+        await dbContext.SaveChangesAsync();
+
+        var sender = new FakeMessageSender();
+        var service = CreateService(dbContext, sender);
+
+        await AddOneItemToCart(service, category, item, 4);
+        await Send(service, "cart.checkout");
+        var addressPrompt = await Send(service, "checkout.delivery");
+
+        Assert.Contains("Please share your delivery address", addressPrompt.ReplyText);
+
+        var confirmation = await Send(service, "Abcds");
+
+        Assert.Contains("Please confirm your order", confirmation.ReplyText);
+        Assert.Contains("Address: Abcds", confirmation.ReplyText);
+        Assert.Equal(new[] { "yes", "no" }, sender.LastButtons.Select(x => x.Id));
+
+        var customer = await dbContext.Customers.SingleAsync();
+
+        Assert.Equal("Abcds", customer.LastAddress);
+    }
+
     private static ConversationService CreateService(
         RestaurantConnectDbContext dbContext,
         IWhatsAppMessageSender sender)
@@ -103,6 +189,17 @@ public sealed class ConversationContinuationFlowTests
                 Guid.NewGuid().ToString("N"),
                 "Customer"));
 
+    private static async Task AddOneItemToCart(
+        IConversationService service,
+        MenuCategory category,
+        MenuItem item,
+        int quantity)
+    {
+        await Send(service, $"category.select:{category.Id}");
+        await Send(service, $"item.select:{item.Id}");
+        await Send(service, $"quantity.select:{item.Id}:{quantity}");
+    }
+
     private static PendingOrderDraft ReadDraft(Conversation conversation) =>
         JsonSerializer.Deserialize<PendingOrderDraft>(
             conversation.TempOrderJson!,
@@ -135,6 +232,8 @@ public sealed class ConversationContinuationFlowTests
         public string? LastFooterText { get; private set; }
         public IReadOnlyCollection<WhatsAppInteractiveListSection> LastSections { get; private set; } =
             Array.Empty<WhatsAppInteractiveListSection>();
+        public IReadOnlyCollection<WhatsAppReplyButton> LastButtons { get; private set; } =
+            Array.Empty<WhatsAppReplyButton>();
 
         public Task<WhatsAppSendResult> SendTextMessageAsync(
             string phoneNumberId,
@@ -164,8 +263,12 @@ public sealed class ConversationContinuationFlowTests
             string bodyText,
             IReadOnlyCollection<WhatsAppReplyButton> buttons,
             string? footerText = null,
-            CancellationToken cancellationToken = default) =>
-            Task.FromResult(new WhatsAppSendResult(true, false));
+            CancellationToken cancellationToken = default)
+        {
+            LastButtons = buttons;
+            LastFooterText = footerText;
+            return Task.FromResult(new WhatsAppSendResult(true, false));
+        }
     }
 
     private sealed class FakeNotificationService : INotificationService

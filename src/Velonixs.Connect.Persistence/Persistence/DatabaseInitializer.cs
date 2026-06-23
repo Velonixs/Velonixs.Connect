@@ -183,7 +183,7 @@ public sealed class DatabaseInitializer(
             WhatsAppPhoneNumberId = demoPhoneNumberId,
             BusinessPhone = "+918055572840",
             NotificationEmail = "info@velonixs.com",
-            StaffWhatsAppNumber = "8080225080",
+            StaffWhatsAppNumber = "9905544835",
             Address = "Rajarhat, Kolkata, West Bengal, India",
             IsActive = true
         };

@@ -1,25 +1,27 @@
 using System.Globalization;
+using Velonixs.Connect.Application.Abstractions;
 using Velonixs.Connect.Application.Models;
 using Velonixs.Connect.Domain.Entities;
 
 namespace Velonixs.Connect.Infrastructure.Services;
 
-public static class WhatsAppOrderingMessageBuilder
+/// <summary>Builds WhatsApp category list messages with bounded pagination.</summary>
+public sealed class CategoryMessageBuilder : ICategoryMessageBuilder
 {
-    public const int CategoryPageSize = 8;
-    public const int ItemPageSize = 6;
+    public int PageSize => 8;
 
-    public static IReadOnlyCollection<WhatsAppInteractiveListSection> BuildCategorySections(
+    public IReadOnlyCollection<WhatsAppInteractiveListSection> BuildSections(
         IReadOnlyList<MenuCategory> categories,
         int page,
         bool hasCart)
     {
         var safePage = Math.Max(0, page);
-        var pageItems = categories.Skip(safePage * CategoryPageSize).Take(CategoryPageSize).ToArray();
-        var rows = pageItems
+        var rows = categories
+            .Skip(safePage * PageSize)
+            .Take(PageSize)
             .Select(category => new WhatsAppInteractiveListRow(
                 $"category.select:{category.Id}",
-                Truncate(category.Name, 24),
+                MessageText.Truncate(category.Name),
                 "Browse available items"))
             .ToList();
 
@@ -28,7 +30,7 @@ public static class WhatsAppOrderingMessageBuilder
             rows.Add(new WhatsAppInteractiveListRow($"category.page:{safePage - 1}", "Previous categories"));
         }
 
-        if ((safePage + 1) * CategoryPageSize < categories.Count)
+        if ((safePage + 1) * PageSize < categories.Count)
         {
             rows.Add(new WhatsAppInteractiveListRow($"category.page:{safePage + 1}", "More categories"));
         }
@@ -40,8 +42,14 @@ public static class WhatsAppOrderingMessageBuilder
 
         return new[] { new WhatsAppInteractiveListSection("Categories", rows.Take(10).ToArray()) };
     }
+}
 
-    public static IReadOnlyCollection<WhatsAppInteractiveListSection> BuildItemSections(
+/// <summary>Builds category-scoped WhatsApp menu lists and search results.</summary>
+public sealed class MenuMessageBuilder : IMenuMessageBuilder
+{
+    public int PageSize => 6;
+
+    public IReadOnlyCollection<WhatsAppInteractiveListSection> BuildSections(
         Guid categoryId,
         IReadOnlyList<MenuItem> items,
         int page,
@@ -49,12 +57,12 @@ public static class WhatsAppOrderingMessageBuilder
     {
         var safePage = Math.Max(0, page);
         var rows = items
-            .Skip(safePage * ItemPageSize)
-            .Take(ItemPageSize)
+            .Skip(safePage * PageSize)
+            .Take(PageSize)
             .Select(item => new WhatsAppInteractiveListRow(
                 $"item.select:{item.Id}",
-                Truncate(item.Name, 24),
-                $"Rs {FormatAmount(item.Price)}"))
+                MessageText.Truncate(item.Name),
+                $"Rs {MessageText.FormatAmount(item.Price)}"))
             .ToList();
 
         if (safePage > 0)
@@ -64,7 +72,7 @@ public static class WhatsAppOrderingMessageBuilder
                 "Previous items"));
         }
 
-        if ((safePage + 1) * ItemPageSize < items.Count)
+        if ((safePage + 1) * PageSize < items.Count)
         {
             rows.Add(new WhatsAppInteractiveListRow(
                 $"item.page:{categoryId}:{safePage + 1}",
@@ -81,22 +89,26 @@ public static class WhatsAppOrderingMessageBuilder
         return new[] { new WhatsAppInteractiveListSection("Available items", rows.Take(10).ToArray()) };
     }
 
-    public static IReadOnlyCollection<WhatsAppInteractiveListSection> BuildSearchSections(
+    public IReadOnlyCollection<WhatsAppInteractiveListSection> BuildSearchSections(
         IReadOnlyList<MenuItem> items)
     {
         var rows = items.Take(9)
             .Select(item => new WhatsAppInteractiveListRow(
                 $"item.select:{item.Id}",
-                Truncate(item.Name, 24),
-                $"Rs {FormatAmount(item.Price)}"))
+                MessageText.Truncate(item.Name),
+                $"Rs {MessageText.FormatAmount(item.Price)}"))
             .Append(new WhatsAppInteractiveListRow("category.list", "Browse categories"))
             .Take(10)
             .ToArray();
 
         return new[] { new WhatsAppInteractiveListSection("Matching items", rows) };
     }
+}
 
-    public static IReadOnlyCollection<WhatsAppInteractiveListSection> BuildQuantitySections(MenuItem item)
+/// <summary>Builds quantity choices and non-destructive back navigation.</summary>
+public sealed class QuantityMessageBuilder : IQuantityMessageBuilder
+{
+    public IReadOnlyCollection<WhatsAppInteractiveListSection> BuildSections(MenuItem item)
     {
         var rows = Enumerable.Range(1, 5)
             .Select(quantity => new WhatsAppInteractiveListRow(
@@ -107,12 +119,18 @@ public static class WhatsAppOrderingMessageBuilder
                 $"quantity.custom:{item.Id}",
                 "Custom quantity",
                 "Type the quantity you need"))
+            .Append(new WhatsAppInteractiveListRow("menu.back", "Back to menu"))
+            .Append(new WhatsAppInteractiveListRow("category.list", "Back to categories"))
             .ToArray();
 
         return new[] { new WhatsAppInteractiveListSection("Quantity", rows) };
     }
+}
 
-    public static IReadOnlyCollection<WhatsAppReplyButton> BuildMainMenuButtons() =>
+/// <summary>Builds cart, checkout, and continue-shopping navigation controls.</summary>
+public sealed class CartNavigationMessageBuilder : ICartNavigationMessageBuilder
+{
+    public IReadOnlyCollection<WhatsAppReplyButton> BuildMainMenuButtons() =>
         new[]
         {
             new WhatsAppReplyButton("category.list", "Browse Menu"),
@@ -120,7 +138,7 @@ public static class WhatsAppOrderingMessageBuilder
             new WhatsAppReplyButton("main.staff", "Help")
         };
 
-    public static IReadOnlyCollection<WhatsAppReplyButton> BuildCartButtons() =>
+    public IReadOnlyCollection<WhatsAppReplyButton> BuildCartButtons() =>
         new[]
         {
             new WhatsAppReplyButton("cart.add_more", "Add More"),
@@ -128,7 +146,7 @@ public static class WhatsAppOrderingMessageBuilder
             new WhatsAppReplyButton("cart.cancel", "Cancel")
         };
 
-    public static IReadOnlyCollection<WhatsAppReplyButton> BuildFulfilmentButtons() =>
+    public IReadOnlyCollection<WhatsAppReplyButton> BuildFulfilmentButtons() =>
         new[]
         {
             new WhatsAppReplyButton("checkout.delivery", "Delivery"),
@@ -136,9 +154,39 @@ public static class WhatsAppOrderingMessageBuilder
             new WhatsAppReplyButton("cart.cancel", "Cancel")
         };
 
-    private static string Truncate(string value, int length) =>
+    public IReadOnlyCollection<WhatsAppInteractiveListSection> BuildItemAddedSections(
+        MenuSelection selection)
+    {
+        var currentCategory = string.IsNullOrWhiteSpace(selection.CurrentCategoryName)
+            ? "Current Category"
+            : selection.CurrentCategoryName;
+
+        return new[]
+        {
+            new WhatsAppInteractiveListSection(
+                "Continue shopping",
+                new[]
+                {
+                    new WhatsAppInteractiveListRow(
+                        "menu.continue",
+                        MessageText.Truncate($"More {currentCategory}"),
+                        "Continue in this category"),
+                    new WhatsAppInteractiveListRow(
+                        "category.list",
+                        "Other categories",
+                        "Browse another category"),
+                    new WhatsAppInteractiveListRow("cart.view", "View cart"),
+                    new WhatsAppInteractiveListRow("cart.checkout", "Checkout")
+                })
+        };
+    }
+}
+
+internal static class MessageText
+{
+    public static string Truncate(string value, int length = 24) =>
         value.Length <= length ? value : value[..length];
 
-    private static string FormatAmount(decimal amount) =>
+    public static string FormatAmount(decimal amount) =>
         amount.ToString("0.##", CultureInfo.InvariantCulture);
 }

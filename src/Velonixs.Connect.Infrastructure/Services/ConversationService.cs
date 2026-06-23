@@ -16,6 +16,10 @@ public sealed partial class ConversationService(
     MenuSearchService menuSearchService,
     FreeTextOrderParser freeTextOrderParser,
     OrderingCartService cartService,
+    ICategoryMessageBuilder categoryMessageBuilder,
+    IMenuMessageBuilder menuMessageBuilder,
+    IQuantityMessageBuilder quantityMessageBuilder,
+    ICartNavigationMessageBuilder cartNavigationMessageBuilder,
     ILogger<ConversationService> logger) : IConversationService
 {
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
@@ -176,6 +180,15 @@ public sealed partial class ConversationService(
                 cancellationToken);
         }
 
+        if (normalized is "menu.continue" or "menu.back" or "back to menu")
+        {
+            return await BuildCurrentCategoryReplyAsync(
+                restaurant,
+                conversation,
+                draft,
+                cancellationToken);
+        }
+
         if (normalized.StartsWith("select_item:", StringComparison.OrdinalIgnoreCase) &&
             int.TryParse(normalized["select_item:".Length..], out var legacyItemCode))
         {
@@ -239,7 +252,18 @@ public sealed partial class ConversationService(
 
         if (normalized is "cart.add_more" or "add more" or "more")
         {
-            return await BuildCategoryReplyAsync(restaurant, conversation, draft, 0, cancellationToken);
+            return draft.MenuSelection.CurrentCategoryId.HasValue
+                ? await BuildCurrentCategoryReplyAsync(
+                    restaurant,
+                    conversation,
+                    draft,
+                    cancellationToken)
+                : await BuildCategoryReplyAsync(
+                    restaurant,
+                    conversation,
+                    draft,
+                    0,
+                    cancellationToken);
         }
 
         if (normalized is "cart.cancel" or "cancel" or "stop")
@@ -318,7 +342,7 @@ public sealed partial class ConversationService(
             {
                 foreach (var line in legacyOrderLines)
                 {
-                    cartService.AddOrUpdate(draft, legacyItems[line.ItemCode], line.Quantity);
+                    AddToDraft(draft, legacyItems[line.ItemCode], line.Quantity);
                 }
 
                 SaveDraft(conversation, draft);
@@ -350,7 +374,7 @@ public sealed partial class ConversationService(
         {
             foreach (var parsedItem in naturalOrder.Items)
             {
-                cartService.AddOrUpdate(draft, parsedItem.Item, parsedItem.Quantity);
+                AddToDraft(draft, parsedItem.Item, parsedItem.Quantity);
             }
 
             SaveDraft(conversation, draft);
@@ -363,7 +387,7 @@ public sealed partial class ConversationService(
             return OutgoingReply.List(
                 "I found a few possible matches. Please select the item you meant.",
                 "Select item",
-                WhatsAppOrderingMessageBuilder.BuildSearchSections(
+                menuMessageBuilder.BuildSearchSections(
                     naturalOrder.SuggestedItems.ToArray()));
         }
 
@@ -384,7 +408,7 @@ public sealed partial class ConversationService(
             return OutgoingReply.List(
                 "Select a matching menu item:",
                 "View matches",
-                WhatsAppOrderingMessageBuilder.BuildSearchSections(
+                menuMessageBuilder.BuildSearchSections(
                     matches.Select(x => x.Item).ToArray()));
         }
 
@@ -400,10 +424,10 @@ public sealed partial class ConversationService(
         };
     }
 
-    private static OutgoingReply BuildWelcomeReply(Domain.Entities.Restaurant restaurant) =>
+    private OutgoingReply BuildWelcomeReply(Domain.Entities.Restaurant restaurant) =>
         OutgoingReply.ButtonReply(
             $"Welcome to {restaurant.Name}. Browse the menu or type an item name to search.",
-            WhatsAppOrderingMessageBuilder.BuildMainMenuButtons(),
+            cartNavigationMessageBuilder.BuildMainMenuButtons(),
             "You can also type: 2 Paneer Pizza and 1 Veg Burger");
 
     private async Task<OutgoingReply> BuildCategoryReplyAsync(
@@ -428,17 +452,15 @@ public sealed partial class ConversationService(
                 "The menu is currently unavailable. Please type Help to contact restaurant staff.");
         }
 
-        var maxPage = (categories.Length - 1) / WhatsAppOrderingMessageBuilder.CategoryPageSize;
+        var maxPage = (categories.Length - 1) / categoryMessageBuilder.PageSize;
         draft.CategoryPage = Math.Clamp(page, 0, maxPage);
-        draft.SelectedCategoryId = null;
-        draft.SelectedCategoryName = null;
         SaveDraft(conversation, draft);
         conversation.CurrentState = ConversationStates.CategorySelection;
 
         return OutgoingReply.List(
             $"Welcome to {restaurant.Name}. Please choose a category.",
             "Categories",
-            WhatsAppOrderingMessageBuilder.BuildCategorySections(
+            categoryMessageBuilder.BuildSections(
                 categories,
                 draft.CategoryPage,
                 draft.Items.Count > 0),
@@ -484,22 +506,44 @@ public sealed partial class ConversationService(
                 cancellationToken);
         }
 
-        var maxPage = (items.Length - 1) / WhatsAppOrderingMessageBuilder.ItemPageSize;
-        draft.SelectedCategoryId = category.Id;
-        draft.SelectedCategoryName = category.Name;
-        draft.ItemPage = Math.Clamp(page, 0, maxPage);
+        var maxPage = (items.Length - 1) / menuMessageBuilder.PageSize;
+        draft.MenuSelection.CurrentCategoryId = category.Id;
+        draft.MenuSelection.CurrentCategoryName = category.Name;
+        draft.MenuSelection.CurrentMenuPage = Math.Clamp(page, 0, maxPage);
         SaveDraft(conversation, draft);
         conversation.CurrentState = ConversationStates.ItemSelection;
 
         return OutgoingReply.List(
             $"{category.Name} items",
             "Select item",
-            WhatsAppOrderingMessageBuilder.BuildItemSections(
+            menuMessageBuilder.BuildSections(
                 category.Id,
                 items,
-                draft.ItemPage,
+                draft.MenuSelection.CurrentMenuPage,
                 draft.Items.Count > 0),
             "Only currently available items are shown.");
+    }
+
+    private Task<OutgoingReply> BuildCurrentCategoryReplyAsync(
+        Domain.Entities.Restaurant restaurant,
+        Conversation conversation,
+        PendingOrderDraft draft,
+        CancellationToken cancellationToken)
+    {
+        return draft.MenuSelection.CurrentCategoryId is Guid categoryId
+            ? BuildItemsReplyAsync(
+                restaurant,
+                conversation,
+                draft,
+                categoryId,
+                draft.MenuSelection.CurrentMenuPage,
+                cancellationToken)
+            : BuildCategoryReplyAsync(
+                restaurant,
+                conversation,
+                draft,
+                draft.CategoryPage,
+                cancellationToken);
     }
 
     private async Task<OutgoingReply> BuildQuantityReplyAsync(
@@ -525,13 +569,25 @@ public sealed partial class ConversationService(
                 cancellationToken);
         }
 
+        if (draft.MenuSelection.CurrentCategoryId != item.CategoryId)
+        {
+            var category = await dbContext.MenuCategories.AsNoTracking().FirstOrDefaultAsync(
+                x => x.Id == item.CategoryId &&
+                     x.RestaurantId == restaurant.Id &&
+                     x.IsActive,
+                cancellationToken);
+            draft.MenuSelection.CurrentCategoryId = item.CategoryId;
+            draft.MenuSelection.CurrentCategoryName = category?.Name;
+            draft.MenuSelection.CurrentMenuPage = 0;
+        }
+
         draft.SelectedMenuItemId = item.Id;
         SaveDraft(conversation, draft);
         conversation.CurrentState = ConversationStates.QuantitySelection;
         return OutgoingReply.List(
             $"{item.Name} - Rs {item.Price:0.##}. Choose quantity.",
             "Quantity",
-            WhatsAppOrderingMessageBuilder.BuildQuantitySections(item),
+            quantityMessageBuilder.BuildSections(item),
             "Choose Custom quantity to type another amount.");
     }
 
@@ -560,13 +616,45 @@ public sealed partial class ConversationService(
                 "That item is no longer available. Type Menu to choose another item.");
         }
 
-        cartService.AddOrUpdate(draft, item, quantity);
+        AddToDraft(draft, item, quantity);
         draft.SelectedMenuItemId = null;
         SaveDraft(conversation, draft);
-        return BuildCartReply(conversation, draft);
+        conversation.CurrentState = ConversationStates.ItemSelection;
+        return OutgoingReply.List(
+            $"✓ {item.Name} x{quantity} added.\n\nWhat would you like to do?",
+            "Continue",
+            cartNavigationMessageBuilder.BuildItemAddedSections(draft.MenuSelection),
+            $"Cart total: Rs {draft.TotalAmount:0.##}");
     }
 
-    private static OutgoingReply BuildCartReply(
+    private void AddToDraft(PendingOrderDraft draft, MenuItem item, int quantity)
+    {
+        cartService.AddOrUpdate(draft, item, quantity);
+        draft.MenuSelection.CartId ??= Guid.NewGuid();
+        draft.MenuSelection.LastSelectedMenuItem = new MenuSelectionItem
+        {
+            MenuItemId = item.Id,
+            MenuItemName = item.Name,
+            Quantity = quantity
+        };
+
+        var selectedItem = draft.MenuSelection.SelectedItems.FirstOrDefault(
+            x => x.MenuItemId == item.Id);
+        if (selectedItem is null)
+        {
+            draft.MenuSelection.SelectedItems.Add(new MenuSelectionItem
+            {
+                MenuItemId = item.Id,
+                MenuItemName = item.Name,
+                Quantity = quantity
+            });
+            return;
+        }
+
+        selectedItem.Quantity += quantity;
+    }
+
+    private OutgoingReply BuildCartReply(
         Conversation conversation,
         PendingOrderDraft draft)
     {
@@ -581,10 +669,10 @@ public sealed partial class ConversationService(
         conversation.CurrentState = ConversationStates.CartReview;
         return OutgoingReply.ButtonReply(
             MenuTextFormatter.BuildCartSummary(draft),
-            WhatsAppOrderingMessageBuilder.BuildCartButtons());
+            cartNavigationMessageBuilder.BuildCartButtons());
     }
 
-    private static OutgoingReply ContinueCheckout(
+    private OutgoingReply ContinueCheckout(
         Customer customer,
         Conversation conversation,
         PendingOrderDraft draft)
@@ -611,10 +699,10 @@ public sealed partial class ConversationService(
         return BuildFulfilmentReply();
     }
 
-    private static OutgoingReply BuildFulfilmentReply() =>
+    private OutgoingReply BuildFulfilmentReply() =>
         OutgoingReply.ButtonReply(
             "Is this order for delivery or pickup?",
-            WhatsAppOrderingMessageBuilder.BuildFulfilmentButtons());
+            cartNavigationMessageBuilder.BuildFulfilmentButtons());
 
     private async Task<string> ConfirmOrCancelAsync(
         Domain.Entities.Restaurant restaurant,
@@ -813,10 +901,25 @@ public sealed partial class ConversationService(
             return new PendingOrderDraft();
         }
 
-        return JsonSerializer.Deserialize<PendingOrderDraft>(
-                   conversation.TempOrderJson,
-                   JsonOptions)
-               ?? new PendingOrderDraft();
+        var draft = JsonSerializer.Deserialize<PendingOrderDraft>(
+                        conversation.TempOrderJson,
+                        JsonOptions)
+                    ?? new PendingOrderDraft();
+        draft.MenuSelection ??= new MenuSelection();
+        draft.MenuSelection.SelectedItems ??= new List<MenuSelectionItem>();
+
+        if (draft.MenuSelection.SelectedItems.Count == 0 && draft.Items.Count > 0)
+        {
+            draft.MenuSelection.SelectedItems.AddRange(
+                draft.Items.Select(item => new MenuSelectionItem
+                {
+                    MenuItemId = item.MenuItemId,
+                    MenuItemName = item.ItemName,
+                    Quantity = item.Quantity
+                }));
+        }
+
+        return draft;
     }
 
     private static void SaveDraft(Conversation conversation, PendingOrderDraft draft) =>

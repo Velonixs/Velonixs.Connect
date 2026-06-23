@@ -104,6 +104,56 @@ public sealed class WhatsAppCloudMessageSender(
         return await SendPayloadAsync(phoneNumberId, normalizedRecipientPhoneNumber, payload, bodyText, cancellationToken);
     }
 
+    public async Task<WhatsAppSendResult> SendReplyButtonMessageAsync(
+        string phoneNumberId,
+        string recipientPhoneNumber,
+        string bodyText,
+        IReadOnlyCollection<WhatsAppReplyButton> buttons,
+        string? footerText = null,
+        CancellationToken cancellationToken = default)
+    {
+        var normalizedRecipientPhoneNumber = NormalizeRecipientPhoneNumber(recipientPhoneNumber);
+        if (string.IsNullOrWhiteSpace(normalizedRecipientPhoneNumber))
+        {
+            logger.LogWarning("WhatsApp send failed. Recipient phone number is empty.");
+            return new WhatsAppSendResult(false, false, Error: "Recipient phone number is empty.");
+        }
+
+        var interactive = new Dictionary<string, object?>
+        {
+            ["type"] = "button",
+            ["body"] = new { text = bodyText },
+            ["action"] = new
+            {
+                buttons = buttons.Take(3).Select(button => new
+                {
+                    type = "reply",
+                    reply = new
+                    {
+                        id = button.Id,
+                        title = button.Title
+                    }
+                }).ToArray()
+            }
+        };
+
+        if (!string.IsNullOrWhiteSpace(footerText))
+        {
+            interactive["footer"] = new { text = footerText };
+        }
+
+        var payload = new
+        {
+            messaging_product = "whatsapp",
+            recipient_type = "individual",
+            to = normalizedRecipientPhoneNumber,
+            type = "interactive",
+            interactive
+        };
+
+        return await SendPayloadAsync(phoneNumberId, normalizedRecipientPhoneNumber, payload, bodyText, cancellationToken);
+    }
+
     private async Task<WhatsAppSendResult> SendPayloadAsync(
         string phoneNumberId,
         string recipientPhoneNumber,

@@ -4,7 +4,7 @@ using Velonixs.Connect.Domain.Entities;
 
 namespace Velonixs.Connect.Infrastructure.Services;
 
-internal static class MenuTextFormatter
+public static class MenuTextFormatter
 {
     public static string BuildWelcomeMessage(Domain.Entities.Restaurant restaurant)
     {

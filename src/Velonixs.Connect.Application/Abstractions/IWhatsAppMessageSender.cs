@@ -18,4 +18,12 @@ public interface IWhatsAppMessageSender
         IReadOnlyCollection<WhatsAppInteractiveListSection> sections,
         string? footerText = null,
         CancellationToken cancellationToken = default);
+
+    Task<WhatsAppSendResult> SendReplyButtonMessageAsync(
+        string phoneNumberId,
+        string recipientPhoneNumber,
+        string bodyText,
+        IReadOnlyCollection<WhatsAppReplyButton> buttons,
+        string? footerText = null,
+        CancellationToken cancellationToken = default);
 }

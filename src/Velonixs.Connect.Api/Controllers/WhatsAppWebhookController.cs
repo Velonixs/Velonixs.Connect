@@ -197,8 +197,7 @@ public sealed class WhatsAppWebhookController(
                 $"select_item:{id["menu.item.".Length..]}",
             var id when id.StartsWith("menu.qty.", StringComparison.OrdinalIgnoreCase) =>
                 ReadQuantityReplyAsText(id),
-            _ => ReadString(whatsAppMessage, "interactive", "list_reply", "title")
-                ?? ReadString(whatsAppMessage, "interactive", "button_reply", "title")
+            _ => replyId
         };
     }
 

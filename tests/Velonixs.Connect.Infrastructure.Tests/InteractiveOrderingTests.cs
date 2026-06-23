@@ -51,6 +51,18 @@ public sealed class InteractiveOrderingTests
     }
 
     [Fact]
+    public void ItemAddedNavigation_OffersContinueChoices()
+    {
+        var rows = WhatsAppOrderingMessageBuilder.BuildItemAddedSections("Pizza").Single().Rows;
+
+        Assert.Equal(4, rows.Count);
+        Assert.Equal(
+            new[] { "menu.continue", "category.list", "cart.view", "cart.checkout" },
+            rows.Select(x => x.Id));
+        Assert.Contains(rows, row => row.Title == "More Pizza");
+    }
+
+    [Fact]
     public void CartCalculation_MergesItemsAndRecalculatesTotals()
     {
         var draft = new PendingOrderDraft();

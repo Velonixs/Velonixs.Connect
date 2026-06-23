@@ -176,6 +176,15 @@ public sealed partial class ConversationService(
                 cancellationToken);
         }
 
+        if (normalized is "menu.continue")
+        {
+            return await BuildCurrentCategoryReplyAsync(
+                restaurant,
+                conversation,
+                draft,
+                cancellationToken);
+        }
+
         if (normalized.StartsWith("select_item:", StringComparison.OrdinalIgnoreCase) &&
             int.TryParse(normalized["select_item:".Length..], out var legacyItemCode))
         {
@@ -525,6 +534,18 @@ public sealed partial class ConversationService(
                 cancellationToken);
         }
 
+        if (draft.SelectedCategoryId != item.CategoryId)
+        {
+            var category = await dbContext.MenuCategories.AsNoTracking().FirstOrDefaultAsync(
+                x => x.Id == item.CategoryId &&
+                     x.RestaurantId == restaurant.Id &&
+                     x.IsActive,
+                cancellationToken);
+            draft.SelectedCategoryId = item.CategoryId;
+            draft.SelectedCategoryName = category?.Name;
+            draft.ItemPage = 0;
+        }
+
         draft.SelectedMenuItemId = item.Id;
         SaveDraft(conversation, draft);
         conversation.CurrentState = ConversationStates.QuantitySelection;
@@ -563,8 +584,33 @@ public sealed partial class ConversationService(
         cartService.AddOrUpdate(draft, item, quantity);
         draft.SelectedMenuItemId = null;
         SaveDraft(conversation, draft);
-        return BuildCartReply(conversation, draft);
+        conversation.CurrentState = ConversationStates.ItemSelection;
+        return OutgoingReply.List(
+            $"✓ {item.Name} x{quantity} added.\n\nWhat would you like to do?",
+            "Continue",
+            WhatsAppOrderingMessageBuilder.BuildItemAddedSections(draft.SelectedCategoryName),
+            $"Cart total: Rs {draft.TotalAmount:0.##}");
     }
+
+    private Task<OutgoingReply> BuildCurrentCategoryReplyAsync(
+        Domain.Entities.Restaurant restaurant,
+        Conversation conversation,
+        PendingOrderDraft draft,
+        CancellationToken cancellationToken) =>
+        draft.SelectedCategoryId is Guid categoryId
+            ? BuildItemsReplyAsync(
+                restaurant,
+                conversation,
+                draft,
+                categoryId,
+                draft.ItemPage,
+                cancellationToken)
+            : BuildCategoryReplyAsync(
+                restaurant,
+                conversation,
+                draft,
+                draft.CategoryPage,
+                cancellationToken);
 
     private static OutgoingReply BuildCartReply(
         Conversation conversation,

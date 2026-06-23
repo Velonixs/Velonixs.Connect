@@ -14,7 +14,7 @@ public interface ICategoryMessageBuilder
         bool hasCart);
 }
 
-/// <summary>Builds menu-item browsing, search, and continuation messages.</summary>
+/// <summary>Builds menu-item browsing and search messages.</summary>
 public interface IMenuMessageBuilder
 {
     int PageSize { get; }
@@ -35,13 +35,10 @@ public interface IQuantityMessageBuilder
     IReadOnlyCollection<WhatsAppInteractiveListSection> BuildSections(MenuItem item);
 }
 
-/// <summary>Builds cart and continue-shopping navigation messages.</summary>
+/// <summary>Builds cart and checkout navigation messages.</summary>
 public interface ICartNavigationMessageBuilder
 {
     IReadOnlyCollection<WhatsAppReplyButton> BuildMainMenuButtons();
     IReadOnlyCollection<WhatsAppReplyButton> BuildCartButtons();
     IReadOnlyCollection<WhatsAppReplyButton> BuildFulfilmentButtons();
-
-    IReadOnlyCollection<WhatsAppInteractiveListSection> BuildItemAddedSections(
-        MenuSelection selection);
 }

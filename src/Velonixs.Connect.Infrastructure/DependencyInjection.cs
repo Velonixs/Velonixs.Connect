@@ -90,6 +90,9 @@ public static class DependencyInjection
         services.AddScoped<IMenuService, MenuService>();
         services.AddScoped<ICatalogService, CatalogService>();
         services.AddScoped<IOrderService, OrderService>();
+        services.AddScoped<MenuSearchService>();
+        services.AddScoped<FreeTextOrderParser>();
+        services.AddScoped<OrderingCartService>();
         services.AddScoped<IConversationService, ConversationService>();
         services.AddScoped<INotificationService, NotificationService>();
         services.AddScoped<IAuthTokenService, AuthTokenService>();

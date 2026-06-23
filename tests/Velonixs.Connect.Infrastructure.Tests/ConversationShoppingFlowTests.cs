@@ -14,7 +14,7 @@ namespace Velonixs.Connect.Infrastructure.Tests;
 public sealed class ConversationShoppingFlowTests
 {
     [Fact]
-    public async Task AddingItemsAndContinuing_KeepsCategoryPageAndSameCart()
+    public async Task QuantitySelection_ShowsCartAndAddMoreReturnsToCategories()
     {
         await using var dbContext = CreateDbContext();
         var restaurant = new Restaurant
@@ -40,6 +40,10 @@ public sealed class ConversationShoppingFlowTests
         var firstAdd = await Send(service, $"quantity.select:{paneerPizza.Id}:2");
 
         Assert.Contains("Paneer Pizza x2 added", firstAdd.ReplyText);
+        Assert.Contains("Your Cart", firstAdd.ReplyText);
+        Assert.Contains("2 x Paneer Pizza", firstAdd.ReplyText);
+        Assert.Contains("Total: Rs 498", firstAdd.ReplyText);
+        Assert.DoesNotContain("What would you like to do?", firstAdd.ReplyText);
 
         var conversation = await dbContext.Conversations.SingleAsync();
         var firstDraft = ReadDraft(conversation);
@@ -50,30 +54,25 @@ public sealed class ConversationShoppingFlowTests
         Assert.Equal(0, firstDraft.MenuSelection.CurrentMenuPage);
         Assert.NotNull(cartId);
         Assert.Equal(paneerPizza.Id, firstDraft.MenuSelection.LastSelectedMenuItem?.MenuItemId);
+        Assert.Equal(ConversationStates.CartReview, conversation.CurrentState);
 
-        var continued = await Send(service, "menu.continue");
+        var addMore = await Send(service, "cart.add_more");
 
-        Assert.Contains("Pizza items", continued.ReplyText);
+        Assert.Contains("Please choose a category", addMore.ReplyText);
         Assert.Single(ReadDraft(conversation).Items);
 
+        await Send(service, $"category.select:{category.Id}");
         await Send(service, $"item.select:{farmhousePizza.Id}");
-        var backToMenu = await Send(service, "menu.back");
-
-        Assert.Contains("Pizza items", backToMenu.ReplyText);
-        Assert.Single(ReadDraft(conversation).Items);
-
-        await Send(service, "category.list");
-        Assert.Single(ReadDraft(conversation).Items);
-
-        await Send(service, "menu.continue");
-        await Send(service, $"item.select:{farmhousePizza.Id}");
-        await Send(service, $"quantity.select:{farmhousePizza.Id}:1");
+        var secondAdd = await Send(service, $"quantity.select:{farmhousePizza.Id}:1");
 
         var finalDraft = ReadDraft(conversation);
         Assert.Equal(cartId, finalDraft.MenuSelection.CartId);
         Assert.Equal(category.Id, finalDraft.MenuSelection.CurrentCategoryId);
         Assert.Equal(2, finalDraft.Items.Count);
         Assert.Equal(797, finalDraft.TotalAmount);
+        Assert.Contains("Your Cart", secondAdd.ReplyText);
+        Assert.Contains("2 x Paneer Pizza", secondAdd.ReplyText);
+        Assert.Contains("1 x Farmhouse Pizza", secondAdd.ReplyText);
     }
 
     private static ConversationService CreateService(RestaurantConnectDbContext dbContext)

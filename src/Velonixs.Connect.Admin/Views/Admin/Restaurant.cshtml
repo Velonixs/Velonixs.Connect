@@ -148,8 +148,8 @@
         <h2>Orders</h2>
     </div>
 
-    <div class="table-responsive">
-        <table class="table table-hover align-middle mb-0">
+    <div class="table-responsive stack-mobile">
+        <table class="table table-hover align-middle mb-0 responsive-stack">
             <thead>
                 <tr>
                     <th>Order</th>
@@ -164,12 +164,12 @@
             @foreach (var order in Model.Orders)
             {
                 <tr>
-                    <td><strong>@order.OrderNumber</strong><small>@order.Source</small></td>
-                    <td>@order.CustomerName<small>@order.CustomerPhone</small></td>
-                    <td><span class="pill">@order.OrderStatus</span></td>
-                    <td>Rs @order.TotalAmount.ToString("0.##")</td>
-                    <td>@order.CreatedAt.ToLocalTime().ToString("dd MMM yyyy, hh:mm tt")</td>
-                    <td class="text-end"><a class="btn btn-sm btn-success" asp-action="Order" asp-route-id="@order.Id">Open</a></td>
+                    <td data-label="Order"><strong>@order.OrderNumber</strong><small>@order.Source</small></td>
+                    <td data-label="Customer">@order.CustomerName<small>@order.CustomerPhone</small></td>
+                    <td data-label="Status"><span class="pill">@order.OrderStatus</span></td>
+                    <td data-label="Total">Rs @order.TotalAmount.ToString("0.##")</td>
+                    <td data-label="Time">@order.CreatedAt.ToLocalTime().ToString("dd MMM yyyy, hh:mm tt")</td>
+                    <td data-label="" class="text-end"><a class="btn btn-sm btn-success" asp-action="Order" asp-route-id="@order.Id">Open</a></td>
                 </tr>
             }
             </tbody>
@@ -284,8 +284,8 @@
     <div class="section-heading">
         <h2>Customers</h2>
     </div>
-    <div class="table-responsive">
-        <table class="table table-hover align-middle mb-0">
+    <div class="table-responsive stack-mobile">
+        <table class="table table-hover align-middle mb-0 responsive-stack">
             <thead>
                 <tr>
                     <th>Customer</th>
@@ -299,11 +299,11 @@
             @foreach (var customer in Model.Customers)
             {
                 <tr>
-                    <td>@(customer.Name ?? "WhatsApp Customer")</td>
-                    <td>@customer.PhoneNumber</td>
-                    <td>@customer.OrderCount</td>
-                    <td>@customer.LastAddress</td>
-                    <td>@customer.LastInteractionAt.ToLocalTime().ToString("dd MMM yyyy, hh:mm tt")</td>
+                    <td data-label="Name">@(customer.Name ?? "WhatsApp Customer")</td>
+                    <td data-label="Phone">@customer.PhoneNumber</td>
+                    <td data-label="Orders">@customer.OrderCount</td>
+                    <td data-label="Last Address">@customer.LastAddress</td>
+                    <td data-label="Last Active">@customer.LastInteractionAt.ToLocalTime().ToString("dd MMM yyyy, hh:mm tt")</td>
                 </tr>
             }
             </tbody>
@@ -337,8 +337,8 @@
             </div>
         </form>
     }
-    <div class="table-responsive">
-        <table class="table table-hover align-middle mb-0">
+    <div class="table-responsive stack-mobile">
+        <table class="table table-hover align-middle mb-0 responsive-stack">
             <thead>
                 <tr>
                     <th>Name</th>
@@ -352,11 +352,11 @@
             @foreach (var user in Model.Users)
             {
                 <tr>
-                    <td>@user.DisplayName</td>
-                    <td>@user.Email</td>
-                    <td><span class="badge text-bg-light border">@user.Role</span></td>
-                    <td><span class="badge @(user.IsActive ? "text-bg-success" : "text-bg-secondary")">@(user.IsActive ? "Active" : "Inactive")</span></td>
-                    <td>
+                    <td data-label="Name">@user.DisplayName</td>
+                    <td data-label="Email">@user.Email</td>
+                    <td data-label="Role"><span class="badge text-bg-light border">@user.Role</span></td>
+                    <td data-label="Status"><span class="badge @(user.IsActive ? "text-bg-success" : "text-bg-secondary")">@(user.IsActive ? "Active" : "Inactive")</span></td>
+                    <td data-label="Reset Password">
                         <form class="d-flex flex-column flex-lg-row gap-2"
                               asp-action="ResetPortalUserPassword"
                               asp-route-restaurantId="@Model.Restaurant.Id"

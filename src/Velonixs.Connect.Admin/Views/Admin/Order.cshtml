@@ -132,8 +132,8 @@
     }
     else
     {
-        <div class="table-wrap">
-            <table>
+        <div class="table-wrap stack-mobile">
+            <table class="responsive-stack">
                 <thead>
                     <tr>
                         <th>Time</th>
@@ -146,10 +146,10 @@
                 @foreach (var history in Model.Order.StatusHistory)
                 {
                     <tr>
-                        <td>@history.UpdatedAtUtc.ToLocalTime().ToString("dd MMM yyyy, hh:mm tt")</td>
-                        <td>@history.PreviousStatus &rarr; @history.NewStatus</td>
-                        <td>@history.UpdatedBy</td>
-                        <td>@history.Comment</td>
+                        <td data-label="Time">@history.UpdatedAtUtc.ToLocalTime().ToString("dd MMM yyyy, hh:mm tt")</td>
+                        <td data-label="Change">@history.PreviousStatus &rarr; @history.NewStatus</td>
+                        <td data-label="Updated By">@history.UpdatedBy</td>
+                        <td data-label="Comment">@history.Comment</td>
                     </tr>
                 }
                 </tbody>

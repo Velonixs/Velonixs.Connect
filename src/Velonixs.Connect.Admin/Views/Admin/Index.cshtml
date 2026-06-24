@@ -68,8 +68,8 @@
             <h2>Businesses</h2>
         </div>
 
-        <div class="table-responsive">
-            <table class="table table-hover align-middle mb-0">
+        <div class="table-responsive stack-mobile">
+            <table class="table table-hover align-middle mb-0 responsive-stack">
                 <thead>
                     <tr>
                         <th>Name</th>
@@ -87,18 +87,18 @@
                 @foreach (var item in Model.Restaurants)
                 {
                     <tr>
-                        <td>
+                        <td data-label="Name">
                             <strong>@item.Restaurant.Name</strong>
                             <small>@item.Restaurant.BusinessPhone</small>
                         </td>
-                        <td>@item.Restaurant.BusinessType</td>
-                        <td><code>@item.Restaurant.WhatsAppPhoneNumberId</code></td>
-                        <td>@item.MenuItemCount</td>
-                        <td>@item.CustomerCount</td>
-                        <td>@item.OrderCount</td>
-                        <td>Rs @item.Revenue.ToString("0.##")</td>
-                        <td><span class="pill @(item.Restaurant.IsActive ? "good" : "muted")">@(item.Restaurant.IsActive ? "Active" : "Inactive")</span></td>
-                        <td class="text-end"><a class="btn btn-sm btn-success" asp-action="Restaurant" asp-route-id="@item.Restaurant.Id">Manage</a></td>
+                        <td data-label="Type">@item.Restaurant.BusinessType</td>
+                        <td data-label="WhatsApp ID"><code>@item.Restaurant.WhatsAppPhoneNumberId</code></td>
+                        <td data-label="Catalog">@item.MenuItemCount</td>
+                        <td data-label="Customers">@item.CustomerCount</td>
+                        <td data-label="Orders">@item.OrderCount</td>
+                        <td data-label="Revenue">Rs @item.Revenue.ToString("0.##")</td>
+                        <td data-label="Status"><span class="pill @(item.Restaurant.IsActive ? "good" : "muted")">@(item.Restaurant.IsActive ? "Active" : "Inactive")</span></td>
+                        <td data-label="" class="text-end"><a class="btn btn-sm btn-success" asp-action="Restaurant" asp-route-id="@item.Restaurant.Id">Manage</a></td>
                     </tr>
                 }
                 </tbody>

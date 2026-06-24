@@ -708,6 +708,10 @@ tbody tr:hover {
     padding: 12px;
 }
 
+.responsive-stack td[data-label]::before {
+    content: "";
+}
+
 .line-item {
     gap: 14px;
 }
@@ -744,12 +748,9 @@ tbody tr:hover {
         flex-direction: column !important;
     }
 
-    .portal-menu-row {
-        grid-template-columns: repeat(2, minmax(0, 1fr));
-    }
-
+    .portal-menu-row,
     .customer-row {
-        grid-template-columns: repeat(2, minmax(0, 1fr));
+        grid-template-columns: 1fr;
     }
 
     .portal-menu-row button {
@@ -789,7 +790,78 @@ tbody tr:hover {
     }
 
     table {
-        min-width: 720px;
+        min-width: 640px;
+    }
+
+    .table-responsive.stack-mobile {
+        overflow-x: visible;
+    }
+
+    table.responsive-stack {
+        border-collapse: separate;
+        border-spacing: 0 12px;
+        min-width: 0 !important;
+    }
+
+    table.responsive-stack thead {
+        display: none;
+    }
+
+    table.responsive-stack,
+    table.responsive-stack tbody,
+    table.responsive-stack tr,
+    table.responsive-stack td {
+        display: block;
+        width: 100%;
+    }
+
+    table.responsive-stack tr {
+        background: rgba(238, 244, 247, 0.74);
+        border: 1px solid rgba(23, 107, 135, 0.12);
+        border-radius: 18px;
+        margin-bottom: 12px;
+        padding: 12px;
+    }
+
+    table.responsive-stack td {
+        border-bottom: 0;
+        padding: 6px 0;
+    }
+
+    table.responsive-stack td[data-label] {
+        align-items: flex-start;
+        display: flex;
+        gap: 14px;
+        justify-content: space-between;
+    }
+
+    table.responsive-stack td[data-label]::before {
+        color: var(--muted);
+        content: attr(data-label);
+        flex: 0 0 38%;
+        font-size: 12px;
+        font-weight: 800;
+        text-transform: uppercase;
+    }
+
+    table.responsive-stack td[data-label=""]::before {
+        display: none;
+    }
+
+    table.responsive-stack td.text-end {
+        text-align: left !important;
+    }
+
+    table.responsive-stack .btn {
+        width: 100%;
+    }
+
+    .customer-row .text-end {
+        text-align: left !important;
+    }
+
+    .customer-row .btn {
+        width: 100%;
     }
 }
 

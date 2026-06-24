@@ -67,19 +67,19 @@ public static class MenuTextFormatter
     public static string BuildCartSummary(PendingOrderDraft draft)
     {
         var builder = new StringBuilder();
-        builder.AppendLine("*Your Cart*");
-        builder.AppendLine("--------------------");
+        builder.AppendLine("🛒 Your Cart");
+        builder.AppendLine();
 
         foreach (var item in draft.Items)
         {
-            builder.AppendLine($"{item.Quantity} x {item.ItemName}");
-            builder.AppendLine($"   Rs {FormatAmount(item.LineTotal)}");
+            builder.AppendLine($"{item.Quantity} × {item.ItemName}");
+            builder.AppendLine($"Rs {FormatAmount(item.LineTotal)}");
         }
 
-        builder.AppendLine("--------------------");
-        builder.AppendLine($"*Total: Rs {FormatAmount(draft.TotalAmount)}*");
         builder.AppendLine();
-        builder.AppendLine("Add more items or checkout when ready.");
+        builder.AppendLine($"Total: Rs {FormatAmount(draft.TotalAmount)}");
+        builder.AppendLine();
+        builder.AppendLine("Select Checkout to continue or Add Items to order more.");
 
         return builder.ToString().Trim();
     }
@@ -117,59 +117,79 @@ public static class MenuTextFormatter
     public static string BuildFinalConfirmation(PendingOrderDraft draft)
     {
         var builder = new StringBuilder();
-        builder.AppendLine("*Please confirm your order*");
-        builder.AppendLine("--------------------");
-        builder.AppendLine($"Name: {draft.CustomerName}");
+        builder.AppendLine("Please review your order");
         builder.AppendLine();
-        builder.AppendLine("*Items*");
+        builder.AppendLine($"Customer: {draft.CustomerName}");
+        builder.AppendLine();
+        builder.AppendLine("Items");
 
         foreach (var item in draft.Items)
         {
-            builder.AppendLine($"{item.Quantity} x {item.ItemName}");
-            builder.AppendLine($"   Rs {FormatAmount(item.LineTotal)}");
+            builder.AppendLine($"{item.Quantity} × {item.ItemName}");
+            builder.AppendLine($"Rs {FormatAmount(item.LineTotal)}");
         }
 
-        builder.AppendLine("--------------------");
-        builder.AppendLine($"*Total: Rs {FormatAmount(draft.TotalAmount)}*");
-        builder.AppendLine($"Address: {draft.Address}");
+        builder.AppendLine("-----------");
         builder.AppendLine();
-        builder.AppendLine("Please confirm using the buttons below.");
+        builder.AppendLine($"Total: Rs {FormatAmount(draft.TotalAmount)}");
+        builder.AppendLine();
+        builder.AppendLine($"Order type: {(draft.IsPickup ? "Pickup" : "Delivery")}");
+        if (!draft.IsPickup)
+        {
+            builder.AppendLine($"Address: {draft.Address}");
+        }
+
+        builder.AppendLine();
+        builder.AppendLine("Please confirm your order using the buttons below.");
 
         return builder.ToString().Trim();
     }
 
-    public static string BuildOrderReceived(string orderNumber)
+    public static string BuildOrderReceived(
+        string orderNumber,
+        string customerName,
+        string restaurantName)
     {
         return $"""
-            *Thank you! Your order has been received.*
-            Restaurant staff will confirm your order shortly.
+            ✅ Order received
 
-            Order ID: *{orderNumber}*
+            Thank you, {customerName}. Your order has been sent to {restaurantName} for confirmation.
+
+            Order ID: {orderNumber}
+
+            We will notify you as soon as the restaurant accepts your order.
             """;
     }
 
     public static string BuildRestaurantNotification(Order order, IReadOnlyCollection<OrderItem> items)
     {
         var builder = new StringBuilder();
-        builder.AppendLine("*New WhatsApp Order Received*");
-        builder.AppendLine("--------------------");
-        builder.AppendLine($"Order ID: *{order.OrderNumber}*");
+        builder.AppendLine("🔔 New Order Received");
+        builder.AppendLine();
+        builder.AppendLine($"Order ID: {order.OrderNumber}");
         builder.AppendLine($"Customer: {order.CustomerName}");
         builder.AppendLine($"Phone: {order.CustomerPhone}");
         builder.AppendLine();
-        builder.AppendLine("*Items*");
+        builder.AppendLine("Items");
 
         foreach (var item in items)
         {
-            builder.AppendLine($"{item.Quantity} x {item.ItemName}");
-            builder.AppendLine($"   Rs {FormatAmount(item.LineTotal)}");
+            builder.AppendLine($"{item.Quantity} × {item.ItemName}");
+            builder.AppendLine($"Rs {FormatAmount(item.LineTotal)}");
         }
 
-        builder.AppendLine("--------------------");
-        builder.AppendLine($"*Total: Rs {FormatAmount(order.TotalAmount)}*");
-        builder.AppendLine($"Address: {order.Address}");
+        builder.AppendLine("-----------");
         builder.AppendLine();
-        builder.AppendLine("Please confirm with customer.");
+        builder.AppendLine($"Total: Rs {FormatAmount(order.TotalAmount)}");
+        builder.AppendLine();
+        builder.AppendLine($"Order type: {ResolveOrderType(order)}");
+        if (!IsPickup(order))
+        {
+            builder.AppendLine($"Address: {order.Address}");
+        }
+
+        builder.AppendLine();
+        builder.AppendLine("Please accept or reject this order from the restaurant portal.");
 
         return builder.ToString().Trim();
     }
@@ -212,6 +232,12 @@ public static class MenuTextFormatter
             OrderStatuses.OutForDelivery => "Out for delivery",
             _ => status
         };
+
+    private static bool IsPickup(Order order) =>
+        string.Equals(order.Address, "Pickup", StringComparison.OrdinalIgnoreCase);
+
+    private static string ResolveOrderType(Order order) =>
+        IsPickup(order) ? "Pickup" : "Delivery";
 
     private static string FormatAmount(decimal amount) =>
         amount.ToString("0.##", CultureInfo.InvariantCulture);

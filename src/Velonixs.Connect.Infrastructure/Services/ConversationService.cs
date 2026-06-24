@@ -52,6 +52,12 @@ public sealed partial class ConversationService(
         var customer = await GetOrCreateCustomerAsync(restaurant.Id, message, cancellationToken);
         var conversation = await GetOrCreateConversationAsync(restaurant.Id, customer, cancellationToken);
 
+        if (string.IsNullOrWhiteSpace(message.WhatsAppMessageId) &&
+            await IsRecentDuplicateIncomingMessageAsync(restaurant.Id, customer.Id, message, cancellationToken))
+        {
+            return WhatsAppWebhookProcessResult.Ignored("Duplicate WhatsApp message.");
+        }
+
         dbContext.MessageLogs.Add(new MessageLog
         {
             RestaurantId = restaurant.Id,
@@ -63,6 +69,7 @@ public sealed partial class ConversationService(
             Status = MessageStatuses.Received,
             CreatedAt = message.ReceivedAt ?? DateTimeOffset.UtcNow
         });
+        await dbContext.SaveChangesAsync(cancellationToken);
 
         OutgoingReply reply;
         try
@@ -289,7 +296,7 @@ public sealed partial class ConversationService(
                     conversation,
                     draft,
                     cancellationToken,
-                    "Your cart is empty. Choose an item to start your order.");
+                    "Your cart is currently empty.\n\nSelect an item from the menu to begin your order.");
             }
 
             return BuildCartReply(conversation, draft);
@@ -315,7 +322,7 @@ public sealed partial class ConversationService(
                     conversation,
                     draft,
                     cancellationToken,
-                    "Your cart is empty. Choose an item before checkout.",
+                    "Your cart is currently empty.\n\nSelect an item from the menu to begin your order.",
                     page: draft.CurrentMenuPage);
             }
 
@@ -583,7 +590,7 @@ public sealed partial class ConversationService(
                 totalPages,
                 prefix),
             WhatsAppOrderingMessageBuilder.BuildMenuNavigationButtons(safePage, totalPages),
-            "Type a number, or type an item name to search.");
+            null);
     }
 
     private async Task<OutgoingReply> BuildCategoryReplyAsync(
@@ -742,9 +749,8 @@ public sealed partial class ConversationService(
             restaurant.Id);
 
         return OutgoingReply.ButtonReply(
-            $"{item.Name} - Rs {item.Price:0.##}. Choose quantity.",
-            WhatsAppOrderingMessageBuilder.BuildQuantityButtons(item.Id),
-            "Type any other quantity as a number, for example 4 or 10.");
+            $"{item.Name} — Rs {item.Price:0.##}\n\nSelect a quantity below or type any quantity, such as 4 or 10.",
+            WhatsAppOrderingMessageBuilder.BuildQuantityButtons(item.Id));
     }
 
     private async Task<OutgoingReply> AddItemAsync(
@@ -784,7 +790,7 @@ public sealed partial class ConversationService(
             conversation,
             draft,
             cancellationToken,
-            $"Added: {quantity} x {item.Name}\nCart total: Rs {draft.TotalAmount:0.##}",
+            $"✅ Added to cart\n\n{quantity} × {item.Name}\nCart total: Rs {draft.TotalAmount:0.##}",
             shouldReturnToDefaultMenu ? null : item.CategoryId,
             shouldReturnToDefaultMenu ? 0 : draft.CurrentMenuPage);
     }
@@ -881,7 +887,7 @@ public sealed partial class ConversationService(
         {
             conversation.CurrentState = ConversationStates.CategorySelection;
             return OutgoingReply.ButtonReply(
-                "Your cart is empty. Browse the menu to add an item.",
+                "Your cart is currently empty.\n\nSelect an item from the menu to begin your order.",
                 new[] { new WhatsAppReplyButton("category.list", "Browse Menu") });
         }
 
@@ -920,7 +926,7 @@ public sealed partial class ConversationService(
 
     private static OutgoingReply BuildFulfilmentReply() =>
         OutgoingReply.ButtonReply(
-            "Is this order for delivery or pickup?",
+            "How would you like to receive your order?",
             WhatsAppOrderingMessageBuilder.BuildFulfilmentButtons());
 
     private static OutgoingReply BuildConfirmationReply(PendingOrderDraft draft) =>
@@ -965,7 +971,7 @@ public sealed partial class ConversationService(
         if (draft.Items.Count == 0)
         {
             conversation.CurrentState = ConversationStates.CategorySelection;
-            return "Your cart is empty. Type Menu to start again.";
+            return "Your cart is currently empty.\n\nSelect an item from the menu to begin your order.";
         }
 
         var order = new Order
@@ -1023,7 +1029,10 @@ public sealed partial class ConversationService(
         }
 
         await dbContext.SaveChangesAsync(cancellationToken);
-        return MenuTextFormatter.BuildOrderReceived(order.OrderNumber);
+        return MenuTextFormatter.BuildOrderReceived(
+            order.OrderNumber,
+            order.CustomerName,
+            restaurant.Name);
     }
 
     private async Task<OutgoingReply> BuildFullMenuReplyAsync(
@@ -1073,6 +1082,24 @@ public sealed partial class ConversationService(
         }
 
         return customer;
+    }
+
+    private Task<bool> IsRecentDuplicateIncomingMessageAsync(
+        Guid restaurantId,
+        Guid customerId,
+        IncomingWhatsAppMessage message,
+        CancellationToken cancellationToken)
+    {
+        var receivedAt = message.ReceivedAt ?? DateTimeOffset.UtcNow;
+        var duplicateWindowStart = receivedAt.AddSeconds(-10);
+
+        return dbContext.MessageLogs.AnyAsync(
+            x => x.RestaurantId == restaurantId &&
+                 x.CustomerId == customerId &&
+                 x.Direction == MessageDirections.Incoming &&
+                 x.MessageText == message.MessageText &&
+                 x.CreatedAt >= duplicateWindowStart,
+            cancellationToken);
     }
 
     private async Task<Conversation> GetOrCreateConversationAsync(

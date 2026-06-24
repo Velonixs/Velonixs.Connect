@@ -46,13 +46,22 @@ var app = builder.Build();
 
 using (var scope = app.Services.CreateScope())
 {
-    await scope.ServiceProvider.GetRequiredService<DatabaseInitializer>().InitializeAsync();
+    var logger = scope.ServiceProvider
+        .GetRequiredService<ILoggerFactory>()
+        .CreateLogger("Startup");
+    try
+    {
+        await scope.ServiceProvider.GetRequiredService<DatabaseInitializer>().InitializeAsync();
+    }
+    catch (Exception ex)
+    {
+        logger.LogCritical(ex, "Portal startup failed while initializing the database.");
+        throw;
+    }
 }
 
-if (!app.Environment.IsDevelopment())
-{
-    app.UseExceptionHandler("/portal/error");
-}
+app.UseExceptionHandler("/portal/error");
+app.UseStatusCodePagesWithReExecute("/portal/error", "?statusCode={0}");
 
 app.UseStaticFiles();
 app.UseRouting();

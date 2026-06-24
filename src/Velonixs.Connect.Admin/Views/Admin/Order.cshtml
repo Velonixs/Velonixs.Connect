@@ -1,6 +1,7 @@
 @model OrderAdminViewModel
 @{
     ViewData["Title"] = Model.Order.OrderNumber;
+    var isPendingConfirmation = Model.Order.OrderStatus == Velonixs.Connect.Domain.Entities.OrderStatuses.PendingConfirmation;
 }
 
 <section class="d-flex flex-column flex-sm-row align-items-sm-center justify-content-between gap-3 mb-4">
@@ -18,7 +19,13 @@
     <div class="col-12 col-md-4"><div class="metric h-100">
         <span>Status</span>
         <strong>@Model.Order.OrderStatus</strong>
-        <small>@Model.Order.CreatedAt.ToLocalTime().ToString("dd MMM yyyy, hh:mm tt")</small>
+        <small>
+            @Model.Order.CreatedAt.ToLocalTime().ToString("dd MMM yyyy, hh:mm tt")
+            @if (Model.Order.EstimatedMinutes is int estimatedMinutes)
+            {
+                <span> - ETA @estimatedMinutes min</span>
+            }
+        </small>
     </div></div>
     <div class="col-12 col-md-4"><div class="metric h-100">
         <span>Total</span>
@@ -73,6 +80,25 @@
                     }
                 </select>
             </label>
+            @if (isPendingConfirmation)
+            {
+                <label>
+                    <span>Estimated time for confirmation</span>
+                    <select class="form-select" name="EstimatedMinutes">
+                        <option value="20">20 minutes</option>
+                        <option value="30" selected>30 minutes</option>
+                        <option value="45">45 minutes</option>
+                    </select>
+                </label>
+                <label>
+                    <span>Custom estimated minutes</span>
+                    <input class="form-control" name="CustomEstimatedMinutes" type="number" min="1" max="1440" placeholder="Optional" />
+                </label>
+            }
+            <label>
+                <span>Customer-visible comment</span>
+                <textarea class="form-control" name="Comment" rows="3" placeholder="Required if rejecting; optional otherwise"></textarea>
+            </label>
             <button class="btn btn-success" type="submit">Update status</button>
             </div>
         </form>
@@ -82,6 +108,42 @@
         <h3>Delivery</h3>
         <p>@Model.Order.Address</p>
     </div>
+</section>
+
+<section class="section-band">
+    <div class="section-heading">
+        <h2>Status History</h2>
+    </div>
+    @if (Model.Order.StatusHistory.Count == 0)
+    {
+        <p class="text-muted mb-0">No status updates yet.</p>
+    }
+    else
+    {
+        <div class="table-wrap">
+            <table>
+                <thead>
+                    <tr>
+                        <th>Time</th>
+                        <th>Change</th>
+                        <th>Updated By</th>
+                        <th>Comment</th>
+                    </tr>
+                </thead>
+                <tbody>
+                @foreach (var history in Model.Order.StatusHistory)
+                {
+                    <tr>
+                        <td>@history.UpdatedAtUtc.ToLocalTime().ToString("dd MMM yyyy, hh:mm tt")</td>
+                        <td>@history.PreviousStatus &rarr; @history.NewStatus</td>
+                        <td>@history.UpdatedBy</td>
+                        <td>@history.Comment</td>
+                    </tr>
+                }
+                </tbody>
+            </table>
+        </div>
+    }
 </section>
 
 <section class="section-band">

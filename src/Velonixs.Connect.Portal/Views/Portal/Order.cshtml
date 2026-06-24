@@ -1,6 +1,10 @@
 @model PortalOrderViewModel
 @{
     ViewData["Title"] = Model.Order.OrderNumber;
+    var pendingConfirmation = Model.Order.OrderStatus == Velonixs.Connect.Domain.Entities.OrderStatuses.PendingConfirmation;
+    var terminalStatus = Model.Order.OrderStatus is Velonixs.Connect.Domain.Entities.OrderStatuses.Delivered
+        or Velonixs.Connect.Domain.Entities.OrderStatuses.Rejected
+        or Velonixs.Connect.Domain.Entities.OrderStatuses.Cancelled;
 }
 
 <section class="d-flex flex-column flex-sm-row align-items-sm-center justify-content-between gap-3 mb-4">
@@ -15,7 +19,13 @@
     <div class="col-12 col-md-4"><div class="metric h-100">
         <span>Status</span>
         <strong>@Model.Order.OrderStatus</strong>
-        <small>@Model.Order.CreatedAt.ToLocalTime().ToString("dd MMM yyyy, hh:mm tt")</small>
+        <small>
+            @Model.Order.CreatedAt.ToLocalTime().ToString("dd MMM yyyy, hh:mm tt")
+            @if (Model.Order.EstimatedMinutes is int estimatedMinutes)
+            {
+                <span> - ETA @estimatedMinutes min</span>
+            }
+        </small>
     </div></div>
     <div class="col-12 col-md-4"><div class="metric h-100">
         <span>Total</span>
@@ -48,26 +58,110 @@
         <p>@Model.Order.Address</p>
     </div>
 
-    <form class="col-12 col-lg-4" asp-action="UpdateOrderStatus" asp-route-id="@Model.Order.Id" method="post">
-        @Html.AntiForgeryToken()
-        <div class="card bg-light border-0 p-3">
-        <h2 class="h5">Update Status</h2>
-        <select class="form-select mb-3" name="Status">
-            @foreach (var status in Model.StatusOptions)
-            {
-                if (status == Model.Order.OrderStatus)
+    <div class="col-12 col-lg-4">
+        @if (pendingConfirmation)
+        {
+            <div class="card bg-light border-0 p-3 mb-3">
+                <h2 class="h5">Confirm Order</h2>
+                <form asp-action="UpdateOrderStatus" asp-route-id="@Model.Order.Id" method="post">
+                    @Html.AntiForgeryToken()
+                    <input type="hidden" name="Status" value="@Velonixs.Connect.Domain.Entities.OrderStatuses.Confirmed" />
+                    <label class="form-label" for="EstimatedMinutes">Estimated time</label>
+                    <select class="form-select mb-2" id="EstimatedMinutes" name="EstimatedMinutes">
+                        <option value="20">20 minutes</option>
+                        <option value="30" selected>30 minutes</option>
+                        <option value="45">45 minutes</option>
+                    </select>
+                    <label class="form-label" for="CustomEstimatedMinutes">Custom estimated time</label>
+                    <input class="form-control mb-2" id="CustomEstimatedMinutes" name="CustomEstimatedMinutes" type="number" min="1" max="1440" placeholder="Optional minutes" />
+                    <label class="form-label" for="ConfirmComment">Customer-visible comment</label>
+                    <textarea class="form-control mb-3" id="ConfirmComment" name="Comment" rows="3" placeholder="Optional message for customer"></textarea>
+                    <button class="btn btn-success w-100" type="submit">Confirm Order</button>
+                </form>
+            </div>
+
+            <div class="card border-danger p-3">
+                <h2 class="h5">Reject Order</h2>
+                <form asp-action="UpdateOrderStatus" asp-route-id="@Model.Order.Id" method="post">
+                    @Html.AntiForgeryToken()
+                    <input type="hidden" name="Status" value="@Velonixs.Connect.Domain.Entities.OrderStatuses.Rejected" />
+                    <label class="form-label" for="RejectComment">Rejection reason</label>
+                    <textarea class="form-control mb-3" id="RejectComment" name="Comment" rows="3" required placeholder="Tell the customer why this order cannot be accepted"></textarea>
+                    <button class="btn btn-outline-danger w-100" type="submit">Reject Order</button>
+                </form>
+            </div>
+        }
+        else if (!terminalStatus)
+        {
+            <form asp-action="UpdateOrderStatus" asp-route-id="@Model.Order.Id" method="post">
+                @Html.AntiForgeryToken()
+                <div class="card bg-light border-0 p-3">
+                    <h2 class="h5">Update Status</h2>
+                    <select class="form-select mb-3" name="Status">
+                        @foreach (var status in Model.StatusOptions)
+                        {
+                            if (status == Model.Order.OrderStatus)
+                            {
+                                <option value="@status" selected>@status</option>
+                            }
+                            else
+                            {
+                                <option value="@status">@status</option>
+                            }
+                        }
+                    </select>
+                    <label class="form-label" for="StatusComment">Customer-visible comment</label>
+                    <textarea class="form-control mb-3" id="StatusComment" name="Comment" rows="3" placeholder="Optional status note"></textarea>
+                    <button class="btn btn-primary" type="submit">Save status</button>
+                </div>
+            </form>
+        }
+        else
+        {
+            <div class="card bg-light border-0 p-3">
+                <h2 class="h5">Order Closed</h2>
+                <p class="mb-0">This order is @Model.Order.OrderStatus and cannot be updated further.</p>
+            </div>
+        }
+    </div>
+    </div>
+</section>
+
+<section class="card shadow-sm mb-4">
+    <div class="card-body">
+    <div class="section-heading">
+        <h2>Status History</h2>
+    </div>
+    @if (Model.Order.StatusHistory.Count == 0)
+    {
+        <p class="text-muted mb-0">No status updates yet.</p>
+    }
+    else
+    {
+        <div class="table-responsive">
+            <table class="table table-hover align-middle mb-0">
+                <thead>
+                    <tr>
+                        <th>Time</th>
+                        <th>Change</th>
+                        <th>Updated By</th>
+                        <th>Comment</th>
+                    </tr>
+                </thead>
+                <tbody>
+                @foreach (var history in Model.Order.StatusHistory)
                 {
-                    <option value="@status" selected>@status</option>
+                    <tr>
+                        <td>@history.UpdatedAtUtc.ToLocalTime().ToString("dd MMM yyyy, hh:mm tt")</td>
+                        <td>@history.PreviousStatus &rarr; @history.NewStatus</td>
+                        <td>@history.UpdatedBy</td>
+                        <td>@history.Comment</td>
+                    </tr>
                 }
-                else
-                {
-                    <option value="@status">@status</option>
-                }
-            }
-        </select>
-        <button class="btn btn-primary" type="submit">Save status</button>
+                </tbody>
+            </table>
         </div>
-    </form>
+    }
     </div>
 </section>
 

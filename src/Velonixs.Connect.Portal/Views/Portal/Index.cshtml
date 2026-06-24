@@ -18,7 +18,7 @@
     <div class="col-12 col-sm-6 col-xl-3"><div class="metric urgent h-100">
         <span>Pending Orders</span>
         <strong>@Model.PendingOrderCount</strong>
-        <small>Confirmed or notified</small>
+        <small>Awaiting restaurant confirmation</small>
     </div></div>
     <div class="col-12 col-sm-6 col-xl-3"><div class="metric h-100">
         <span>Today Orders</span>
@@ -36,6 +36,14 @@
         <small>Visible to customers</small>
     </div></div>
 </section>
+
+@if (Model.PendingOrderCount > 0)
+{
+    <section class="alert alert-warning border-warning shadow-sm new-order-alert" role="alert">
+        <strong>New order alert:</strong> @Model.PendingOrderCount order@(Model.PendingOrderCount == 1 ? "" : "s") waiting for confirmation.
+        Open the order to confirm or reject it.
+    </section>
+}
 
 <section class="card shadow-sm mb-4">
     <div class="card-body">
@@ -57,7 +65,7 @@
             <tbody>
             @foreach (var order in Model.Orders)
             {
-                <tr>
+                <tr class="@(order.OrderStatus == Velonixs.Connect.Domain.Entities.OrderStatuses.PendingConfirmation ? "table-warning pending-order-row" : "")">
                     <td><strong>@order.OrderNumber</strong><small>@order.Address</small></td>
                     <td>@order.CustomerName<small>@order.CustomerPhone</small></td>
                     <td><span class="pill">@order.OrderStatus</span></td>
@@ -71,6 +79,44 @@
     </div>
     </div>
 </section>
+
+@if (Model.PendingOrderCount > 0)
+{
+    <script>
+        (() => {
+            if (sessionStorage.getItem("velonixs.pendingOrderAlert") === "@Model.PendingOrderCount") {
+                return;
+            }
+
+            sessionStorage.setItem("velonixs.pendingOrderAlert", "@Model.PendingOrderCount");
+            const AudioContextCtor = window.AudioContext || window.webkitAudioContext;
+            if (!AudioContextCtor) {
+                return;
+            }
+
+            const context = new AudioContextCtor();
+            const oscillator = context.createOscillator();
+            const gain = context.createGain();
+            oscillator.type = "sine";
+            oscillator.frequency.value = 880;
+            gain.gain.setValueAtTime(0.001, context.currentTime);
+            gain.gain.exponentialRampToValueAtTime(0.15, context.currentTime + 0.02);
+            gain.gain.exponentialRampToValueAtTime(0.001, context.currentTime + 0.35);
+            oscillator.connect(gain);
+            gain.connect(context.destination);
+            oscillator.start();
+            oscillator.stop(context.currentTime + 0.38);
+        })();
+    </script>
+}
+
+<script>
+    window.setTimeout(() => {
+        if (!document.hidden) {
+            window.location.reload();
+        }
+    }, 15000);
+</script>
 
 <section class="card shadow-sm mb-4">
     <div class="card-body">

@@ -40,14 +40,50 @@ public sealed class InteractiveOrderingTests
     }
 
     [Fact]
-    public void QuantitySelection_OffersOneThroughFiveAndCustom()
+    public void QuantitySelection_OffersOneThroughThreeButtonsOnly()
     {
         var item = Item("Paneer Pizza", 249);
 
-        var rows = WhatsAppOrderingMessageBuilder.BuildQuantitySections(item).Single().Rows;
+        var buttons = WhatsAppOrderingMessageBuilder.BuildQuantityButtons(item.Id);
 
-        Assert.Equal(6, rows.Count);
-        Assert.Equal(new[] { "1", "2", "3", "4", "5", "Custom quantity" }, rows.Select(x => x.Title));
+        Assert.Equal(3, buttons.Count);
+        Assert.Equal(new[] { "1", "2", "3" }, buttons.Select(x => x.Title));
+        Assert.DoesNotContain(buttons, button => button.Title.Contains("Custom", StringComparison.OrdinalIgnoreCase));
+    }
+
+    [Fact]
+    public void NumberedMenuNavigation_UsesMaximumThreeButtons()
+    {
+        var firstPage = WhatsAppOrderingMessageBuilder.BuildMenuNavigationButtons(0, 3);
+        var middlePage = WhatsAppOrderingMessageBuilder.BuildMenuNavigationButtons(1, 3);
+        var lastPage = WhatsAppOrderingMessageBuilder.BuildMenuNavigationButtons(2, 3);
+
+        Assert.Equal(new[] { "Next", "View Cart", "Checkout" }, firstPage.Select(x => x.Title));
+        Assert.Equal(new[] { "Previous", "Next", "View Cart" }, middlePage.Select(x => x.Title));
+        Assert.Equal(new[] { "Previous", "View Cart", "Checkout" }, lastPage.Select(x => x.Title));
+        Assert.All(new[] { firstPage, middlePage, lastPage }, buttons => Assert.True(buttons.Count <= 3));
+    }
+
+    [Fact]
+    public void NumberedMenuText_GroupsItemsAndShowsNumbers()
+    {
+        var category = new MenuCategory { Name = "Pizza" };
+        var pageItems = new[]
+        {
+            (Category: category, Item: Item("Paneer Pizza", 249, category.Id)),
+            (Category: category, Item: Item("Margherita Pizza", 199, category.Id))
+        };
+
+        var message = WhatsAppOrderingMessageBuilder.BuildNumberedMenuText(
+            "99 Restaurant",
+            pageItems,
+            0,
+            1);
+
+        Assert.Contains("Welcome to 99 Restaurant.", message);
+        Assert.Contains("Pizza", message);
+        Assert.Contains("1. Paneer Pizza - Rs 249", message);
+        Assert.Contains("2. Margherita Pizza - Rs 199", message);
     }
 
     [Fact]

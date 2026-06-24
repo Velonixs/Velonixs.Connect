@@ -180,8 +180,9 @@ public sealed class WhatsAppCloudMessageSender(
         if (!response.IsSuccessStatusCode)
         {
             logger.LogWarning(
-                "WhatsApp send failed. StatusCode={StatusCode}",
-                response.StatusCode);
+                "WhatsApp send failed. StatusCode={StatusCode}, Response={Response}",
+                response.StatusCode,
+                responseText);
 
             return new WhatsAppSendResult(false, false, Error: responseText);
         }

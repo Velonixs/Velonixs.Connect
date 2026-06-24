@@ -9,6 +9,7 @@ public static class WhatsAppOrderingMessageBuilder
     public const int CategoryPageSize = 8;
     public const int ItemPageSize = 6;
     public const int DirectMenuItemCount = 6;
+    public const int NumberedMenuPageSize = 6;
 
     public static IReadOnlyCollection<WhatsAppInteractiveListSection> BuildDirectMenuSections(
         MenuCategory category,
@@ -167,6 +168,100 @@ public static class WhatsAppOrderingMessageBuilder
 
         return new[] { new WhatsAppInteractiveListSection("Quantity", rows) };
     }
+
+    /// <summary>
+    /// Builds a plain-text numbered menu so customers can reply with the item number shown on the current page.
+    /// </summary>
+    public static string BuildNumberedMenuText(
+        string restaurantName,
+        IReadOnlyList<(MenuCategory Category, MenuItem Item)> pageItems,
+        int page,
+        int totalPages,
+        string? prefix = null)
+    {
+        var builder = new System.Text.StringBuilder();
+
+        if (!string.IsNullOrWhiteSpace(prefix))
+        {
+            builder.AppendLine(prefix.Trim());
+            builder.AppendLine();
+        }
+
+        builder.AppendLine($"Welcome to {restaurantName}.");
+        builder.AppendLine($"Reply with item number to choose. Page {page + 1} of {totalPages}.");
+
+        Guid? currentCategoryId = null;
+        for (var index = 0; index < pageItems.Count; index++)
+        {
+            var (category, item) = pageItems[index];
+            if (currentCategoryId != category.Id)
+            {
+                currentCategoryId = category.Id;
+                builder.AppendLine();
+                builder.AppendLine(category.Name);
+                builder.AppendLine("----------------");
+            }
+
+            builder.AppendLine($"{index + 1}. {item.Name} - Rs {FormatAmount(item.Price)}");
+        }
+
+        builder.AppendLine();
+        builder.AppendLine("You can also type an item name to search.");
+
+        return builder.ToString().Trim();
+    }
+
+    /// <summary>
+    /// Builds WhatsApp reply buttons for the numbered menu page while respecting the three-button limit.
+    /// </summary>
+    public static IReadOnlyCollection<WhatsAppReplyButton> BuildMenuNavigationButtons(
+        int page,
+        int totalPages)
+    {
+        var safePage = Math.Max(0, page);
+        var safeTotalPages = Math.Max(1, totalPages);
+
+        IReadOnlyCollection<WhatsAppReplyButton> buttons = safeTotalPages switch
+        {
+            <= 1 => new[]
+            {
+                new WhatsAppReplyButton("cart.view", "View Cart"),
+                new WhatsAppReplyButton("cart.checkout", "Checkout"),
+                new WhatsAppReplyButton("main.staff", "Contact Us")
+            },
+            _ when safePage <= 0 => new[]
+            {
+                new WhatsAppReplyButton("menu.next", "Next"),
+                new WhatsAppReplyButton("cart.view", "View Cart"),
+                new WhatsAppReplyButton("cart.checkout", "Checkout")
+            },
+            _ when safePage >= safeTotalPages - 1 => new[]
+            {
+                new WhatsAppReplyButton("menu.previous", "Previous"),
+                new WhatsAppReplyButton("cart.view", "View Cart"),
+                new WhatsAppReplyButton("cart.checkout", "Checkout")
+            },
+            _ => new[]
+            {
+                new WhatsAppReplyButton("menu.previous", "Previous"),
+                new WhatsAppReplyButton("menu.next", "Next"),
+                new WhatsAppReplyButton("cart.view", "View Cart")
+            }
+        };
+
+        return buttons.Take(3).ToArray();
+    }
+
+    /// <summary>
+    /// Builds compact quantity buttons. Customers can still type any numeric quantity manually.
+    /// </summary>
+    public static IReadOnlyCollection<WhatsAppReplyButton> BuildQuantityButtons(Guid menuItemId) =>
+        new[]
+        {
+            new WhatsAppReplyButton($"quantity.select:{menuItemId}:1", "1"),
+            new WhatsAppReplyButton($"quantity.select:{menuItemId}:2", "2"),
+            new WhatsAppReplyButton($"quantity.select:{menuItemId}:3", "3")
+        };
 
     public static IReadOnlyCollection<WhatsAppReplyButton> BuildMainMenuButtons() =>
         new[]

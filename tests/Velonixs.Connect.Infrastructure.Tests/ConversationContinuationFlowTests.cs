@@ -14,7 +14,7 @@ namespace Velonixs.Connect.Infrastructure.Tests;
 public sealed class ConversationContinuationFlowTests
 {
     [Fact]
-    public async Task Greeting_ShowsDirectMenuListAndSelectionGoesToQuantity()
+    public async Task Greeting_ShowsNumberedMenuAndSelectionGoesToQuantity()
     {
         await using var dbContext = CreateDbContext();
         var restaurant = new Restaurant
@@ -40,16 +40,13 @@ public sealed class ConversationContinuationFlowTests
 
         var greeting = await Send(service, "Hi");
 
-        Assert.Contains("Welcome to 99 Restaurant. Choose an item", greeting.ReplyText);
-        Assert.Equal("Menu", sender.LastButtonText);
-        Assert.Empty(sender.LastButtons);
-        Assert.Contains(sender.LastSections, section => section.Title == "Pizza");
-        Assert.Contains(sender.LastSections.SelectMany(section => section.Rows), row =>
-            row.Id == $"item.select:{paneerPizza.Id}" && row.Title == "Paneer Pizza");
-        Assert.Contains(sender.LastSections.SelectMany(section => section.Rows), row =>
-            row.Id == "cart.view" && row.Title == "View Cart");
-        Assert.Contains(sender.LastSections.SelectMany(section => section.Rows), row =>
-            row.Id == "main.staff" && row.Title == "Contact Us");
+        Assert.Contains("Welcome to 99 Restaurant.", greeting.ReplyText);
+        Assert.Contains("Pizza", greeting.ReplyText);
+        Assert.Contains("1. Paneer Pizza - Rs 249", greeting.ReplyText);
+        Assert.Contains("2. Margherita Pizza - Rs 199", greeting.ReplyText);
+        Assert.Empty(sender.LastSections);
+        Assert.Equal(new[] { "cart.view", "cart.checkout", "main.staff" }, sender.LastButtons.Select(x => x.Id));
+        Assert.All(sender.LastButtons, button => Assert.True(button.Title.Length <= 20));
 
         var conversation = await dbContext.Conversations.SingleAsync();
         var draft = ReadDraft(conversation);
@@ -58,10 +55,43 @@ public sealed class ConversationContinuationFlowTests
         Assert.Equal(pizza.Id, draft.CurrentCategoryId);
         Assert.Equal(ConversationStates.ItemSelection, draft.CurrentStep);
 
-        var quantity = await Send(service, $"item.select:{paneerPizza.Id}");
+        var quantity = await Send(service, "1");
 
         Assert.Contains("Paneer Pizza - Rs 249", quantity.ReplyText);
-        Assert.Equal("Quantity", sender.LastButtonText);
+        Assert.Equal(new[] { "1", "2", "3" }, sender.LastButtons.Select(x => x.Title));
+        Assert.Empty(sender.LastSections);
+    }
+
+    [Fact]
+    public async Task Greeting_DoesNotUseInteractiveList()
+    {
+        await using var dbContext = CreateDbContext();
+        var restaurant = new Restaurant
+        {
+            Name = "99 Restaurant",
+            WhatsAppPhoneNumberId = "phone-id"
+        };
+        var category = new MenuCategory
+        {
+            Restaurant = restaurant,
+            Name = "Pizza",
+            DisplayOrder = 1
+        };
+        var item = MenuItem(restaurant, category, "Paneer Pizza", 249, 1);
+
+        dbContext.AddRange(restaurant, category, item);
+        await dbContext.SaveChangesAsync();
+
+        var sender = new FakeMessageSender { FailInteractiveLists = true };
+        var service = CreateService(dbContext, sender);
+
+        await Send(service, "Hi");
+
+        Assert.Equal(0, sender.InteractiveListSendCount);
+        Assert.Empty(sender.TextMessages);
+        Assert.Contains("Welcome to 99 Restaurant", sender.LastButtonBodyText);
+        Assert.Contains("1. Paneer Pizza - Rs 249", sender.LastButtonBodyText);
+        Assert.Equal(new[] { "View Cart", "Checkout", "Contact Us" }, sender.LastButtons.Select(x => x.Title));
     }
 
     [Fact]
@@ -91,9 +121,103 @@ public sealed class ConversationContinuationFlowTests
 
         Assert.Contains("Your cart is empty", cart.ReplyText);
         Assert.Contains("Choose an item", cart.ReplyText);
-        Assert.Equal("Menu", sender.LastButtonText);
-        Assert.Contains(sender.LastSections.SelectMany(section => section.Rows), row =>
-            row.Id == $"item.select:{item.Id}");
+        Assert.Empty(sender.LastSections);
+        Assert.Contains("1. Paneer Pizza - Rs 249", cart.ReplyText);
+        Assert.Equal(new[] { "View Cart", "Checkout", "Contact Us" }, sender.LastButtons.Select(x => x.Title));
+    }
+
+    [Fact]
+    public async Task NumberedMenu_PaginatesWithExpectedThreeButtonSets()
+    {
+        await using var dbContext = CreateDbContext();
+        var restaurant = new Restaurant
+        {
+            Name = "99 Restaurant",
+            WhatsAppPhoneNumberId = "phone-id"
+        };
+        var category = new MenuCategory
+        {
+            Restaurant = restaurant,
+            Name = "Pizza",
+            DisplayOrder = 1
+        };
+        var items = Enumerable.Range(1, 14)
+            .Select(index => MenuItem(restaurant, category, $"Pizza {index}", 100 + index, index))
+            .ToArray();
+
+        dbContext.AddRange(restaurant, category);
+        dbContext.AddRange(items);
+        await dbContext.SaveChangesAsync();
+
+        var sender = new FakeMessageSender();
+        var service = CreateService(dbContext, sender);
+
+        var firstPage = await Send(service, "Hi");
+
+        Assert.Contains("Page 1 of 3", firstPage.ReplyText);
+        Assert.Contains("1. Pizza 1 - Rs 101", firstPage.ReplyText);
+        Assert.Equal(new[] { "Next", "View Cart", "Checkout" }, sender.LastButtons.Select(x => x.Title));
+
+        var middlePage = await Send(service, "menu.next");
+
+        Assert.Contains("Page 2 of 3", middlePage.ReplyText);
+        Assert.Contains("1. Pizza 7 - Rs 107", middlePage.ReplyText);
+        Assert.Equal(new[] { "Previous", "Next", "View Cart" }, sender.LastButtons.Select(x => x.Title));
+
+        var lastPage = await Send(service, "menu.next");
+
+        Assert.Contains("Page 3 of 3", lastPage.ReplyText);
+        Assert.Contains("1. Pizza 13 - Rs 113", lastPage.ReplyText);
+        Assert.Equal(new[] { "Previous", "View Cart", "Checkout" }, sender.LastButtons.Select(x => x.Title));
+        Assert.All(sender.LastButtons, _ => Assert.True(sender.LastButtons.Count <= 3));
+    }
+
+    [Fact]
+    public async Task NumberedMenu_SelectsItemByNumberAndKeepsCartWhilePaging()
+    {
+        await using var dbContext = CreateDbContext();
+        var restaurant = new Restaurant
+        {
+            Name = "99 Restaurant",
+            WhatsAppPhoneNumberId = "phone-id"
+        };
+        var category = new MenuCategory
+        {
+            Restaurant = restaurant,
+            Name = "Pizza",
+            DisplayOrder = 1
+        };
+        var items = Enumerable.Range(1, 8)
+            .Select(index => MenuItem(restaurant, category, $"Pizza {index}", 100 + index, index))
+            .ToArray();
+
+        dbContext.AddRange(restaurant, category);
+        dbContext.AddRange(items);
+        await dbContext.SaveChangesAsync();
+
+        var sender = new FakeMessageSender();
+        var service = CreateService(dbContext, sender);
+
+        await Send(service, "Hi");
+        await Send(service, "2");
+        var firstAdd = await Send(service, "4");
+
+        Assert.Contains("Added: 4 x Pizza 2", firstAdd.ReplyText);
+        Assert.Contains("Cart total: Rs 408", firstAdd.ReplyText);
+        Assert.Contains("Page 1 of 2", firstAdd.ReplyText);
+
+        await Send(service, "menu.next");
+        await Send(service, "1");
+        var secondAdd = await Send(service, "2");
+
+        Assert.Contains("Added: 2 x Pizza 7", secondAdd.ReplyText);
+        Assert.Contains("Page 2 of 2", secondAdd.ReplyText);
+
+        var cart = await Send(service, "cart.view");
+
+        Assert.Contains("4 x Pizza 2", cart.ReplyText);
+        Assert.Contains("2 x Pizza 7", cart.ReplyText);
+        Assert.Contains("Total: Rs 622", cart.ReplyText);
     }
 
     [Fact]
@@ -120,18 +244,18 @@ public sealed class ConversationContinuationFlowTests
         var sender = new FakeMessageSender();
         var service = CreateService(dbContext, sender);
 
-        await Send(service, $"category.select:{category.Id}");
-        await Send(service, $"item.select:{paneerPizza.Id}");
-        var firstAdd = await Send(service, $"quantity.select:{paneerPizza.Id}:5");
+        await Send(service, "Hi");
+        await Send(service, "1");
+        var firstAdd = await Send(service, "5");
 
         Assert.Contains("Added: 5 x Paneer Pizza", firstAdd.ReplyText);
         Assert.Contains("Cart total: Rs 1245", firstAdd.ReplyText);
         Assert.DoesNotContain("What would you like to do?", firstAdd.ReplyText);
-        Assert.Equal("Menu", sender.LastButtonText);
-        Assert.Contains(sender.LastSections, section => section.Title == "Pizza");
-        Assert.Contains(sender.LastSections.SelectMany(x => x.Rows), row =>
-            row.Id == $"item.select:{farmhousePizza.Id}");
-        Assert.Contains(sender.LastSections.SelectMany(x => x.Rows), row => row.Id == "cart.checkout");
+        Assert.Empty(sender.LastSections);
+        Assert.Contains("Pizza", firstAdd.ReplyText);
+        Assert.Contains("2. Farmhouse Pizza - Rs 299", firstAdd.ReplyText);
+        Assert.Contains(sender.LastButtons, button => button.Id == "cart.checkout");
+        Assert.All(sender.LastButtons, button => Assert.True(sender.LastButtons.Count <= 3));
 
         var conversation = await dbContext.Conversations.SingleAsync();
         var firstDraft = ReadDraft(conversation);
@@ -140,8 +264,8 @@ public sealed class ConversationContinuationFlowTests
         Assert.Equal("Pizza", firstDraft.SelectedCategoryName);
         Assert.Equal(ConversationStates.ItemSelection, conversation.CurrentState);
 
-        await Send(service, $"item.select:{farmhousePizza.Id}");
-        await Send(service, $"quantity.select:{farmhousePizza.Id}:1");
+        await Send(service, "2");
+        await Send(service, "1");
 
         var finalDraft = ReadDraft(conversation);
 
@@ -184,12 +308,11 @@ public sealed class ConversationContinuationFlowTests
 
         await Send(service, "pizza");
         await Send(service, $"item.select:{farmhousePizza.Id}");
-        var added = await Send(service, $"quantity.select:{farmhousePizza.Id}:1");
+        var added = await Send(service, "1");
 
         Assert.Contains("Added: 1 x Farmhouse Pizza", added.ReplyText);
-        Assert.Equal("Burgers", sender.LastSections.First().Title);
-        Assert.Contains(sender.LastSections.SelectMany(section => section.Rows), row =>
-            row.Id == $"item.select:{vegBurger.Id}");
+        Assert.Contains("Burgers", added.ReplyText);
+        Assert.Contains("1. Veg Burger - Rs 99", added.ReplyText);
     }
 
     [Fact]
@@ -278,6 +401,46 @@ public sealed class ConversationContinuationFlowTests
         Assert.Equal("Abcds", customer.LastAddress);
     }
 
+    [Fact]
+    public async Task FinalCustomerConfirmation_CreatesPendingConfirmationOrderWithHistory()
+    {
+        await using var dbContext = CreateDbContext();
+        var restaurant = new Restaurant
+        {
+            Name = "99 Restaurant",
+            WhatsAppPhoneNumberId = "phone-id"
+        };
+        var category = new MenuCategory
+        {
+            Restaurant = restaurant,
+            Name = "Main",
+            DisplayOrder = 1
+        };
+        var item = MenuItem(restaurant, category, "Paneer Butter Masala", 220, 1);
+
+        dbContext.AddRange(restaurant, category, item);
+        await dbContext.SaveChangesAsync();
+
+        var sender = new FakeMessageSender();
+        var service = CreateService(dbContext, sender);
+
+        await AddOneItemToCart(service, category, item, 2);
+        await Send(service, "cart.checkout");
+        await Send(service, "checkout.pickup");
+        var created = await Send(service, "yes");
+
+        Assert.Contains("Order ID", created.ReplyText);
+
+        var order = await dbContext.Orders
+            .Include(x => x.StatusHistory)
+            .SingleAsync();
+
+        Assert.Equal(OrderStatuses.PendingConfirmation, order.OrderStatus);
+        var history = Assert.Single(order.StatusHistory);
+        Assert.Equal(OrderStatuses.Draft, history.PreviousStatus);
+        Assert.Equal(OrderStatuses.PendingConfirmation, history.NewStatus);
+    }
+
     private static ConversationService CreateService(
         RestaurantConnectDbContext dbContext,
         IWhatsAppMessageSender sender)
@@ -351,6 +514,10 @@ public sealed class ConversationContinuationFlowTests
 
     private sealed class FakeMessageSender : IWhatsAppMessageSender
     {
+        public bool FailInteractiveLists { get; init; }
+        public int InteractiveListSendCount { get; private set; }
+        public List<string> TextMessages { get; } = new();
+        public string? LastButtonBodyText { get; private set; }
         public string? LastButtonText { get; private set; }
         public string? LastFooterText { get; private set; }
         public IReadOnlyCollection<WhatsAppInteractiveListSection> LastSections { get; private set; } =
@@ -362,8 +529,16 @@ public sealed class ConversationContinuationFlowTests
             string phoneNumberId,
             string recipientPhoneNumber,
             string message,
-            CancellationToken cancellationToken = default) =>
-            Task.FromResult(new WhatsAppSendResult(true, false));
+            CancellationToken cancellationToken = default)
+        {
+            TextMessages.Add(message);
+            LastButtonBodyText = null;
+            LastButtonText = null;
+            LastFooterText = null;
+            LastSections = Array.Empty<WhatsAppInteractiveListSection>();
+            LastButtons = Array.Empty<WhatsAppReplyButton>();
+            return Task.FromResult(new WhatsAppSendResult(true, false));
+        }
 
         public Task<WhatsAppSendResult> SendInteractiveListMessageAsync(
             string phoneNumberId,
@@ -374,9 +549,17 @@ public sealed class ConversationContinuationFlowTests
             string? footerText = null,
             CancellationToken cancellationToken = default)
         {
+            InteractiveListSendCount++;
+            if (FailInteractiveLists)
+            {
+                return Task.FromResult(new WhatsAppSendResult(false, false, Error: "Meta rejected list."));
+            }
+
+            LastButtonBodyText = null;
             LastButtonText = buttonText;
             LastFooterText = footerText;
             LastSections = sections;
+            LastButtons = Array.Empty<WhatsAppReplyButton>();
             return Task.FromResult(new WhatsAppSendResult(true, false));
         }
 
@@ -388,8 +571,11 @@ public sealed class ConversationContinuationFlowTests
             string? footerText = null,
             CancellationToken cancellationToken = default)
         {
+            LastButtonBodyText = bodyText;
+            LastButtonText = null;
             LastButtons = buttons;
             LastFooterText = footerText;
+            LastSections = Array.Empty<WhatsAppInteractiveListSection>();
             return Task.FromResult(new WhatsAppSendResult(true, false));
         }
     }
@@ -410,5 +596,13 @@ public sealed class ConversationContinuationFlowTests
             string customerMessage,
             CancellationToken cancellationToken = default) =>
             Task.CompletedTask;
+
+        public Task<WhatsAppSendResult> NotifyCustomerOrderStatusAsync(
+            Restaurant restaurant,
+            Customer customer,
+            Order order,
+            string message,
+            CancellationToken cancellationToken = default) =>
+            Task.FromResult(new WhatsAppSendResult(true, false));
     }
 }

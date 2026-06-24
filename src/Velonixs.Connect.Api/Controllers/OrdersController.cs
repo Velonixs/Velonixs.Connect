@@ -47,7 +47,16 @@ public sealed class OrdersController(
             return Forbid();
         }
 
-        var order = await orderService.UpdateStatusAsync(id, request, cancellationToken);
+        OrderDetailResponse? order;
+        try
+        {
+            order = await orderService.UpdateStatusAsync(id, request, cancellationToken);
+        }
+        catch (InvalidOperationException ex)
+        {
+            return BadRequest(new { error = ex.Message });
+        }
+
         return order is null ? NotFound() : Ok(order);
     }
 }

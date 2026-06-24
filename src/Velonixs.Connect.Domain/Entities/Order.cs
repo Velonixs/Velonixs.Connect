@@ -10,6 +10,8 @@ public sealed class Order
     public string CustomerPhone { get; set; } = string.Empty;
     public string Address { get; set; } = string.Empty;
     public string OrderStatus { get; set; } = OrderStatuses.Draft;
+    public int? EstimatedMinutes { get; set; }
+    public string? RestaurantComment { get; set; }
     public decimal TotalAmount { get; set; }
     public string Source { get; set; } = OrderSources.WhatsApp;
     public DateTimeOffset CreatedAt { get; set; } = DateTimeOffset.UtcNow;
@@ -17,4 +19,5 @@ public sealed class Order
     public Restaurant Restaurant { get; set; } = null!;
     public Customer Customer { get; set; } = null!;
     public ICollection<OrderItem> Items { get; set; } = new List<OrderItem>();
+    public ICollection<OrderStatusHistory> StatusHistory { get; set; } = new List<OrderStatusHistory>();
 }

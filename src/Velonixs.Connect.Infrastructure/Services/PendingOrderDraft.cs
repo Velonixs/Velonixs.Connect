@@ -14,6 +14,7 @@ public sealed class PendingOrderDraft
     public string? SelectedCategoryName { get; set; }
     public Guid? SelectedMenuItemId { get; set; }
     public bool ReturnToDefaultMenuAfterQuantity { get; set; }
+    public List<Guid> CurrentMenuItemIds { get; set; } = new();
     public int CategoryPage { get; set; }
     public int ItemPage { get; set; }
     public string? CheckoutState { get; set; }

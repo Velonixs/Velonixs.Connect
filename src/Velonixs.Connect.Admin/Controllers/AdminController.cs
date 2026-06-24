@@ -67,9 +67,12 @@ public sealed class AdminController(
         return View(model);
     }
 
+    [AllowAnonymous]
     [HttpGet("admin/error")]
-    public IActionResult Error()
+    public IActionResult Error(int? statusCode = null)
     {
+        ViewData["StatusCode"] = statusCode;
+        ViewData["RequestId"] = HttpContext.TraceIdentifier;
         return View();
     }
 
@@ -345,7 +348,23 @@ public sealed class AdminController(
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> UpdateOrderStatus(Guid id, OrderStatusFormModel form, CancellationToken cancellationToken)
     {
-        var order = await orderService.UpdateStatusAsync(id, new UpdateOrderStatusRequest(form.Status), cancellationToken);
+        OrderDetailResponse? order;
+        try
+        {
+            order = await orderService.UpdateStatusAsync(
+                id,
+                new UpdateOrderStatusRequest(
+                    form.Status,
+                    form.Comment,
+                    User.Identity?.Name ?? "Platform admin",
+                    form.EffectiveEstimatedMinutes),
+                cancellationToken);
+        }
+        catch (InvalidOperationException ex)
+        {
+            TempData["Error"] = ex.Message;
+            return RedirectToAction(nameof(Order), new { id });
+        }
 
         if (order is null)
         {

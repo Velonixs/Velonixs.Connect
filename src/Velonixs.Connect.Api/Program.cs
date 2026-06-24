@@ -1,3 +1,5 @@
+using Microsoft.AspNetCore.Diagnostics;
+using Microsoft.AspNetCore.Mvc;
 using Velonixs.Connect.Application;
 using Velonixs.Connect.Api.Security;
 using Velonixs.Connect.Infrastructure;
@@ -9,6 +11,7 @@ var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddApplication();
 builder.Services.AddInfrastructure(builder.Configuration);
 builder.Services.AddControllers();
+builder.Services.AddProblemDetails();
 builder.Services.AddHttpContextAccessor();
 builder.Services.AddScoped<ApiBusinessAccessService>();
 builder.Services.AddHealthChecks();
@@ -39,9 +42,63 @@ if (app.Environment.IsDevelopment())
 
 using (var scope = app.Services.CreateScope())
 {
-    var databaseInitializer = scope.ServiceProvider.GetRequiredService<DatabaseInitializer>();
-    await databaseInitializer.InitializeAsync();
+    var logger = scope.ServiceProvider
+        .GetRequiredService<ILoggerFactory>()
+        .CreateLogger("Startup");
+    try
+    {
+        var databaseInitializer = scope.ServiceProvider.GetRequiredService<DatabaseInitializer>();
+        await databaseInitializer.InitializeAsync();
+    }
+    catch (Exception ex)
+    {
+        logger.LogCritical(ex, "API startup failed while initializing the database.");
+        throw;
+    }
 }
+
+app.UseExceptionHandler(errorApp =>
+{
+    errorApp.Run(async context =>
+    {
+        var exceptionFeature = context.Features.Get<IExceptionHandlerFeature>();
+        var exception = exceptionFeature?.Error;
+        var logger = context.RequestServices
+            .GetRequiredService<ILoggerFactory>()
+            .CreateLogger("GlobalExceptionHandler");
+        var statusCode = exception switch
+        {
+            ArgumentException => StatusCodes.Status400BadRequest,
+            InvalidOperationException => StatusCodes.Status400BadRequest,
+            UnauthorizedAccessException => StatusCodes.Status403Forbidden,
+            KeyNotFoundException => StatusCodes.Status404NotFound,
+            _ => StatusCodes.Status500InternalServerError
+        };
+
+        logger.LogError(
+            exception,
+            "Unhandled API exception. TraceId={TraceId}, Path={Path}, StatusCode={StatusCode}",
+            context.TraceIdentifier,
+            context.Request.Path,
+            statusCode);
+
+        context.Response.StatusCode = statusCode;
+        context.Response.ContentType = "application/problem+json";
+
+        var problem = new ProblemDetails
+        {
+            Status = statusCode,
+            Title = statusCode == StatusCodes.Status500InternalServerError
+                ? "An unexpected error occurred."
+                : "The request could not be processed.",
+            Detail = app.Environment.IsDevelopment() ? exception?.Message : null,
+            Instance = context.Request.Path
+        };
+        problem.Extensions["traceId"] = context.TraceIdentifier;
+
+        await context.Response.WriteAsJsonAsync(problem);
+    });
+});
 
 app.UseHttpsRedirection();
 app.UseRouting();

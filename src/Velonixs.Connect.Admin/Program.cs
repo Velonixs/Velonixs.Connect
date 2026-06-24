@@ -43,13 +43,22 @@ var allowRemoteAdmin = builder.Configuration.GetValue<bool>("Admin:AllowRemote")
 
 using (var scope = app.Services.CreateScope())
 {
-    await scope.ServiceProvider.GetRequiredService<DatabaseInitializer>().InitializeAsync();
+    var logger = scope.ServiceProvider
+        .GetRequiredService<ILoggerFactory>()
+        .CreateLogger("Startup");
+    try
+    {
+        await scope.ServiceProvider.GetRequiredService<DatabaseInitializer>().InitializeAsync();
+    }
+    catch (Exception ex)
+    {
+        logger.LogCritical(ex, "Admin startup failed while initializing the database.");
+        throw;
+    }
 }
 
-if (!app.Environment.IsDevelopment())
-{
-    app.UseExceptionHandler("/admin/error");
-}
+app.UseExceptionHandler("/admin/error");
+app.UseStatusCodePagesWithReExecute("/admin/error", "?statusCode={0}");
 
 app.UseStaticFiles();
 

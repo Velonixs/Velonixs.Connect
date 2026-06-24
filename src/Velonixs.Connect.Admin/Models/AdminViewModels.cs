@@ -129,4 +129,11 @@ public sealed class MenuItemFormModel
 public sealed class OrderStatusFormModel
 {
     public string Status { get; set; } = string.Empty;
+    public int? EstimatedMinutes { get; set; }
+    public int? CustomEstimatedMinutes { get; set; }
+    public string? Comment { get; set; }
+
+    public int? EffectiveEstimatedMinutes => CustomEstimatedMinutes is > 0
+        ? CustomEstimatedMinutes
+        : EstimatedMinutes;
 }

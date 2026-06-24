@@ -40,7 +40,7 @@ public sealed class ConversationContinuationFlowTests
 
         var greeting = await Send(service, "Hi");
 
-        Assert.Contains("Welcome to 99 Restaurant.", greeting.ReplyText);
+        Assert.Contains("Welcome to 99 Restaurant!", greeting.ReplyText);
         Assert.Contains("Pizza", greeting.ReplyText);
         Assert.Contains("1. Paneer Pizza - Rs 249", greeting.ReplyText);
         Assert.Contains("2. Margherita Pizza - Rs 199", greeting.ReplyText);
@@ -57,7 +57,7 @@ public sealed class ConversationContinuationFlowTests
 
         var quantity = await Send(service, "1");
 
-        Assert.Contains("Paneer Pizza - Rs 249", quantity.ReplyText);
+        Assert.Contains("Paneer Pizza — Rs 249", quantity.ReplyText);
         Assert.Equal(new[] { "1", "2", "3" }, sender.LastButtons.Select(x => x.Title));
         Assert.Empty(sender.LastSections);
     }
@@ -95,6 +95,40 @@ public sealed class ConversationContinuationFlowTests
     }
 
     [Fact]
+    public async Task DuplicateIncomingMessageId_IsIgnoredWithoutSendingSecondPrompt()
+    {
+        await using var dbContext = CreateDbContext();
+        var restaurant = new Restaurant
+        {
+            Name = "99 Restaurant",
+            WhatsAppPhoneNumberId = "phone-id"
+        };
+        var category = new MenuCategory
+        {
+            Restaurant = restaurant,
+            Name = "Pizza",
+            DisplayOrder = 1
+        };
+        var item = MenuItem(restaurant, category, "Paneer Pizza", 249, 1);
+
+        dbContext.AddRange(restaurant, category, item);
+        await dbContext.SaveChangesAsync();
+
+        var sender = new FakeMessageSender();
+        var service = CreateService(dbContext, sender);
+        const string messageId = "wamid.same-message";
+
+        var first = await SendWithId(service, "Hi", messageId);
+        var duplicate = await SendWithId(service, "Hi", messageId);
+
+        Assert.True(first.IsProcessed);
+        Assert.False(duplicate.IsProcessed);
+        Assert.Equal("Duplicate WhatsApp message.", duplicate.Error);
+        Assert.Equal(1, sender.ReplyButtonSendCount);
+        Assert.Equal(2, await dbContext.MessageLogs.CountAsync());
+    }
+
+    [Fact]
     public async Task EmptyCartView_ShowsDirectMenuAgain()
     {
         await using var dbContext = CreateDbContext();
@@ -119,8 +153,8 @@ public sealed class ConversationContinuationFlowTests
 
         var cart = await Send(service, "cart.view");
 
-        Assert.Contains("Your cart is empty", cart.ReplyText);
-        Assert.Contains("Choose an item", cart.ReplyText);
+        Assert.Contains("Your cart is currently empty", cart.ReplyText);
+        Assert.Contains("Select an item from the menu", cart.ReplyText);
         Assert.Empty(sender.LastSections);
         Assert.Contains("1. Paneer Pizza - Rs 249", cart.ReplyText);
         Assert.Equal(new[] { "View Cart", "Checkout", "Contact Us" }, sender.LastButtons.Select(x => x.Title));
@@ -202,7 +236,8 @@ public sealed class ConversationContinuationFlowTests
         await Send(service, "2");
         var firstAdd = await Send(service, "4");
 
-        Assert.Contains("Added: 4 x Pizza 2", firstAdd.ReplyText);
+        Assert.Contains("✅ Added to cart", firstAdd.ReplyText);
+        Assert.Contains("4 × Pizza 2", firstAdd.ReplyText);
         Assert.Contains("Cart total: Rs 408", firstAdd.ReplyText);
         Assert.Contains("Page 1 of 2", firstAdd.ReplyText);
 
@@ -210,13 +245,13 @@ public sealed class ConversationContinuationFlowTests
         await Send(service, "1");
         var secondAdd = await Send(service, "2");
 
-        Assert.Contains("Added: 2 x Pizza 7", secondAdd.ReplyText);
+        Assert.Contains("2 × Pizza 7", secondAdd.ReplyText);
         Assert.Contains("Page 2 of 2", secondAdd.ReplyText);
 
         var cart = await Send(service, "cart.view");
 
-        Assert.Contains("4 x Pizza 2", cart.ReplyText);
-        Assert.Contains("2 x Pizza 7", cart.ReplyText);
+        Assert.Contains("4 × Pizza 2", cart.ReplyText);
+        Assert.Contains("2 × Pizza 7", cart.ReplyText);
         Assert.Contains("Total: Rs 622", cart.ReplyText);
     }
 
@@ -248,7 +283,8 @@ public sealed class ConversationContinuationFlowTests
         await Send(service, "1");
         var firstAdd = await Send(service, "5");
 
-        Assert.Contains("Added: 5 x Paneer Pizza", firstAdd.ReplyText);
+        Assert.Contains("✅ Added to cart", firstAdd.ReplyText);
+        Assert.Contains("5 × Paneer Pizza", firstAdd.ReplyText);
         Assert.Contains("Cart total: Rs 1245", firstAdd.ReplyText);
         Assert.DoesNotContain("What would you like to do?", firstAdd.ReplyText);
         Assert.Empty(sender.LastSections);
@@ -310,7 +346,7 @@ public sealed class ConversationContinuationFlowTests
         await Send(service, $"item.select:{farmhousePizza.Id}");
         var added = await Send(service, "1");
 
-        Assert.Contains("Added: 1 x Farmhouse Pizza", added.ReplyText);
+        Assert.Contains("1 × Farmhouse Pizza", added.ReplyText);
         Assert.Contains("Burgers", added.ReplyText);
         Assert.Contains("1. Veg Burger - Rs 99", added.ReplyText);
     }
@@ -429,7 +465,9 @@ public sealed class ConversationContinuationFlowTests
         await Send(service, "checkout.pickup");
         var created = await Send(service, "yes");
 
+        Assert.Contains("✅ Order received", created.ReplyText);
         Assert.Contains("Order ID", created.ReplyText);
+        Assert.Contains("sent to 99 Restaurant for confirmation", created.ReplyText);
 
         var order = await dbContext.Orders
             .Include(x => x.StatusHistory)
@@ -467,12 +505,18 @@ public sealed class ConversationContinuationFlowTests
     private static Task<WhatsAppWebhookProcessResult> Send(
         IConversationService service,
         string message) =>
+        SendWithId(service, message, Guid.NewGuid().ToString("N"));
+
+    private static Task<WhatsAppWebhookProcessResult> SendWithId(
+        IConversationService service,
+        string message,
+        string? messageId) =>
         service.ProcessIncomingMessageAsync(
             new IncomingWhatsAppMessage(
                 "phone-id",
                 "919999999999",
                 message,
-                Guid.NewGuid().ToString("N"),
+                messageId,
                 "Customer"));
 
     private static async Task AddOneItemToCart(
@@ -516,6 +560,7 @@ public sealed class ConversationContinuationFlowTests
     {
         public bool FailInteractiveLists { get; init; }
         public int InteractiveListSendCount { get; private set; }
+        public int ReplyButtonSendCount { get; private set; }
         public List<string> TextMessages { get; } = new();
         public string? LastButtonBodyText { get; private set; }
         public string? LastButtonText { get; private set; }
@@ -571,6 +616,7 @@ public sealed class ConversationContinuationFlowTests
             string? footerText = null,
             CancellationToken cancellationToken = default)
         {
+            ReplyButtonSendCount++;
             LastButtonBodyText = bodyText;
             LastButtonText = null;
             LastButtons = buttons;

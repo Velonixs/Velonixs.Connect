@@ -173,9 +173,12 @@ public sealed class PortalController(
         return RedirectToAction(nameof(Index));
     }
 
+    [AllowAnonymous]
     [HttpGet("portal/error")]
-    public IActionResult Error()
+    public IActionResult Error(int? statusCode = null)
     {
+        ViewData["StatusCode"] = statusCode;
+        ViewData["RequestId"] = HttpContext.TraceIdentifier;
         return View();
     }
 

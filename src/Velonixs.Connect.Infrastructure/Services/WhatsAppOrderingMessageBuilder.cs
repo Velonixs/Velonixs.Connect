@@ -187,8 +187,14 @@ public static class WhatsAppOrderingMessageBuilder
             builder.AppendLine();
         }
 
-        builder.AppendLine($"Welcome to {restaurantName}.");
-        builder.AppendLine($"Reply with item number to choose. Page {page + 1} of {totalPages}.");
+        builder.AppendLine($"Welcome to {restaurantName}!");
+        builder.AppendLine();
+        builder.AppendLine("Select an item by replying with its number.");
+
+        if (totalPages > 1)
+        {
+            builder.AppendLine($"Page {page + 1} of {totalPages}");
+        }
 
         Guid? currentCategoryId = null;
         for (var index = 0; index < pageItems.Count; index++)
@@ -206,7 +212,7 @@ public static class WhatsAppOrderingMessageBuilder
         }
 
         builder.AppendLine();
-        builder.AppendLine("You can also type an item name to search.");
+        builder.AppendLine("Reply with an item number or type an item name to search.");
 
         return builder.ToString().Trim();
     }

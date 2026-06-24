@@ -1,5 +1,7 @@
 @{
     ViewData["Title"] = "Error";
+    var statusCode = ViewData["StatusCode"] as int?;
+    var requestId = ViewData["RequestId"] as string;
 }
 
 <section class="page-title">
@@ -11,5 +13,21 @@
 </section>
 
 <section class="section-band">
-    <p>The portal could not complete the request. Check the application logs for details.</p>
+    @if (statusCode is 404)
+    {
+        <p>The page or record you requested could not be found.</p>
+    }
+    else if (statusCode is 403)
+    {
+        <p>You do not have permission to complete this request.</p>
+    }
+    else
+    {
+        <p>The portal could not complete the request. Please try again. If the problem continues, check the application logs.</p>
+    }
+
+    @if (!string.IsNullOrWhiteSpace(requestId))
+    {
+        <p><small>Request ID: @requestId</small></p>
+    }
 </section>

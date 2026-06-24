@@ -80,7 +80,9 @@ public sealed class InteractiveOrderingTests
             0,
             1);
 
-        Assert.Contains("Welcome to 99 Restaurant.", message);
+        Assert.Contains("Welcome to 99 Restaurant!", message);
+        Assert.DoesNotContain("Page 1 of 1", message);
+        Assert.Contains("Reply with an item number or type an item name to search.", message);
         Assert.Contains("Pizza", message);
         Assert.Contains("1. Paneer Pizza - Rs 249", message);
         Assert.Contains("2. Margherita Pizza - Rs 199", message);
@@ -220,10 +222,11 @@ public sealed class InteractiveOrderingTests
 
         var message = MenuTextFormatter.BuildFinalConfirmation(draft);
 
-        Assert.Contains("Name: Rajesh", message);
-        Assert.Contains("3 x Paneer Pizza", message);
+        Assert.Contains("Customer: Rajesh", message);
+        Assert.Contains("3 × Paneer Pizza", message);
         Assert.Contains("Rs 747", message);
-        Assert.Contains("Address: Pickup", message);
+        Assert.Contains("Order type: Pickup", message);
+        Assert.DoesNotContain("Address:", message);
         Assert.Contains("buttons below", message);
     }
 

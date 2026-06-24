@@ -96,7 +96,11 @@ public static class DependencyInjection
         services.AddScoped<IConversationService, ConversationService>();
         services.AddScoped<INotificationService, NotificationService>();
         services.AddScoped<IAuthTokenService, AuthTokenService>();
-        services.AddHttpClient<IWhatsAppMessageSender, WhatsAppCloudMessageSender>();
+        services.AddHttpClient<IWhatsAppMessageSender, WhatsAppCloudMessageSender>(client =>
+        {
+            var timeoutSeconds = Math.Clamp(configuration.GetSection("WhatsApp").Get<WhatsAppOptions>()?.SendTimeoutSeconds ?? 10, 1, 30);
+            client.Timeout = TimeSpan.FromSeconds(timeoutSeconds);
+        });
 
         return services;
     }

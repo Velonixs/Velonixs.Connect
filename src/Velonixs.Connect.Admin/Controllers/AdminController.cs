@@ -58,6 +58,7 @@ public sealed class AdminController(
         var model = new AdminIndexViewModel
         {
             Restaurants = summaries.OrderBy(x => x.Restaurant.Name).ToArray(),
+            MasterCatalog = await menuService.GetMasterCatalogAsync(cancellationToken),
             TotalRestaurants = restaurants.Count,
             ActiveRestaurants = restaurants.Count(x => x.IsActive),
             TotalOrders = summaries.Sum(x => x.OrderCount),
@@ -65,6 +66,71 @@ public sealed class AdminController(
         };
 
         return View(model);
+    }
+
+    [HttpPost("admin/master-categories")]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> CreateMasterCategory(
+        MasterCatalogCategoryFormModel form,
+        CancellationToken cancellationToken)
+    {
+        if (!ModelState.IsValid)
+        {
+            TempData["Error"] = "Enter a valid master category name.";
+            return RedirectToAction(nameof(Index));
+        }
+
+        try
+        {
+            await menuService.CreateMasterCategoryAsync(
+                new CreateMasterMenuCategoryRequest(form.Name, form.DisplayOrder, form.IsActive),
+                cancellationToken);
+        }
+        catch (DbUpdateException)
+        {
+            TempData["Error"] = "A master category with this name already exists.";
+            return RedirectToAction(nameof(Index));
+        }
+
+        TempData["Success"] = "Master category added.";
+        return RedirectToAction(nameof(Index));
+    }
+
+    [HttpPost("admin/master-items")]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> CreateMasterItem(
+        MasterCatalogItemFormModel form,
+        CancellationToken cancellationToken)
+    {
+        if (!ModelState.IsValid)
+        {
+            TempData["Error"] = "Enter valid master menu item details.";
+            return RedirectToAction(nameof(Index));
+        }
+
+        try
+        {
+            await menuService.CreateMasterItemAsync(
+                new CreateMasterMenuItemRequest(
+                    form.MasterCategoryId,
+                    form.Name,
+                    form.Description,
+                    form.IsActive),
+                cancellationToken);
+        }
+        catch (InvalidOperationException ex)
+        {
+            TempData["Error"] = ex.Message;
+            return RedirectToAction(nameof(Index));
+        }
+        catch (DbUpdateException)
+        {
+            TempData["Error"] = "A master item with this name already exists in the selected category.";
+            return RedirectToAction(nameof(Index));
+        }
+
+        TempData["Success"] = "Master menu item added.";
+        return RedirectToAction(nameof(Index));
     }
 
     [AllowAnonymous]
@@ -375,7 +441,7 @@ public sealed class AdminController(
     {
         await menuService.CreateItemAsync(
             restaurantId,
-            new CreateMenuItemRequest(form.CategoryId, form.ItemCode, form.Name, form.Description, form.Price, form.IsAvailable, form.IsActive),
+            new CreateMenuItemRequest(form.CategoryId, null, form.ItemCode, form.Name, form.Description, form.Price, form.IsAvailable, form.IsActive),
             cancellationToken);
 
         TempData["Success"] = "Menu item added.";
@@ -388,7 +454,7 @@ public sealed class AdminController(
     {
         await menuService.UpdateItemAsync(
             id,
-            new UpdateMenuItemRequest(form.CategoryId, form.ItemCode, form.Name, form.Description, form.Price, form.IsAvailable, form.IsActive),
+            new UpdateMenuItemRequest(form.CategoryId, null, form.ItemCode, form.Name, form.Description, form.Price, form.IsAvailable, form.IsActive),
             cancellationToken);
 
         TempData["Success"] = "Menu item saved.";

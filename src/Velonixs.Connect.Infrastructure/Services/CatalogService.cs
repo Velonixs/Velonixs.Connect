@@ -27,6 +27,7 @@ public sealed class CatalogService(IMenuService menuService) : ICatalogService
             businessId,
             new CreateMenuItemRequest(
                 request.CategoryId,
+                null,
                 request.ProductCode,
                 request.Name,
                 request.Description,
@@ -44,6 +45,7 @@ public sealed class CatalogService(IMenuService menuService) : ICatalogService
             id,
             new UpdateMenuItemRequest(
                 request.CategoryId,
+                null,
                 request.ProductCode,
                 request.Name,
                 request.Description,

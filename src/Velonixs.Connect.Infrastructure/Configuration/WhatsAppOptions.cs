@@ -8,4 +8,5 @@ public sealed class WhatsAppOptions
     public string? AppSecret { get; set; }
     public string BaseUrl { get; set; } = "https://graph.facebook.com";
     public bool DisableSending { get; set; } = true;
+    public int SendTimeoutSeconds { get; set; } = 10;
 }

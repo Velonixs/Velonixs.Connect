@@ -187,7 +187,7 @@ public static class WhatsAppOrderingMessageBuilder
             builder.AppendLine();
         }
 
-        builder.AppendLine($"Welcome to {restaurantName}!");
+        builder.AppendLine($"🍽️ Welcome to {restaurantName}!");
         builder.AppendLine();
         builder.AppendLine("Select an item by replying with its number.");
 
@@ -204,11 +204,12 @@ public static class WhatsAppOrderingMessageBuilder
             {
                 currentCategoryId = category.Id;
                 builder.AppendLine();
-                builder.AppendLine(category.Name);
-                builder.AppendLine("----------------");
+                builder.AppendLine($"{ResolveCategoryIcon(category.Name)} {category.Name}");
+                builder.AppendLine("━━━━━━━━━━━━");
             }
 
-            builder.AppendLine($"{index + 1}. {item.Name} - Rs {FormatAmount(item.Price)}");
+            builder.AppendLine($"{index + 1}. {item.Name}");
+            builder.AppendLine($"   Rs {FormatAmount(item.Price)}");
         }
 
         builder.AppendLine();
@@ -305,4 +306,41 @@ public static class WhatsAppOrderingMessageBuilder
 
     private static string FormatAmount(decimal amount) =>
         amount.ToString("0.##", CultureInfo.InvariantCulture);
+
+    private static string ResolveCategoryIcon(string categoryName)
+    {
+        var normalized = categoryName.Trim().ToLowerInvariant();
+
+        if (normalized.Contains("pizza"))
+        {
+            return "🍕";
+        }
+
+        if (normalized.Contains("burger"))
+        {
+            return "🍔";
+        }
+
+        if (normalized.Contains("drink") || normalized.Contains("beverage") || normalized.Contains("juice"))
+        {
+            return "🥤";
+        }
+
+        if (normalized.Contains("dessert") || normalized.Contains("sweet") || normalized.Contains("cake"))
+        {
+            return "🍰";
+        }
+
+        if (normalized.Contains("main") || normalized.Contains("course") || normalized.Contains("biryani") || normalized.Contains("rice"))
+        {
+            return "🍛";
+        }
+
+        if (normalized.Contains("starter") || normalized.Contains("snack"))
+        {
+            return "🥟";
+        }
+
+        return "🍽️";
+    }
 }

@@ -1,5 +1,6 @@
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
+using System.Diagnostics;
 using System.Text.Json;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
@@ -174,18 +175,29 @@ public sealed class WhatsAppCloudMessageSender(
         request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", _options.AccessToken);
         request.Content = JsonContent.Create(payload);
 
+        var stopwatch = Stopwatch.StartNew();
         using var response = await httpClient.SendAsync(request, cancellationToken);
         var responseText = await response.Content.ReadAsStringAsync(cancellationToken);
+        stopwatch.Stop();
 
         if (!response.IsSuccessStatusCode)
         {
             logger.LogWarning(
-                "WhatsApp send failed. StatusCode={StatusCode}, Response={Response}",
+                "WhatsApp send failed in {ElapsedMilliseconds} ms. PhoneNumberId={PhoneNumberId}, Recipient={Recipient}, StatusCode={StatusCode}, Response={Response}",
+                stopwatch.ElapsedMilliseconds,
+                phoneNumberId,
+                recipientPhoneNumber,
                 response.StatusCode,
                 responseText);
 
             return new WhatsAppSendResult(false, false, Error: responseText);
         }
+
+        logger.LogInformation(
+            "WhatsApp send completed in {ElapsedMilliseconds} ms. PhoneNumberId={PhoneNumberId}, Recipient={Recipient}",
+            stopwatch.ElapsedMilliseconds,
+            phoneNumberId,
+            recipientPhoneNumber);
 
         return new WhatsAppSendResult(true, false, ProviderMessageId: ExtractProviderMessageId(responseText));
     }

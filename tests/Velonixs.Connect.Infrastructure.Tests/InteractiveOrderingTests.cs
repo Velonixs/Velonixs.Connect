@@ -51,15 +51,41 @@ public sealed class InteractiveOrderingTests
     }
 
     [Fact]
-    public void ItemAddedNavigation_OffersContinueChoices()
+    public void DirectMenu_ShowsItemsAndUtilityActionsWithinWhatsAppLimit()
     {
-        var rows = WhatsAppOrderingMessageBuilder.BuildItemAddedSections("Pizza").Single().Rows;
+        var category = new MenuCategory { Name = "Pizza" };
+        var items = new[]
+        {
+            Item("Paneer Pizza", 249),
+            Item("Margherita Pizza", 199),
+            Item("Farmhouse Pizza", 299)
+        };
 
-        Assert.Equal(4, rows.Count);
-        Assert.Equal(
-            new[] { "menu.continue", "category.list", "cart.view", "cart.checkout" },
-            rows.Select(x => x.Id));
-        Assert.Contains(rows, row => row.Title == "More Pizza");
+        var sections = WhatsAppOrderingMessageBuilder.BuildDirectMenuSections(category, items, true);
+        var rows = sections.SelectMany(section => section.Rows).ToArray();
+
+        Assert.Equal(new[] { "Pizza", "More" }, sections.Select(section => section.Title));
+        Assert.Contains(rows, row => row.Title == "Paneer Pizza" && row.Description == "Rs 249");
+        Assert.Contains(rows, row => row.Id == "menu.more" && row.Title == "View More Items");
+        Assert.Contains(rows, row => row.Id == "cart.view" && row.Title == "View Cart");
+        Assert.Contains(rows, row => row.Id == "main.staff" && row.Title == "Contact Us");
+        Assert.True(rows.Length <= 10);
+    }
+
+    [Fact]
+    public void DirectMenu_WithCart_ShowsCheckoutAndCancelWithinWhatsAppLimit()
+    {
+        var category = new MenuCategory { Name = "Pizza" };
+        var items = Enumerable.Range(1, 5)
+            .Select(index => Item($"Pizza {index}", index * 10))
+            .ToArray();
+
+        var sections = WhatsAppOrderingMessageBuilder.BuildDirectMenuSections(category, items, true, true);
+        var rows = sections.SelectMany(section => section.Rows).ToArray();
+
+        Assert.Contains(rows, row => row.Id == "cart.checkout" && row.Title == "Checkout");
+        Assert.Contains(rows, row => row.Id == "cart.cancel" && row.Title == "Cancel");
+        Assert.True(rows.Length <= 10);
     }
 
     [Fact]

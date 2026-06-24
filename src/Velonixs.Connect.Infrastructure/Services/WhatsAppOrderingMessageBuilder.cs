@@ -8,6 +8,62 @@ public static class WhatsAppOrderingMessageBuilder
 {
     public const int CategoryPageSize = 8;
     public const int ItemPageSize = 6;
+    public const int DirectMenuItemCount = 6;
+
+    public static IReadOnlyCollection<WhatsAppInteractiveListSection> BuildDirectMenuSections(
+        MenuCategory category,
+        IReadOnlyList<MenuItem> items,
+        bool hasMoreItems,
+        bool hasCart = false)
+    {
+        return BuildDirectMenuSections(
+            new[] { (Category: category, Items: items) },
+            hasMoreItems,
+            hasCart);
+    }
+
+    public static IReadOnlyCollection<WhatsAppInteractiveListSection> BuildDirectMenuSections(
+        IReadOnlyList<(MenuCategory Category, IReadOnlyList<MenuItem> Items)> categoryGroups,
+        bool hasMoreItems,
+        bool hasCart = false)
+    {
+        var sections = categoryGroups
+            .Where(group => group.Items.Count > 0)
+            .Select(group => new WhatsAppInteractiveListSection(
+                Truncate(group.Category.Name, 24),
+                group.Items
+                    .Select(item => new WhatsAppInteractiveListRow(
+                        $"item.select:{item.Id}",
+                        Truncate(item.Name, 24),
+                        $"Rs {FormatAmount(item.Price)}"))
+                    .ToArray()))
+            .ToList();
+
+        var moreRows = new List<WhatsAppInteractiveListRow>();
+        if (hasMoreItems)
+        {
+            moreRows.Add(new WhatsAppInteractiveListRow(
+                "menu.more",
+                "View More Items",
+                "Browse full menu"));
+        }
+
+        moreRows.Add(new WhatsAppInteractiveListRow("cart.view", "View Cart"));
+        if (hasCart)
+        {
+            moreRows.Add(new WhatsAppInteractiveListRow("cart.checkout", "Checkout"));
+            moreRows.Add(new WhatsAppInteractiveListRow("cart.cancel", "Cancel"));
+        }
+
+        moreRows.Add(new WhatsAppInteractiveListRow(
+            "main.staff",
+            "Contact Us",
+            "Connect restaurant"));
+
+        sections.Add(new WhatsAppInteractiveListSection("More", moreRows));
+
+        return sections;
+    }
 
     public static IReadOnlyCollection<WhatsAppInteractiveListSection> BuildCategorySections(
         IReadOnlyList<MenuCategory> categories,
@@ -110,33 +166,6 @@ public static class WhatsAppOrderingMessageBuilder
             .ToArray();
 
         return new[] { new WhatsAppInteractiveListSection("Quantity", rows) };
-    }
-
-    public static IReadOnlyCollection<WhatsAppInteractiveListSection> BuildItemAddedSections(
-        string? categoryName)
-    {
-        var currentCategory = string.IsNullOrWhiteSpace(categoryName)
-            ? "Current category"
-            : categoryName;
-
-        return new[]
-        {
-            new WhatsAppInteractiveListSection(
-                "Continue",
-                new[]
-                {
-                    new WhatsAppInteractiveListRow(
-                        "menu.continue",
-                        Truncate($"More {currentCategory}", 24),
-                        "Select another item"),
-                    new WhatsAppInteractiveListRow(
-                        "category.list",
-                        "Change category",
-                        "Browse other items"),
-                    new WhatsAppInteractiveListRow("cart.view", "View cart"),
-                    new WhatsAppInteractiveListRow("cart.checkout", "Checkout")
-                })
-        };
     }
 
     public static IReadOnlyCollection<WhatsAppReplyButton> BuildMainMenuButtons() =>

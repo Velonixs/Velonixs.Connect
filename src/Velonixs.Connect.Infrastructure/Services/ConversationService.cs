@@ -433,7 +433,12 @@ public sealed partial class ConversationService(
             {
                 foreach (var line in legacyOrderLines)
                 {
-                    cartService.AddOrUpdate(draft, legacyItems[line.ItemCode], line.Quantity);
+                    cartService.AddOrUpdate(
+                        draft,
+                        legacyItems[line.ItemCode],
+                        line.Quantity,
+                        restaurant.CgstPercent,
+                        restaurant.SgstPercent);
                 }
 
                 SaveDraft(conversation, draft);
@@ -466,7 +471,12 @@ public sealed partial class ConversationService(
         {
             foreach (var parsedItem in naturalOrder.Items)
             {
-                cartService.AddOrUpdate(draft, parsedItem.Item, parsedItem.Quantity);
+                cartService.AddOrUpdate(
+                    draft,
+                    parsedItem.Item,
+                    parsedItem.Quantity,
+                    restaurant.CgstPercent,
+                    restaurant.SgstPercent);
             }
 
             SaveDraft(conversation, draft);
@@ -813,7 +823,7 @@ public sealed partial class ConversationService(
                 "That item is no longer available. Type Menu to choose another item.");
         }
 
-        cartService.AddOrUpdate(draft, item, quantity);
+        cartService.AddOrUpdate(draft, item, quantity, restaurant.CgstPercent, restaurant.SgstPercent);
         draft.CurrentStep = ConversationStates.ItemSelection;
         var shouldReturnToDefaultMenu = draft.ReturnToDefaultMenuAfterQuantity;
         draft.ReturnToDefaultMenuAfterQuantity = false;
@@ -1024,6 +1034,11 @@ public sealed partial class ConversationService(
             Address = draft.IsPickup ? "Pickup" : draft.Address ?? "Pickup",
             OrderStatus = OrderStatuses.PendingConfirmation,
             Source = OrderSources.WhatsApp,
+            SubTotalAmount = draft.SubTotalAmount,
+            CgstPercent = draft.CgstPercent,
+            CgstAmount = draft.CgstAmount,
+            SgstPercent = draft.SgstPercent,
+            SgstAmount = draft.SgstAmount,
             TotalAmount = draft.TotalAmount
         };
 

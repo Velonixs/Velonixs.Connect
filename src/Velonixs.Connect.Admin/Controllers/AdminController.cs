@@ -55,9 +55,20 @@ public sealed class AdminController(
             });
         }
 
+        var taxSetting = await restaurantService.GetPlatformTaxSettingAsync(cancellationToken);
         var model = new AdminIndexViewModel
         {
             Restaurants = summaries.OrderBy(x => x.Restaurant.Name).ToArray(),
+            TaxSetting =
+            {
+                CgstPercent = taxSetting.CgstPercent,
+                SgstPercent = taxSetting.SgstPercent
+            },
+            NewRestaurant =
+            {
+                CgstPercent = taxSetting.CgstPercent,
+                SgstPercent = taxSetting.SgstPercent
+            },
             TotalRestaurants = restaurants.Count,
             ActiveRestaurants = restaurants.Count(x => x.IsActive),
             TotalOrders = summaries.Sum(x => x.OrderCount),
@@ -65,6 +76,33 @@ public sealed class AdminController(
         };
 
         return View(model);
+    }
+
+    [HttpPost("admin/tax-settings")]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> UpdateTaxSetting(TaxSettingFormModel form, CancellationToken cancellationToken)
+    {
+        if (!ModelState.IsValid)
+        {
+            TempData["Error"] = "CGST and SGST must be between 0 and 100.";
+            return RedirectToAction(nameof(Index));
+        }
+
+        try
+        {
+            await restaurantService.UpdatePlatformTaxSettingAsync(
+                form.CgstPercent,
+                form.SgstPercent,
+                cancellationToken);
+        }
+        catch (InvalidOperationException ex)
+        {
+            TempData["Error"] = ex.Message;
+            return RedirectToAction(nameof(Index));
+        }
+
+        TempData["Success"] = "Master GST defaults saved. New restaurants will use these defaults.";
+        return RedirectToAction(nameof(Index));
     }
 
     [HttpGet("admin/master-catalog")]
@@ -321,6 +359,8 @@ public sealed class AdminController(
                     form.NotificationEmail,
                     form.StaffWhatsAppNumber,
                     form.Address,
+                    form.CgstPercent,
+                    form.SgstPercent,
                     form.IsActive),
                 cancellationToken);
 
@@ -446,6 +486,8 @@ public sealed class AdminController(
                 form.NotificationEmail,
                 form.StaffWhatsAppNumber,
                 form.Address,
+                form.CgstPercent,
+                form.SgstPercent,
                 form.IsActive),
             cancellationToken);
 
@@ -675,6 +717,8 @@ public sealed class AdminController(
             NotificationEmail = restaurant.NotificationEmail,
             StaffWhatsAppNumber = restaurant.StaffWhatsAppNumber,
             Address = restaurant.Address,
+            CgstPercent = restaurant.CgstPercent,
+            SgstPercent = restaurant.SgstPercent,
             IsActive = restaurant.IsActive
         };
     }

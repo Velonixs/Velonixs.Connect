@@ -18,6 +18,11 @@ public sealed class PendingOrderDraft
     public int CategoryPage { get; set; }
     public int ItemPage { get; set; }
     public string? CheckoutState { get; set; }
+    public decimal SubTotalAmount { get; set; }
+    public decimal CgstPercent { get; set; }
+    public decimal CgstAmount { get; set; }
+    public decimal SgstPercent { get; set; }
+    public decimal SgstAmount { get; set; }
     public decimal TotalAmount { get; set; }
     public List<PendingOrderItemDraft> Items { get; set; } = new();
 }

@@ -18,6 +18,31 @@
 
 @if (Model.CanManageMenu)
 {
+    <section class="card shadow-sm mb-4">
+        <div class="card-body">
+            <div class="section-heading">
+                <div>
+                    <h2>GST Settings</h2>
+                    <p class="text-secondary mb-0">These rates are added to the order total for this restaurant.</p>
+                </div>
+            </div>
+            <form class="row g-3 align-items-end" asp-action="UpdateTaxSetting" method="post">
+                @Html.AntiForgeryToken()
+                <div class="col-12 col-md-3">
+                    <label class="form-label">CGST %</label>
+                    <input class="form-control" asp-for="TaxSetting.CgstPercent" name="CgstPercent" type="number" min="0" max="100" step="0.01" />
+                </div>
+                <div class="col-12 col-md-3">
+                    <label class="form-label">SGST %</label>
+                    <input class="form-control" asp-for="TaxSetting.SgstPercent" name="SgstPercent" type="number" min="0" max="100" step="0.01" />
+                </div>
+                <div class="col-12 col-md-auto">
+                    <button class="btn btn-primary" type="submit">Save GST</button>
+                </div>
+            </form>
+        </div>
+    </section>
+
     <section class="row g-3 mb-4">
         <div class="col-12 col-xl-5">
             <div class="card shadow-sm h-100">

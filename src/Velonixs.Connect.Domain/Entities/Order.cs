@@ -12,6 +12,11 @@ public sealed class Order
     public string OrderStatus { get; set; } = OrderStatuses.Draft;
     public int? EstimatedMinutes { get; set; }
     public string? RestaurantComment { get; set; }
+    public decimal SubTotalAmount { get; set; }
+    public decimal CgstPercent { get; set; }
+    public decimal CgstAmount { get; set; }
+    public decimal SgstPercent { get; set; }
+    public decimal SgstAmount { get; set; }
     public decimal TotalAmount { get; set; }
     public string Source { get; set; } = OrderSources.WhatsApp;
     public DateTimeOffset CreatedAt { get; set; } = DateTimeOffset.UtcNow;

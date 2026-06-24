@@ -40,6 +40,31 @@
 <section class="card shadow-sm mb-4">
     <div class="card-body">
         <div class="section-heading">
+            <div>
+                <h2>Master GST Defaults</h2>
+                <p class="text-secondary mb-0">These defaults are applied when creating a new restaurant. Each restaurant can override them in the portal.</p>
+            </div>
+        </div>
+        <form class="row g-3 align-items-end" asp-action="UpdateTaxSetting" method="post">
+            @Html.AntiForgeryToken()
+            <div class="col-12 col-md-3">
+                <label class="form-label">CGST %</label>
+                <input class="form-control" asp-for="TaxSetting.CgstPercent" name="CgstPercent" type="number" min="0" max="100" step="0.01" />
+            </div>
+            <div class="col-12 col-md-3">
+                <label class="form-label">SGST %</label>
+                <input class="form-control" asp-for="TaxSetting.SgstPercent" name="SgstPercent" type="number" min="0" max="100" step="0.01" />
+            </div>
+            <div class="col-12 col-md-auto">
+                <button class="btn btn-success" type="submit">Save GST defaults</button>
+            </div>
+        </form>
+    </div>
+</section>
+
+<section class="card shadow-sm mb-4">
+    <div class="card-body">
+        <div class="section-heading">
             <h2>Businesses</h2>
         </div>
 
@@ -122,6 +147,14 @@
             <div class="col-12 col-lg-6">
                 <label class="form-label">Address</label>
                 <input class="form-control" asp-for="NewRestaurant.Address" name="Address" />
+            </div>
+            <div class="col-12 col-lg-3">
+                <label class="form-label">CGST %</label>
+                <input class="form-control" asp-for="NewRestaurant.CgstPercent" name="CgstPercent" type="number" min="0" max="100" step="0.01" />
+            </div>
+            <div class="col-12 col-lg-3">
+                <label class="form-label">SGST %</label>
+                <input class="form-control" asp-for="NewRestaurant.SgstPercent" name="SgstPercent" type="number" min="0" max="100" step="0.01" />
             </div>
 
             <div class="col-12"><hr class="my-2" /><h3 class="h5 mb-0">Business owner login</h3></div>

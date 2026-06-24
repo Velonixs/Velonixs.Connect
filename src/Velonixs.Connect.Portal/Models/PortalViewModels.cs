@@ -24,7 +24,17 @@ public sealed class PortalMenuViewModel
     public MasterCatalogResponse? MasterCatalog { get; set; }
     public MenuCategoryPortalFormModel NewCategory { get; set; } = new();
     public MenuItemPortalFormModel NewItem { get; set; } = new();
+    public RestaurantTaxFormModel TaxSetting { get; set; } = new();
     public bool CanManageMenu { get; set; }
+}
+
+public sealed class RestaurantTaxFormModel
+{
+    [Range(0, 100)]
+    public decimal CgstPercent { get; set; }
+
+    [Range(0, 100)]
+    public decimal SgstPercent { get; set; }
 }
 
 public sealed class PortalCustomersViewModel

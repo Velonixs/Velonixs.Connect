@@ -51,6 +51,18 @@
             </div>
         }
         <div class="line-item total">
+            <span>Subtotal</span>
+            <strong>Rs @Model.Order.SubTotalAmount.ToString("0.##")</strong>
+        </div>
+        <div class="line-item">
+            <span>CGST (@Model.Order.CgstPercent.ToString("0.##")%)</span>
+            <strong>Rs @Model.Order.CgstAmount.ToString("0.##")</strong>
+        </div>
+        <div class="line-item">
+            <span>SGST (@Model.Order.SgstPercent.ToString("0.##")%)</span>
+            <strong>Rs @Model.Order.SgstAmount.ToString("0.##")</strong>
+        </div>
+        <div class="line-item total">
             <span>Total</span>
             <strong>Rs @Model.Order.TotalAmount.ToString("0.##")</strong>
         </div>

@@ -8,6 +8,8 @@ public sealed class OrderingCartService
     {
         ArgumentOutOfRangeException.ThrowIfNegativeOrZero(quantity);
 
+        draft.CartId ??= Guid.NewGuid();
+
         var existingItem = draft.Items.FirstOrDefault(x => x.MenuItemId == menuItem.Id);
         if (existingItem is null)
         {

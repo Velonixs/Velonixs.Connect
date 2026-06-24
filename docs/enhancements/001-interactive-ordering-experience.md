@@ -6,12 +6,12 @@ The previous WhatsApp flow rendered the restaurant's complete menu as a long tex
 
 ## Proposed customer flow
 
-1. Welcome message with Browse Menu, View Cart, and Connect Restaurant reply buttons.
-2. Paginated category list containing only categories with active, available items.
-3. Paginated item list for the selected category.
-4. Quantity list with quick choices 1-5 and a custom quantity option.
-5. Item-added confirmation with a Continue list.
-6. Continue lets the customer select another item in the same category, change category, view the cart, or checkout.
+1. Greeting opens a WhatsApp interactive Menu list directly; no Browse Menu tap is required.
+2. The first screen shows available items from the first active category, plus View More Items, View Cart, and Contact Us.
+3. View More Items reuses the existing category/item pagination.
+4. Selecting an item opens the quantity list with quick choices 1-5 and a custom quantity option.
+5. Quantity selection adds the item, shows a short Added/cart-total confirmation, and immediately repeats the direct menu.
+6. Customers keep selecting items until they explicitly choose View Cart, Checkout, Contact Us, or Cancel.
 7. Cart summary with Add More, Checkout, and Cancel reply buttons.
 8. Customer name collection when the WhatsApp profile does not provide one.
 9. Delivery or Pickup selection. Delivery reuses the customer's saved address when one exists; otherwise the address is collected and saved.
@@ -40,7 +40,7 @@ The full text menu is sent only when the customer explicitly types `Full Menu`.
 - `category.list`, `category.page:{page}`, `category.select:{categoryId}`
 - `item.page:{categoryId}:{page}`, `item.select:{itemId}`
 - `quantity.select:{itemId}:{quantity}`, `quantity.custom:{itemId}`
-- `menu.continue`
+- `menu.more`
 - `cart.view`, `cart.add_more`, `cart.checkout`, `cart.cancel`
 - `checkout.delivery`, `checkout.pickup`
 - `yes`, `no`
@@ -58,9 +58,10 @@ The webhook passes these identifiers to the conversation service as command text
 ## Testing checklist
 
 - [x] Category list generation and pagination stay within ten rows.
+- [x] Greeting shows a direct menu list with item rows and More/View Cart/Contact Us actions.
 - [x] Item pagination includes previous/next/category/cart actions.
 - [x] Quantity selection includes 1-5 and custom quantity.
-- [x] Item-added confirmation exposes Continue choices for another item, category change, cart, and checkout.
+- [x] Quantity selection silently updates the cart and repeats the direct menu with an Added/cart-total confirmation.
 - [x] Cart merges duplicate items and recalculates line and grand totals.
 - [x] Search filters inactive/unavailable items and ranks exact matches.
 - [x] Free-text parsing handles multi-item natural order messages.

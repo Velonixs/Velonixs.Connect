@@ -1,11 +1,9 @@
 @model PortalDashboardViewModel
 @{
     ViewData["Title"] = Model.Restaurant.Name;
-    var canManageMenu = User.IsInRole(Velonixs.Connect.Shared.Security.AppRoles.BusinessOwner) ||
-        User.IsInRole(Velonixs.Connect.Shared.Security.AppRoles.BusinessManager);
 }
 
-<section class="d-flex flex-column flex-sm-row align-items-sm-center justify-content-between gap-3 mb-4">
+<section class="d-flex flex-column flex-lg-row align-items-lg-center justify-content-between gap-3 mb-4">
     <div>
         <p class="eyebrow">Live Business</p>
         <h1>@Model.Restaurant.Name</h1>
@@ -39,6 +37,39 @@
     </div></div>
 </section>
 
+<section class="row g-3 mb-4">
+    <div class="col-12 col-md-4">
+        <a class="card module-tile h-100 text-decoration-none" asp-action="Menu">
+            <div class="card-body">
+                <span class="eyebrow">Menu</span>
+                <h2 class="h4">Price & Stock</h2>
+                <p class="text-secondary mb-0">Map menu items, update prices, stock, and active status.</p>
+            </div>
+        </a>
+    </div>
+    <div class="col-12 col-md-4">
+        <a class="card module-tile h-100 text-decoration-none" asp-action="Customers">
+            <div class="card-body">
+                <span class="eyebrow">Customers</span>
+                <h2 class="h4">Customer Records</h2>
+                <p class="text-secondary mb-0">Review and edit customer names and saved addresses.</p>
+            </div>
+        </a>
+    </div>
+    @if (User.IsInRole(Velonixs.Connect.Shared.Security.AppRoles.BusinessOwner))
+    {
+        <div class="col-12 col-md-4">
+            <a class="card module-tile h-100 text-decoration-none" asp-action="Staff">
+                <div class="card-body">
+                    <span class="eyebrow">Team</span>
+                    <h2 class="h4">Staff Users</h2>
+                    <p class="text-secondary mb-0">Manage portal users and access for this business.</p>
+                </div>
+            </a>
+        </div>
+    }
+</section>
+
 @if (Model.PendingOrderCount > 0)
 {
     <section class="alert alert-warning border-warning shadow-sm new-order-alert" role="alert">
@@ -47,38 +78,38 @@
     </section>
 }
 
-<section class="card shadow-sm mb-4">
+<section class="card shadow-sm">
     <div class="card-body">
-    <div class="section-heading">
-        <h2>Orders</h2>
-    </div>
-    <div class="table-responsive">
-        <table class="table table-hover align-middle mb-0">
-            <thead>
-                <tr>
-                    <th>Order</th>
-                    <th>Customer</th>
-                    <th>Status</th>
-                    <th>Total</th>
-                    <th>Time</th>
-                    <th></th>
-                </tr>
-            </thead>
-            <tbody>
-            @foreach (var order in Model.Orders)
-            {
-                <tr class="@(order.OrderStatus == Velonixs.Connect.Domain.Entities.OrderStatuses.PendingConfirmation ? "table-warning pending-order-row" : "")">
-                    <td><strong>@order.OrderNumber</strong><small>@order.Address</small></td>
-                    <td>@order.CustomerName<small>@order.CustomerPhone</small></td>
-                    <td><span class="pill">@order.OrderStatus</span></td>
-                    <td>Rs @order.TotalAmount.ToString("0.##")</td>
-                    <td>@order.CreatedAt.ToLocalTime().ToString("dd MMM, hh:mm tt")</td>
-                    <td class="text-end"><a class="btn btn-sm btn-primary" asp-action="Order" asp-route-id="@order.Id">Open</a></td>
-                </tr>
-            }
-            </tbody>
-        </table>
-    </div>
+        <div class="section-heading">
+            <h2>Orders</h2>
+        </div>
+        <div class="table-responsive">
+            <table class="table table-hover align-middle mb-0">
+                <thead>
+                    <tr>
+                        <th>Order</th>
+                        <th>Customer</th>
+                        <th>Status</th>
+                        <th>Total</th>
+                        <th>Time</th>
+                        <th></th>
+                    </tr>
+                </thead>
+                <tbody>
+                @foreach (var order in Model.Orders)
+                {
+                    <tr class="@(order.OrderStatus == Velonixs.Connect.Domain.Entities.OrderStatuses.PendingConfirmation ? "table-warning pending-order-row" : "")">
+                        <td><strong>@order.OrderNumber</strong><small>@order.Address</small></td>
+                        <td>@order.CustomerName<small>@order.CustomerPhone</small></td>
+                        <td><span class="pill">@order.OrderStatus</span></td>
+                        <td>Rs @order.TotalAmount.ToString("0.##")</td>
+                        <td>@order.CreatedAt.ToLocalTime().ToString("dd MMM, hh:mm tt")</td>
+                        <td class="text-end"><a class="btn btn-sm btn-primary" asp-action="Order" asp-route-id="@order.Id">Open</a></td>
+                    </tr>
+                }
+                </tbody>
+            </table>
+        </div>
     </div>
 </section>
 
@@ -119,223 +150,3 @@
         }
     }, 15000);
 </script>
-
-<section class="card shadow-sm mb-4">
-    <div class="card-body">
-    <div class="section-heading">
-        <div>
-            <h2>Menu, Price & Stock</h2>
-            <p class="text-secondary mb-0">Manage this restaurant's menu only. WhatsApp customers see active and available items.</p>
-        </div>
-    </div>
-
-    @if (canManageMenu)
-    {
-        <div class="row g-3 mb-4">
-            <div class="col-12 col-lg-5">
-                <form class="card h-100 bg-light border-0 p-3" asp-action="CreateCategory" method="post">
-                    @Html.AntiForgeryToken()
-                    <h3 class="h5">Map category</h3>
-                    @if ((Model.MasterCatalog?.Categories ?? Array.Empty<MasterMenuCategoryResponse>()).Any(x => x.IsActive))
-                    {
-                        <div class="row g-2">
-                            <div class="col-12 col-md-7">
-                                <label class="form-label">Master category</label>
-                                <select class="form-select" asp-for="NewCategory.MasterCategoryId" name="MasterCategoryId" required>
-                                    @foreach (var category in (Model.MasterCatalog?.Categories ?? Array.Empty<MasterMenuCategoryResponse>()).Where(x => x.IsActive))
-                                    {
-                                        <option value="@category.Id">@category.Name</option>
-                                    }
-                                </select>
-                                <input asp-for="NewCategory.Name" name="Name" type="hidden" value="From master" />
-                            </div>
-                            <div class="col-12 col-md-3">
-                                <label class="form-label">Order</label>
-                                <input class="form-control" asp-for="NewCategory.DisplayOrder" name="DisplayOrder" type="number" />
-                            </div>
-                            <div class="col-12 col-md-2 d-flex align-items-end">
-                                <div class="form-check">
-                                    <input class="form-check-input" asp-for="NewCategory.IsActive" name="IsActive" />
-                                    <label class="form-check-label">Active</label>
-                                </div>
-                            </div>
-                            <div class="col-12">
-                                <button class="btn btn-primary" type="submit">Map category</button>
-                            </div>
-                        </div>
-                    }
-                    else
-                    {
-                        <p class="text-secondary mb-0">Ask platform admin to add master categories first.</p>
-                    }
-                </form>
-            </div>
-
-            <div class="col-12 col-lg-7">
-                <form class="card h-100 bg-light border-0 p-3" asp-action="CreateMenuItem" method="post">
-                    @Html.AntiForgeryToken()
-                    <h3 class="h5">Map menu item</h3>
-                    @if ((Model.Menu?.Categories ?? Array.Empty<MenuCategoryResponse>()).Any(x => x.IsActive) &&
-                         (Model.MasterCatalog?.Items ?? Array.Empty<MasterMenuItemResponse>()).Any(x => x.IsActive))
-                    {
-                        <div class="row g-2">
-                            <div class="col-12 col-md-4">
-                                <label class="form-label">Master item</label>
-                                <select class="form-select" asp-for="NewItem.MasterMenuItemId" name="MasterMenuItemId" required>
-                                    @foreach (var item in (Model.MasterCatalog?.Items ?? Array.Empty<MasterMenuItemResponse>()).Where(x => x.IsActive))
-                                    {
-                                        <option value="@item.Id">@item.MasterCategoryName - @item.Name</option>
-                                    }
-                                </select>
-                                <input asp-for="NewItem.Name" name="Name" type="hidden" value="From master" />
-                            </div>
-                            <div class="col-12 col-md-3">
-                                <label class="form-label">Category</label>
-                                <select class="form-select" asp-for="NewItem.CategoryId" name="CategoryId" required>
-                                    @foreach (var category in (Model.Menu?.Categories ?? Array.Empty<MenuCategoryResponse>()).Where(x => x.IsActive))
-                                    {
-                                        <option value="@category.Id">@category.Name</option>
-                                    }
-                                </select>
-                            </div>
-                            <div class="col-6 col-md-2">
-                                <label class="form-label">Code</label>
-                                <input class="form-control" asp-for="NewItem.ItemCode" name="ItemCode" type="number" min="1" required />
-                            </div>
-                            <div class="col-6 col-md-3">
-                                <label class="form-label">Price</label>
-                                <input class="form-control" asp-for="NewItem.Price" name="Price" type="number" step="0.01" min="0" required />
-                            </div>
-                            <div class="col-12 d-flex flex-wrap gap-3">
-                                <div class="form-check">
-                                    <input class="form-check-input" asp-for="NewItem.IsAvailable" name="IsAvailable" />
-                                    <label class="form-check-label">In stock / available</label>
-                                </div>
-                                <div class="form-check">
-                                    <input class="form-check-input" asp-for="NewItem.IsActive" name="IsActive" />
-                                    <label class="form-check-label">Active on menu</label>
-                                </div>
-                            </div>
-                            <div class="col-12">
-                                <button class="btn btn-primary" type="submit">Map item</button>
-                            </div>
-                        </div>
-                    }
-                    else
-                    {
-                        <p class="text-secondary mb-0">Map an active category and ask platform admin to add master items first.</p>
-                    }
-                </form>
-            </div>
-        </div>
-    }
-
-    <div class="portal-menu-list">
-    @foreach (var item in (Model.Menu?.Items ?? Array.Empty<MenuItemResponse>()).OrderBy(x => x.ItemCode))
-    {
-        if (canManageMenu)
-        {
-            <form class="portal-menu-row" asp-action="UpdateMenuItem" asp-route-id="@item.Id" method="post">
-                @Html.AntiForgeryToken()
-                <input name="ItemCode" value="@item.ItemCode" type="number" min="1" aria-label="Item code" required />
-                <select name="MasterMenuItemId" aria-label="Master menu item" required>
-                    @foreach (var masterItem in (Model.MasterCatalog?.Items ?? Array.Empty<MasterMenuItemResponse>()).Where(x => x.IsActive))
-                    {
-                        if (masterItem.Id == item.MasterMenuItemId)
-                        {
-                            <option value="@masterItem.Id" selected>@masterItem.Name</option>
-                        }
-                        else
-                        {
-                            <option value="@masterItem.Id">@masterItem.Name</option>
-                        }
-                    }
-                </select>
-                <select name="CategoryId" aria-label="Category" required>
-                    @foreach (var category in Model.Menu?.Categories ?? Array.Empty<MenuCategoryResponse>())
-                    {
-                        if (category.Id == item.CategoryId)
-                        {
-                            <option value="@category.Id" selected>@category.Name</option>
-                        }
-                        else
-                        {
-                            <option value="@category.Id">@category.Name</option>
-                        }
-                    }
-                </select>
-                <input name="Price" value="@item.Price.ToString("0.##")" type="number" step="0.01" min="0" aria-label="Price" required />
-                <input name="Name" value="@item.Name" type="hidden" />
-                <label class="form-check mb-0">
-                    <input class="form-check-input" name="IsAvailable" type="checkbox" value="true" checked="@item.IsAvailable" />
-                    <input name="IsAvailable" type="hidden" value="false" />
-                    <span class="form-check-label">In stock</span>
-                </label>
-                <label class="form-check mb-0">
-                    <input class="form-check-input" name="IsActive" type="checkbox" value="true" checked="@item.IsActive" />
-                    <input name="IsActive" type="hidden" value="false" />
-                    <span class="form-check-label">Active</span>
-                </label>
-                <button class="btn btn-sm btn-primary" type="submit">Save</button>
-                <button class="btn btn-sm btn-outline-danger" type="submit" formaction="@Url.Action("DeactivateMenuItem", "Portal", new { id = item.Id })">Deactivate</button>
-            </form>
-        }
-        else
-        {
-            <article class="portal-menu-row readonly">
-                <strong>@item.ItemCode. @item.Name</strong>
-                <span>@item.CategoryName</span>
-                <span>Rs @item.Price.ToString("0.##")</span>
-                <span class="badge @(item.IsAvailable ? "text-bg-success" : "text-bg-secondary")">@(item.IsAvailable ? "In stock" : "Out of stock")</span>
-                <span class="badge @(item.IsActive ? "text-bg-success" : "text-bg-secondary")">@(item.IsActive ? "Active" : "Inactive")</span>
-            </article>
-        }
-    }
-
-    @if (!(Model.Menu?.Items ?? Array.Empty<MenuItemResponse>()).Any())
-    {
-        <div class="alert alert-info mb-0">
-            No menu items yet. Add a category and item to start accepting WhatsApp orders.
-        </div>
-    }
-    </div>
-
-    @if (canManageMenu)
-    {
-        <div class="alert alert-light border mt-3 mb-0">
-            Stock is currently managed as <strong>In stock / Out of stock</strong>. Out-of-stock or inactive items are hidden from the WhatsApp ordering menu.
-        </div>
-    }
-    </div>
-</section>
-
-<section class="card shadow-sm">
-    <div class="card-body">
-    <div class="section-heading">
-        <h2>Recent Customers</h2>
-    </div>
-    <div class="table-responsive">
-        <table class="table table-hover align-middle mb-0">
-            <thead>
-                <tr>
-                    <th>Name</th>
-                    <th>Phone</th>
-                    <th>Last Address</th>
-                    <th>Last Active</th>
-                </tr>
-            </thead>
-            <tbody>
-            @foreach (var customer in Model.RecentCustomers)
-            {
-                <tr>
-                    <td>@(customer.Name ?? "WhatsApp Customer")</td>
-                    <td>@customer.PhoneNumber</td>
-                    <td>@customer.LastAddress</td>
-                    <td>@customer.LastInteractionAt.ToLocalTime().ToString("dd MMM, hh:mm tt")</td>
-                </tr>
-            }
-            </tbody>
-        </table>
-    </div>
-    </div>
-</section>

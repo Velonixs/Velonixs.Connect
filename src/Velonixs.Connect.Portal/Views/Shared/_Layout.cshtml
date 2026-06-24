@@ -22,6 +22,8 @@
                     @if (User.Identity?.IsAuthenticated == true)
                     {
                         <li class="nav-item"><a class="nav-link" asp-controller="Portal" asp-action="Index">Dashboard</a></li>
+                        <li class="nav-item"><a class="nav-link" asp-controller="Portal" asp-action="Menu">Menu</a></li>
+                        <li class="nav-item"><a class="nav-link" asp-controller="Portal" asp-action="Customers">Customers</a></li>
                         @if (User.IsInRole(Velonixs.Connect.Shared.Security.AppRoles.BusinessOwner))
                         {
                             <li class="nav-item"><a class="nav-link" asp-controller="Portal" asp-action="Staff">Staff Users</a></li>

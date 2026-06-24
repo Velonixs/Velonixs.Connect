@@ -200,14 +200,14 @@ public sealed class ConversationContinuationFlowTests
         var middlePage = await Send(service, "menu.next");
 
         Assert.Contains("Page 2 of 3", middlePage.ReplyText);
-        Assert.Contains("1. Pizza 7", middlePage.ReplyText);
+        Assert.Contains("7. Pizza 7", middlePage.ReplyText);
         Assert.Contains("Rs 107", middlePage.ReplyText);
         Assert.Equal(new[] { "Previous", "Next", "View Cart" }, sender.LastButtons.Select(x => x.Title));
 
         var lastPage = await Send(service, "menu.next");
 
         Assert.Contains("Page 3 of 3", lastPage.ReplyText);
-        Assert.Contains("1. Pizza 13", lastPage.ReplyText);
+        Assert.Contains("13. Pizza 13", lastPage.ReplyText);
         Assert.Contains("Rs 113", lastPage.ReplyText);
         Assert.Equal(new[] { "Previous", "View Cart", "Checkout" }, sender.LastButtons.Select(x => x.Title));
         Assert.All(sender.LastButtons, _ => Assert.True(sender.LastButtons.Count <= 3));
@@ -396,7 +396,7 @@ public sealed class ConversationContinuationFlowTests
 
         Assert.DoesNotContain("Please share your delivery address", confirmation.ReplyText);
         Assert.Contains("Please confirm your order", confirmation.ReplyText);
-        Assert.Contains("Address: Saved Street 123", confirmation.ReplyText);
+        Assert.Contains("Delivery address: Saved Street 123", confirmation.ReplyText);
         Assert.Equal(new[] { "yes", "no" }, sender.LastButtons.Select(x => x.Id));
 
         var conversation = await dbContext.Conversations.SingleAsync();
@@ -438,7 +438,7 @@ public sealed class ConversationContinuationFlowTests
         var confirmation = await Send(service, "Abcds");
 
         Assert.Contains("Please confirm your order", confirmation.ReplyText);
-        Assert.Contains("Address: Abcds", confirmation.ReplyText);
+        Assert.Contains("Delivery address: Abcds", confirmation.ReplyText);
         Assert.Equal(new[] { "yes", "no" }, sender.LastButtons.Select(x => x.Id));
 
         var customer = await dbContext.Customers.SingleAsync();

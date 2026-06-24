@@ -610,13 +610,20 @@ public sealed partial class ConversationService(
             safePage,
             pageEntries.Length);
 
+        var itemAddedPrefix = prefix?.Contains("Added to cart", StringComparison.OrdinalIgnoreCase) == true;
+        var startNumber = safePage * WhatsAppOrderingMessageBuilder.NumberedMenuPageSize + 1;
         return OutgoingReply.ButtonReply(
             WhatsAppOrderingMessageBuilder.BuildNumberedMenuText(
                 restaurant.Name,
                 pageEntries,
                 safePage,
                 totalPages,
-                prefix),
+                prefix,
+                startNumber,
+                showWelcome: !itemAddedPrefix,
+                instruction: itemAddedPrefix
+                    ? "Want to add more item? Select an item by replying with its number."
+                    : null),
             WhatsAppOrderingMessageBuilder.BuildMenuNavigationButtons(safePage, totalPages),
             null);
     }
@@ -830,7 +837,12 @@ public sealed partial class ConversationService(
         int itemNumber,
         CancellationToken cancellationToken)
     {
-        if (itemNumber <= 0 || itemNumber > draft.CurrentMenuItemIds.Count)
+        var globalStartNumber = draft.CurrentMenuPage * WhatsAppOrderingMessageBuilder.NumberedMenuPageSize + 1;
+        var itemIndex = itemNumber >= globalStartNumber
+            ? itemNumber - globalStartNumber
+            : itemNumber - 1;
+
+        if (itemIndex < 0 || itemIndex >= draft.CurrentMenuItemIds.Count)
         {
             return await BuildNumberedMenuReplyAsync(
                 restaurant,
@@ -841,7 +853,7 @@ public sealed partial class ConversationService(
                 page: draft.CurrentMenuPage);
         }
 
-        var menuItemId = draft.CurrentMenuItemIds[itemNumber - 1];
+        var menuItemId = draft.CurrentMenuItemIds[itemIndex];
         return await BuildQuantityReplyAsync(
             restaurant,
             conversation,

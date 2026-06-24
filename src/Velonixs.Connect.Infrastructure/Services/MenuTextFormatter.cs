@@ -119,14 +119,16 @@ public static class MenuTextFormatter
         var builder = new StringBuilder();
         builder.AppendLine("Please review your order");
         builder.AppendLine();
-        builder.AppendLine($"Customer: {draft.CustomerName}");
+        builder.AppendLine($"Customer Name: {draft.CustomerName}");
         builder.AppendLine();
         builder.AppendLine("Items");
+        builder.AppendLine("No. | Item | Qty | Price | Amount");
 
+        var serialNumber = 1;
         foreach (var item in draft.Items)
         {
-            builder.AppendLine($"{item.Quantity} × {item.ItemName}");
-            builder.AppendLine($"Rs {FormatAmount(item.LineTotal)}");
+            builder.AppendLine($"{serialNumber} | {item.ItemName} | {item.Quantity} | Rs {FormatAmount(item.UnitPrice)} | Rs {FormatAmount(item.LineTotal)}");
+            serialNumber++;
         }
 
         builder.AppendLine("-----------");
@@ -136,7 +138,7 @@ public static class MenuTextFormatter
         builder.AppendLine($"Order type: {(draft.IsPickup ? "Pickup" : "Delivery")}");
         if (!draft.IsPickup)
         {
-            builder.AppendLine($"Address: {draft.Address}");
+            builder.AppendLine($"Delivery address: {draft.Address}");
         }
 
         builder.AppendLine();

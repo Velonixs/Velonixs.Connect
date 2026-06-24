@@ -91,6 +91,52 @@ public sealed class InteractiveOrderingTests
     }
 
     [Fact]
+    public void NumberedMenuText_UsesGlobalNumbersOnLaterPages()
+    {
+        var category = new MenuCategory { Name = "Main Course" };
+        var pageItems = new[]
+        {
+            (Category: category, Item: Item("Paneer Butter Masala", 180, category.Id))
+        };
+
+        var message = WhatsAppOrderingMessageBuilder.BuildNumberedMenuText(
+            "99 Restaurant",
+            pageItems,
+            1,
+            2,
+            startNumber: 7);
+
+        Assert.Contains("Page 2 of 2", message);
+        Assert.Contains("7. Paneer Butter Masala", message);
+        Assert.DoesNotContain("1. Paneer Butter Masala", message);
+    }
+
+    [Fact]
+    public void NumberedMenuText_ContinuationAfterAddSkipsRepeatedWelcome()
+    {
+        var category = new MenuCategory { Name = "Main Course" };
+        var pageItems = new[]
+        {
+            (Category: category, Item: Item("Paneer Butter Masala", 180, category.Id))
+        };
+
+        var message = WhatsAppOrderingMessageBuilder.BuildNumberedMenuText(
+            "99 Restaurant",
+            pageItems,
+            1,
+            2,
+            "✅ Added to cart\n\n2 × Paneer Butter Masala\nCart total: Rs 360",
+            startNumber: 7,
+            showWelcome: false,
+            instruction: "Want to add more item? Select an item by replying with its number.");
+
+        Assert.Contains("✅ Added to cart", message);
+        Assert.Contains("Want to add more item? Select an item by replying with its number.", message);
+        Assert.DoesNotContain("Welcome to 99 Restaurant", message);
+        Assert.Contains("7. Paneer Butter Masala", message);
+    }
+
+    [Fact]
     public void DirectMenu_ShowsItemsAndUtilityActionsWithinWhatsAppLimit()
     {
         var category = new MenuCategory { Name = "Pizza" };
@@ -224,8 +270,9 @@ public sealed class InteractiveOrderingTests
 
         var message = MenuTextFormatter.BuildFinalConfirmation(draft);
 
-        Assert.Contains("Customer: Rajesh", message);
-        Assert.Contains("3 × Paneer Pizza", message);
+        Assert.Contains("Customer Name: Rajesh", message);
+        Assert.Contains("No. | Item | Qty | Price | Amount", message);
+        Assert.Contains("1 | Paneer Pizza | 3 | Rs 249 | Rs 747", message);
         Assert.Contains("Rs 747", message);
         Assert.Contains("Order type: Pickup", message);
         Assert.DoesNotContain("Address:", message);

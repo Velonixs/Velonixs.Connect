@@ -177,7 +177,10 @@ public static class WhatsAppOrderingMessageBuilder
         IReadOnlyList<(MenuCategory Category, MenuItem Item)> pageItems,
         int page,
         int totalPages,
-        string? prefix = null)
+        string? prefix = null,
+        int startNumber = 1,
+        bool showWelcome = true,
+        string? instruction = null)
     {
         var builder = new System.Text.StringBuilder();
 
@@ -189,7 +192,22 @@ public static class WhatsAppOrderingMessageBuilder
 
         builder.AppendLine($"🍽️ Welcome to {restaurantName}!");
         builder.AppendLine();
-        builder.AppendLine("Select an item by replying with its number.");
+        if (!showWelcome)
+        {
+            var text = builder.ToString();
+            var welcomeStart = text.LastIndexOf("Welcome to ", StringComparison.Ordinal);
+            if (welcomeStart >= 0)
+            {
+                builder.Clear();
+                if (!string.IsNullOrWhiteSpace(prefix))
+                {
+                    builder.AppendLine(prefix.Trim());
+                    builder.AppendLine();
+                }
+            }
+        }
+
+        builder.AppendLine(instruction ?? "Select an item by replying with its number.");
 
         if (totalPages > 1)
         {
@@ -208,7 +226,7 @@ public static class WhatsAppOrderingMessageBuilder
                 builder.AppendLine("━━━━━━━━━━━━");
             }
 
-            builder.AppendLine($"{index + 1}. {item.Name}");
+            builder.AppendLine($"{startNumber + index}. {item.Name}");
             builder.AppendLine($"   Rs {FormatAmount(item.Price)}");
         }
 

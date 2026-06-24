@@ -51,6 +51,18 @@
             </div>
         }
         <div class="line-item total">
+            <span>Subtotal</span>
+            <strong>Rs @Model.Order.SubTotalAmount.ToString("0.##")</strong>
+        </div>
+        <div class="line-item">
+            <span>CGST (@Model.Order.CgstPercent.ToString("0.##")%)</span>
+            <strong>Rs @Model.Order.CgstAmount.ToString("0.##")</strong>
+        </div>
+        <div class="line-item">
+            <span>SGST (@Model.Order.SgstPercent.ToString("0.##")%)</span>
+            <strong>Rs @Model.Order.SgstAmount.ToString("0.##")</strong>
+        </div>
+        <div class="line-item total">
             <span>Total</span>
             <strong>Rs @Model.Order.TotalAmount.ToString("0.##")</strong>
         </div>
@@ -138,8 +150,8 @@
     }
     else
     {
-        <div class="table-responsive">
-            <table class="table table-hover align-middle mb-0">
+        <div class="table-responsive stack-mobile">
+            <table class="table table-hover align-middle mb-0 responsive-stack">
                 <thead>
                     <tr>
                         <th>Time</th>
@@ -152,10 +164,10 @@
                 @foreach (var history in Model.Order.StatusHistory)
                 {
                     <tr>
-                        <td>@history.UpdatedAtUtc.ToLocalTime().ToString("dd MMM yyyy, hh:mm tt")</td>
-                        <td>@history.PreviousStatus &rarr; @history.NewStatus</td>
-                        <td>@history.UpdatedBy</td>
-                        <td>@history.Comment</td>
+                        <td data-label="Time">@history.UpdatedAtUtc.ToLocalTime().ToString("dd MMM yyyy, hh:mm tt")</td>
+                        <td data-label="Change">@history.PreviousStatus &rarr; @history.NewStatus</td>
+                        <td data-label="Updated By">@history.UpdatedBy</td>
+                        <td data-label="Comment">@history.Comment</td>
                     </tr>
                 }
                 </tbody>

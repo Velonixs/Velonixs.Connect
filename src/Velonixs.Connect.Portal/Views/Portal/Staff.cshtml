@@ -17,8 +17,8 @@
         <section class="card shadow-sm">
             <div class="card-body">
                 <h2 class="h5 mb-3">Current users</h2>
-                <div class="table-responsive">
-                    <table class="table table-hover align-middle mb-0">
+                <div class="table-responsive stack-mobile">
+                    <table class="table table-hover align-middle mb-0 responsive-stack">
                         <thead>
                             <tr>
                                 <th>Name</th>
@@ -32,11 +32,11 @@
                         @foreach (var user in Model.Users)
                         {
                             <tr>
-                                <td>@user.DisplayName</td>
-                                <td>@user.Email</td>
-                                <td><span class="badge text-bg-light border">@user.Role</span></td>
-                                <td><span class="badge @(user.IsActive ? "text-bg-success" : "text-bg-secondary")">@(user.IsActive ? "Active" : "Inactive")</span></td>
-                                <td class="text-end">
+                                <td data-label="Name">@user.DisplayName</td>
+                                <td data-label="Email">@user.Email</td>
+                                <td data-label="Role"><span class="badge text-bg-light border">@user.Role</span></td>
+                                <td data-label="Status"><span class="badge @(user.IsActive ? "text-bg-success" : "text-bg-secondary")">@(user.IsActive ? "Active" : "Inactive")</span></td>
+                                <td data-label="" class="text-end">
                                     @if (user.Role != Velonixs.Connect.Shared.Security.AppRoles.BusinessOwner)
                                     {
                                         <form asp-action="UpdateStaffStatus" asp-route-id="@user.Id" method="post">

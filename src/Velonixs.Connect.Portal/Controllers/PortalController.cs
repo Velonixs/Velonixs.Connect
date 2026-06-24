@@ -103,6 +103,11 @@ public sealed class PortalController(
             {
                 MasterCategoryId = masterCatalog.Categories.FirstOrDefault(x => x.IsActive)?.Id ?? Guid.Empty
             },
+            TaxSetting =
+            {
+                CgstPercent = restaurant.CgstPercent,
+                SgstPercent = restaurant.SgstPercent
+            },
             CanManageMenu = User.IsInRole(AppRoles.BusinessOwner) || User.IsInRole(AppRoles.BusinessManager)
         });
     }
@@ -239,6 +244,32 @@ public sealed class PortalController(
         }
 
         TempData["Success"] = "Menu category added.";
+        return RedirectToAction(nameof(Menu));
+    }
+
+    [HttpPost("portal/tax-settings")]
+    [Authorize(Roles = AppRoles.BusinessOwner + "," + AppRoles.BusinessManager)]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> UpdateTaxSetting(RestaurantTaxFormModel form, CancellationToken cancellationToken)
+    {
+        if (!ModelState.IsValid)
+        {
+            TempData["Error"] = "CGST and SGST must be between 0 and 100.";
+            return RedirectToAction(nameof(Menu));
+        }
+
+        var restaurant = await dbContext.Restaurants.FirstOrDefaultAsync(x => x.Id == GetBusinessId(), cancellationToken);
+
+        if (restaurant is null)
+        {
+            return NotFound();
+        }
+
+        restaurant.CgstPercent = form.CgstPercent;
+        restaurant.SgstPercent = form.SgstPercent;
+        await dbContext.SaveChangesAsync(cancellationToken);
+
+        TempData["Success"] = "GST settings saved. New carts and orders will use these values.";
         return RedirectToAction(nameof(Menu));
     }
 

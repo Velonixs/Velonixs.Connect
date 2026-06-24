@@ -28,6 +28,8 @@ public sealed class BusinessService(IRestaurantService restaurantService) : IBus
                 request.NotificationEmail,
                 request.StaffWhatsAppNumber,
                 request.Address,
+                0,
+                0,
                 request.IsActive),
             cancellationToken);
 
@@ -36,6 +38,13 @@ public sealed class BusinessService(IRestaurantService restaurantService) : IBus
 
     public async Task<BusinessResponse?> UpdateBusinessAsync(Guid id, UpdateBusinessRequest request, CancellationToken cancellationToken = default)
     {
+        var existing = await restaurantService.GetRestaurantAsync(id, cancellationToken);
+
+        if (existing is null)
+        {
+            return null;
+        }
+
         var restaurant = await restaurantService.UpdateRestaurantAsync(
             id,
             new UpdateRestaurantRequest(
@@ -46,6 +55,8 @@ public sealed class BusinessService(IRestaurantService restaurantService) : IBus
                 request.NotificationEmail,
                 request.StaffWhatsAppNumber,
                 request.Address,
+                existing.CgstPercent,
+                existing.SgstPercent,
                 request.IsActive),
             cancellationToken);
 

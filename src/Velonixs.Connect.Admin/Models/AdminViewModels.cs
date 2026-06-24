@@ -8,11 +8,21 @@ public sealed class AdminIndexViewModel
 {
     public IReadOnlyCollection<RestaurantAdminSummary> Restaurants { get; set; } = Array.Empty<RestaurantAdminSummary>();
     public RestaurantFormModel NewRestaurant { get; set; } = new();
+    public TaxSettingFormModel TaxSetting { get; set; } = new();
     public IReadOnlyCollection<string> BusinessTypeOptions { get; set; } = BusinessTypes.All;
     public int TotalRestaurants { get; set; }
     public int ActiveRestaurants { get; set; }
     public int TotalOrders { get; set; }
     public decimal TotalRevenue { get; set; }
+}
+
+public sealed class TaxSettingFormModel
+{
+    [Range(0, 100)]
+    public decimal CgstPercent { get; set; }
+
+    [Range(0, 100)]
+    public decimal SgstPercent { get; set; }
 }
 
 public sealed class MasterCatalogManageViewModel
@@ -132,6 +142,10 @@ public sealed class RestaurantFormModel
     public string? NotificationEmail { get; set; }
     public string? StaffWhatsAppNumber { get; set; }
     public string? Address { get; set; }
+    [Range(0, 100)]
+    public decimal CgstPercent { get; set; }
+    [Range(0, 100)]
+    public decimal SgstPercent { get; set; }
     public bool IsActive { get; set; } = true;
 
     [Required]

@@ -26,6 +26,9 @@ public sealed class RestaurantService(RestaurantConnectDbContext dbContext) : IR
 
     public async Task<RestaurantResponse> CreateRestaurantAsync(CreateRestaurantRequest request, CancellationToken cancellationToken = default)
     {
+        ValidateTaxPercent(request.CgstPercent, nameof(request.CgstPercent));
+        ValidateTaxPercent(request.SgstPercent, nameof(request.SgstPercent));
+
         var restaurant = new Domain.Entities.Restaurant
         {
             Name = request.Name.Trim(),
@@ -35,6 +38,8 @@ public sealed class RestaurantService(RestaurantConnectDbContext dbContext) : IR
             NotificationEmail = request.NotificationEmail?.Trim(),
             StaffWhatsAppNumber = request.StaffWhatsAppNumber?.Trim(),
             Address = request.Address?.Trim(),
+            CgstPercent = request.CgstPercent,
+            SgstPercent = request.SgstPercent,
             IsActive = request.IsActive
         };
 
@@ -60,11 +65,58 @@ public sealed class RestaurantService(RestaurantConnectDbContext dbContext) : IR
         restaurant.NotificationEmail = request.NotificationEmail?.Trim();
         restaurant.StaffWhatsAppNumber = request.StaffWhatsAppNumber?.Trim();
         restaurant.Address = request.Address?.Trim();
+        ValidateTaxPercent(request.CgstPercent, nameof(request.CgstPercent));
+        ValidateTaxPercent(request.SgstPercent, nameof(request.SgstPercent));
+        restaurant.CgstPercent = request.CgstPercent;
+        restaurant.SgstPercent = request.SgstPercent;
         restaurant.IsActive = request.IsActive;
 
         await dbContext.SaveChangesAsync(cancellationToken);
 
         return ToResponse(restaurant);
+    }
+
+    public async Task<PlatformTaxSettingResponse> GetPlatformTaxSettingAsync(CancellationToken cancellationToken = default)
+    {
+        var setting = await GetOrCreatePlatformTaxSettingAsync(cancellationToken);
+        return new PlatformTaxSettingResponse(setting.CgstPercent, setting.SgstPercent, setting.UpdatedAtUtc);
+    }
+
+    public async Task<PlatformTaxSettingResponse> UpdatePlatformTaxSettingAsync(
+        decimal cgstPercent,
+        decimal sgstPercent,
+        CancellationToken cancellationToken = default)
+    {
+        ValidateTaxPercent(cgstPercent, nameof(cgstPercent));
+        ValidateTaxPercent(sgstPercent, nameof(sgstPercent));
+
+        var setting = await GetOrCreatePlatformTaxSettingAsync(cancellationToken);
+        setting.CgstPercent = cgstPercent;
+        setting.SgstPercent = sgstPercent;
+        setting.UpdatedAtUtc = DateTimeOffset.UtcNow;
+        await dbContext.SaveChangesAsync(cancellationToken);
+
+        return new PlatformTaxSettingResponse(setting.CgstPercent, setting.SgstPercent, setting.UpdatedAtUtc);
+    }
+
+    private async Task<PlatformTaxSetting> GetOrCreatePlatformTaxSettingAsync(CancellationToken cancellationToken)
+    {
+        var setting = await dbContext.PlatformTaxSettings.FirstOrDefaultAsync(
+            x => x.Id == PlatformTaxSetting.DefaultId,
+            cancellationToken);
+
+        if (setting is not null)
+        {
+            return setting;
+        }
+
+        setting = new PlatformTaxSetting
+        {
+            Id = PlatformTaxSetting.DefaultId
+        };
+        dbContext.PlatformTaxSettings.Add(setting);
+        await dbContext.SaveChangesAsync(cancellationToken);
+        return setting;
     }
 
     private static RestaurantResponse ToResponse(Domain.Entities.Restaurant restaurant)
@@ -78,7 +130,17 @@ public sealed class RestaurantService(RestaurantConnectDbContext dbContext) : IR
             restaurant.NotificationEmail,
             restaurant.StaffWhatsAppNumber,
             restaurant.Address,
+            restaurant.CgstPercent,
+            restaurant.SgstPercent,
             restaurant.IsActive,
             restaurant.CreatedAt);
+    }
+
+    private static void ValidateTaxPercent(decimal value, string fieldName)
+    {
+        if (value is < 0 or > 100)
+        {
+            throw new InvalidOperationException($"{fieldName} must be between 0 and 100.");
+        }
     }
 }

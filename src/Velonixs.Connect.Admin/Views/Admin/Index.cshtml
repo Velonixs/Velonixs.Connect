@@ -40,11 +40,36 @@
 <section class="card shadow-sm mb-4">
     <div class="card-body">
         <div class="section-heading">
+            <div>
+                <h2>Master GST Defaults</h2>
+                <p class="text-secondary mb-0">These defaults are applied when creating a new restaurant. Each restaurant can override them in the portal.</p>
+            </div>
+        </div>
+        <form class="row g-3 align-items-end" asp-action="UpdateTaxSetting" method="post">
+            @Html.AntiForgeryToken()
+            <div class="col-12 col-md-3">
+                <label class="form-label">CGST %</label>
+                <input class="form-control" asp-for="TaxSetting.CgstPercent" name="CgstPercent" type="number" min="0" max="100" step="0.01" />
+            </div>
+            <div class="col-12 col-md-3">
+                <label class="form-label">SGST %</label>
+                <input class="form-control" asp-for="TaxSetting.SgstPercent" name="SgstPercent" type="number" min="0" max="100" step="0.01" />
+            </div>
+            <div class="col-12 col-md-auto">
+                <button class="btn btn-success" type="submit">Save GST defaults</button>
+            </div>
+        </form>
+    </div>
+</section>
+
+<section class="card shadow-sm mb-4">
+    <div class="card-body">
+        <div class="section-heading">
             <h2>Businesses</h2>
         </div>
 
-        <div class="table-responsive">
-            <table class="table table-hover align-middle mb-0">
+        <div class="table-responsive stack-mobile">
+            <table class="table table-hover align-middle mb-0 responsive-stack">
                 <thead>
                     <tr>
                         <th>Name</th>
@@ -62,18 +87,18 @@
                 @foreach (var item in Model.Restaurants)
                 {
                     <tr>
-                        <td>
+                        <td data-label="Name">
                             <strong>@item.Restaurant.Name</strong>
                             <small>@item.Restaurant.BusinessPhone</small>
                         </td>
-                        <td>@item.Restaurant.BusinessType</td>
-                        <td><code>@item.Restaurant.WhatsAppPhoneNumberId</code></td>
-                        <td>@item.MenuItemCount</td>
-                        <td>@item.CustomerCount</td>
-                        <td>@item.OrderCount</td>
-                        <td>Rs @item.Revenue.ToString("0.##")</td>
-                        <td><span class="pill @(item.Restaurant.IsActive ? "good" : "muted")">@(item.Restaurant.IsActive ? "Active" : "Inactive")</span></td>
-                        <td class="text-end"><a class="btn btn-sm btn-success" asp-action="Restaurant" asp-route-id="@item.Restaurant.Id">Manage</a></td>
+                        <td data-label="Type">@item.Restaurant.BusinessType</td>
+                        <td data-label="WhatsApp ID"><code>@item.Restaurant.WhatsAppPhoneNumberId</code></td>
+                        <td data-label="Catalog">@item.MenuItemCount</td>
+                        <td data-label="Customers">@item.CustomerCount</td>
+                        <td data-label="Orders">@item.OrderCount</td>
+                        <td data-label="Revenue">Rs @item.Revenue.ToString("0.##")</td>
+                        <td data-label="Status"><span class="pill @(item.Restaurant.IsActive ? "good" : "muted")">@(item.Restaurant.IsActive ? "Active" : "Inactive")</span></td>
+                        <td data-label="" class="text-end"><a class="btn btn-sm btn-success" asp-action="Restaurant" asp-route-id="@item.Restaurant.Id">Manage</a></td>
                     </tr>
                 }
                 </tbody>
@@ -122,6 +147,14 @@
             <div class="col-12 col-lg-6">
                 <label class="form-label">Address</label>
                 <input class="form-control" asp-for="NewRestaurant.Address" name="Address" />
+            </div>
+            <div class="col-12 col-lg-3">
+                <label class="form-label">CGST %</label>
+                <input class="form-control" asp-for="NewRestaurant.CgstPercent" name="CgstPercent" type="number" min="0" max="100" step="0.01" />
+            </div>
+            <div class="col-12 col-lg-3">
+                <label class="form-label">SGST %</label>
+                <input class="form-control" asp-for="NewRestaurant.SgstPercent" name="SgstPercent" type="number" min="0" max="100" step="0.01" />
             </div>
 
             <div class="col-12"><hr class="my-2" /><h3 class="h5 mb-0">Business owner login</h3></div>

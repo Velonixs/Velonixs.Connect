@@ -10,6 +10,8 @@ public sealed class Restaurant
     public string? NotificationEmail { get; set; }
     public string? StaffWhatsAppNumber { get; set; }
     public string? Address { get; set; }
+    public decimal CgstPercent { get; set; }
+    public decimal SgstPercent { get; set; }
     public bool IsActive { get; set; } = true;
     public DateTimeOffset CreatedAt { get; set; } = DateTimeOffset.UtcNow;
 

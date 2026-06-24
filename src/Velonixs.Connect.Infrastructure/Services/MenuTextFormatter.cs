@@ -77,7 +77,7 @@ public static class MenuTextFormatter
         }
 
         builder.AppendLine();
-        builder.AppendLine($"Total: Rs {FormatAmount(draft.TotalAmount)}");
+        AppendTaxSummary(builder, draft.SubTotalAmount, draft.CgstPercent, draft.CgstAmount, draft.SgstPercent, draft.SgstAmount, draft.TotalAmount);
         builder.AppendLine();
         builder.AppendLine("Select Checkout to continue or Add Items to order more.");
 
@@ -97,7 +97,7 @@ public static class MenuTextFormatter
         }
 
         builder.AppendLine("--------------------");
-        builder.AppendLine($"*Total: Rs {FormatAmount(draft.TotalAmount)}*");
+        AppendTaxSummary(builder, draft.SubTotalAmount, draft.CgstPercent, draft.CgstAmount, draft.SgstPercent, draft.SgstAmount, draft.TotalAmount, boldTotal: true);
         builder.AppendLine();
         builder.AppendLine("Please reply with your name.");
 
@@ -133,7 +133,7 @@ public static class MenuTextFormatter
 
         builder.AppendLine("-----------");
         builder.AppendLine();
-        builder.AppendLine($"Total: Rs {FormatAmount(draft.TotalAmount)}");
+        AppendTaxSummary(builder, draft.SubTotalAmount, draft.CgstPercent, draft.CgstAmount, draft.SgstPercent, draft.SgstAmount, draft.TotalAmount);
         builder.AppendLine();
         builder.AppendLine($"Order type: {(draft.IsPickup ? "Pickup" : "Delivery")}");
         if (!draft.IsPickup)
@@ -182,7 +182,7 @@ public static class MenuTextFormatter
 
         builder.AppendLine("-----------");
         builder.AppendLine();
-        builder.AppendLine($"Total: Rs {FormatAmount(order.TotalAmount)}");
+        AppendTaxSummary(builder, order.SubTotalAmount, order.CgstPercent, order.CgstAmount, order.SgstPercent, order.SgstAmount, order.TotalAmount);
         builder.AppendLine();
         builder.AppendLine($"Order type: {ResolveOrderType(order)}");
         if (!IsPickup(order))
@@ -240,6 +240,34 @@ public static class MenuTextFormatter
 
     private static string ResolveOrderType(Order order) =>
         IsPickup(order) ? "Pickup" : "Delivery";
+
+    private static void AppendTaxSummary(
+        StringBuilder builder,
+        decimal subTotal,
+        decimal cgstPercent,
+        decimal cgstAmount,
+        decimal sgstPercent,
+        decimal sgstAmount,
+        decimal total,
+        bool boldTotal = false)
+    {
+        var effectiveSubTotal = subTotal > 0 ? subTotal : total - cgstAmount - sgstAmount;
+        builder.AppendLine($"Subtotal: Rs {FormatAmount(effectiveSubTotal)}");
+
+        if (cgstPercent > 0 || cgstAmount > 0)
+        {
+            builder.AppendLine($"CGST ({FormatAmount(cgstPercent)}%): Rs {FormatAmount(cgstAmount)}");
+        }
+
+        if (sgstPercent > 0 || sgstAmount > 0)
+        {
+            builder.AppendLine($"SGST ({FormatAmount(sgstPercent)}%): Rs {FormatAmount(sgstAmount)}");
+        }
+
+        builder.AppendLine(boldTotal
+            ? $"*Total: Rs {FormatAmount(total)}*"
+            : $"Total: Rs {FormatAmount(total)}");
+    }
 
     private static string FormatAmount(decimal amount) =>
         amount.ToString("0.##", CultureInfo.InvariantCulture);

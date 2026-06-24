@@ -14,6 +14,7 @@ public sealed class RestaurantConnectDbContext(
     : IdentityDbContext<ApplicationUser, IdentityRole<Guid>, Guid>(options)
 {
     public DbSet<Domain.Entities.Restaurant> Restaurants => Set<Domain.Entities.Restaurant>();
+    public DbSet<PlatformTaxSetting> PlatformTaxSettings => Set<PlatformTaxSetting>();
     public DbSet<MasterMenuCategory> MasterMenuCategories => Set<MasterMenuCategory>();
     public DbSet<MasterMenuItem> MasterMenuItems => Set<MasterMenuItem>();
     public DbSet<MenuCategory> MenuCategories => Set<MenuCategory>();
@@ -39,6 +40,7 @@ public sealed class RestaurantConnectDbContext(
         ConfigureIdentity(modelBuilder);
         ConfigureDataProtectionState(modelBuilder);
         ConfigureRestaurant(modelBuilder, nullableEncryptedStringConverter);
+        ConfigurePlatformTaxSetting(modelBuilder);
         ConfigureMasterMenuCategory(modelBuilder);
         ConfigureMasterMenuItem(modelBuilder);
         ConfigureMenuCategory(modelBuilder);
@@ -96,8 +98,22 @@ public sealed class RestaurantConnectDbContext(
             entity.Property(x => x.NotificationEmail).HasColumnType("nvarchar(max)").HasConversion(encryptedStringConverter);
             entity.Property(x => x.StaffWhatsAppNumber).HasColumnType("nvarchar(max)").HasConversion(encryptedStringConverter);
             entity.Property(x => x.Address).HasColumnType("nvarchar(max)").HasConversion(encryptedStringConverter);
+            entity.Property(x => x.CgstPercent).HasPrecision(5, 2);
+            entity.Property(x => x.SgstPercent).HasPrecision(5, 2);
 
             entity.HasIndex(x => x.WhatsAppPhoneNumberId).IsUnique();
+        });
+    }
+
+    private static void ConfigurePlatformTaxSetting(ModelBuilder modelBuilder)
+    {
+        modelBuilder.Entity<PlatformTaxSetting>(entity =>
+        {
+            entity.ToTable("PlatformTaxSetting");
+            entity.HasKey(x => x.Id);
+            entity.Property(x => x.Id).HasMaxLength(40);
+            entity.Property(x => x.CgstPercent).HasPrecision(5, 2);
+            entity.Property(x => x.SgstPercent).HasPrecision(5, 2);
         });
     }
 
@@ -239,6 +255,11 @@ public sealed class RestaurantConnectDbContext(
             entity.Property(x => x.Address).HasColumnType("nvarchar(max)").HasConversion(encryptedStringConverter).IsRequired();
             entity.Property(x => x.OrderStatus).HasMaxLength(50).IsRequired();
             entity.Property(x => x.RestaurantComment).HasColumnType("nvarchar(max)").HasConversion(nullableEncryptedStringConverter);
+            entity.Property(x => x.SubTotalAmount).HasPrecision(18, 2);
+            entity.Property(x => x.CgstPercent).HasPrecision(5, 2);
+            entity.Property(x => x.CgstAmount).HasPrecision(18, 2);
+            entity.Property(x => x.SgstPercent).HasPrecision(5, 2);
+            entity.Property(x => x.SgstAmount).HasPrecision(18, 2);
             entity.Property(x => x.TotalAmount).HasPrecision(18, 2);
             entity.Property(x => x.Source).HasMaxLength(30).IsRequired();
 

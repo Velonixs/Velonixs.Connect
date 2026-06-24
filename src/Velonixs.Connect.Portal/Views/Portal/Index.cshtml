@@ -83,8 +83,8 @@
         <div class="section-heading">
             <h2>Orders</h2>
         </div>
-        <div class="table-responsive">
-            <table class="table table-hover align-middle mb-0">
+        <div class="table-responsive stack-mobile">
+            <table class="table table-hover align-middle mb-0 responsive-stack">
                 <thead>
                     <tr>
                         <th>Order</th>
@@ -99,12 +99,12 @@
                 @foreach (var order in Model.Orders)
                 {
                     <tr class="@(order.OrderStatus == Velonixs.Connect.Domain.Entities.OrderStatuses.PendingConfirmation ? "table-warning pending-order-row" : "")">
-                        <td><strong>@order.OrderNumber</strong><small>@order.Address</small></td>
-                        <td>@order.CustomerName<small>@order.CustomerPhone</small></td>
-                        <td><span class="pill">@order.OrderStatus</span></td>
-                        <td>Rs @order.TotalAmount.ToString("0.##")</td>
-                        <td>@order.CreatedAt.ToLocalTime().ToString("dd MMM, hh:mm tt")</td>
-                        <td class="text-end"><a class="btn btn-sm btn-primary" asp-action="Order" asp-route-id="@order.Id">Open</a></td>
+                        <td data-label="Order"><strong>@order.OrderNumber</strong><small>@order.Address</small></td>
+                        <td data-label="Customer">@order.CustomerName<small>@order.CustomerPhone</small></td>
+                        <td data-label="Status"><span class="pill">@order.OrderStatus</span></td>
+                        <td data-label="Total">Rs @order.TotalAmount.ToString("0.##")</td>
+                        <td data-label="Time">@order.CreatedAt.ToLocalTime().ToString("dd MMM, hh:mm tt")</td>
+                        <td data-label="" class="text-end"><a class="btn btn-sm btn-primary" asp-action="Order" asp-route-id="@order.Id">Open</a></td>
                     </tr>
                 }
                 </tbody>

@@ -210,6 +210,23 @@ public sealed class InteractiveOrderingTests
     }
 
     [Fact]
+    public void CartCalculation_AddsCgstAndSgstToTotal()
+    {
+        var draft = new PendingOrderDraft();
+        var item = Item("Paneer Pizza", 100);
+        var service = new OrderingCartService();
+
+        service.AddOrUpdate(draft, item, 2, cgstPercent: 2.5m, sgstPercent: 2.5m);
+
+        Assert.Equal(200, draft.SubTotalAmount);
+        Assert.Equal(2.5m, draft.CgstPercent);
+        Assert.Equal(5, draft.CgstAmount);
+        Assert.Equal(2.5m, draft.SgstPercent);
+        Assert.Equal(5, draft.SgstAmount);
+        Assert.Equal(210, draft.TotalAmount);
+    }
+
+    [Fact]
     public void SearchMatching_ReturnsOnlyActiveAvailableTenantInput()
     {
         var service = new MenuSearchService();

@@ -43,7 +43,6 @@ public sealed class PortalController(
 
         var orders = await orderService.GetRestaurantOrdersAsync(restaurant.Id, cancellationToken);
         var menu = await menuService.GetMenuAsync(restaurant.Id, cancellationToken);
-        var masterCatalog = await menuService.GetMasterCatalogAsync(cancellationToken);
         var today = DateTimeOffset.UtcNow.Date;
         var recentCustomers = await dbContext.Customers
             .AsNoTracking()
@@ -52,6 +51,7 @@ public sealed class PortalController(
             .Take(10)
             .Select(x => new CustomerPortalSummary
             {
+                Id = x.Id,
                 PhoneNumber = x.PhoneNumber,
                 Name = x.Name,
                 LastAddress = x.LastAddress,
@@ -64,6 +64,34 @@ public sealed class PortalController(
             Restaurant = restaurant,
             Orders = orders.Take(20).ToArray(),
             Menu = menu,
+            PendingOrderCount = orders.Count(x => x.OrderStatus == OrderStatuses.PendingConfirmation),
+            TodayOrderCount = orders.Count(x => x.CreatedAt.UtcDateTime.Date == today),
+            TodayRevenue = orders.Where(x => x.CreatedAt.UtcDateTime.Date == today).Sum(x => x.TotalAmount),
+            AvailableItemCount = menu?.Items.Count(x => x.IsActive && x.IsAvailable) ?? 0,
+            RecentCustomers = recentCustomers,
+            CurrentRole = User.Claims.FirstOrDefault(x => x.Type == ClaimTypes.Role)?.Value ?? string.Empty
+        };
+
+        return View(model);
+    }
+
+    [HttpGet("portal/menu")]
+    public async Task<IActionResult> Menu(CancellationToken cancellationToken)
+    {
+        var restaurant = await ResolveRestaurantAsync(cancellationToken);
+
+        if (restaurant is null)
+        {
+            return View("NoRestaurant");
+        }
+
+        var menu = await menuService.GetMenuAsync(restaurant.Id, cancellationToken);
+        var masterCatalog = await menuService.GetMasterCatalogAsync(cancellationToken);
+
+        return View(new PortalMenuViewModel
+        {
+            Restaurant = restaurant,
+            Menu = menu,
             MasterCatalog = masterCatalog,
             NewItem =
             {
@@ -75,15 +103,40 @@ public sealed class PortalController(
             {
                 MasterCategoryId = masterCatalog.Categories.FirstOrDefault(x => x.IsActive)?.Id ?? Guid.Empty
             },
-            PendingOrderCount = orders.Count(x => x.OrderStatus == OrderStatuses.PendingConfirmation),
-            TodayOrderCount = orders.Count(x => x.CreatedAt.UtcDateTime.Date == today),
-            TodayRevenue = orders.Where(x => x.CreatedAt.UtcDateTime.Date == today).Sum(x => x.TotalAmount),
-            AvailableItemCount = menu?.Items.Count(x => x.IsActive && x.IsAvailable) ?? 0,
-            RecentCustomers = recentCustomers,
-            CurrentRole = User.Claims.FirstOrDefault(x => x.Type == ClaimTypes.Role)?.Value ?? string.Empty
-        };
+            CanManageMenu = User.IsInRole(AppRoles.BusinessOwner) || User.IsInRole(AppRoles.BusinessManager)
+        });
+    }
 
-        return View(model);
+    [HttpGet("portal/customers")]
+    public async Task<IActionResult> Customers(CancellationToken cancellationToken)
+    {
+        var restaurant = await ResolveRestaurantAsync(cancellationToken);
+
+        if (restaurant is null)
+        {
+            return View("NoRestaurant");
+        }
+
+        var customers = await dbContext.Customers
+            .AsNoTracking()
+            .Where(x => x.RestaurantId == restaurant.Id)
+            .OrderByDescending(x => x.LastInteractionAt)
+            .Take(100)
+            .Select(x => new CustomerPortalSummary
+            {
+                Id = x.Id,
+                PhoneNumber = x.PhoneNumber,
+                Name = x.Name,
+                LastAddress = x.LastAddress,
+                LastInteractionAt = x.LastInteractionAt
+            })
+            .ToArrayAsync(cancellationToken);
+
+        return View(new PortalCustomersViewModel
+        {
+            Restaurant = restaurant,
+            Customers = customers
+        });
     }
 
     [HttpGet("portal/orders/{id:guid}")]
@@ -169,7 +222,7 @@ public sealed class PortalController(
         if (!ModelState.IsValid)
         {
             TempData["Error"] = "Enter a valid category name.";
-            return RedirectToAction(nameof(Index));
+            return RedirectToAction(nameof(Menu));
         }
 
         try
@@ -182,11 +235,11 @@ public sealed class PortalController(
         catch (DbUpdateException)
         {
             TempData["Error"] = "A category with this name already exists for this restaurant.";
-            return RedirectToAction(nameof(Index));
+            return RedirectToAction(nameof(Menu));
         }
 
         TempData["Success"] = "Menu category added.";
-        return RedirectToAction(nameof(Index));
+        return RedirectToAction(nameof(Menu));
     }
 
     [HttpPost("portal/menu-items")]
@@ -197,7 +250,7 @@ public sealed class PortalController(
         if (!ModelState.IsValid)
         {
             TempData["Error"] = "Enter valid product details.";
-            return RedirectToAction(nameof(Index));
+            return RedirectToAction(nameof(Menu));
         }
 
         try
@@ -218,16 +271,16 @@ public sealed class PortalController(
         catch (InvalidOperationException ex)
         {
             TempData["Error"] = ex.Message;
-            return RedirectToAction(nameof(Index));
+            return RedirectToAction(nameof(Menu));
         }
         catch (DbUpdateException)
         {
             TempData["Error"] = "A product with this code or category/name already exists for this restaurant.";
-            return RedirectToAction(nameof(Index));
+            return RedirectToAction(nameof(Menu));
         }
 
         TempData["Success"] = "Menu product added.";
-        return RedirectToAction(nameof(Index));
+        return RedirectToAction(nameof(Menu));
     }
 
     [HttpPost("portal/menu-items/{id:guid}")]
@@ -238,7 +291,7 @@ public sealed class PortalController(
         if (!ModelState.IsValid)
         {
             TempData["Error"] = "Enter valid product details.";
-            return RedirectToAction(nameof(Index));
+            return RedirectToAction(nameof(Menu));
         }
 
         var item = await dbContext.MenuItems.AsNoTracking().FirstOrDefaultAsync(x => x.Id == id, cancellationToken);
@@ -271,16 +324,16 @@ public sealed class PortalController(
         catch (InvalidOperationException ex)
         {
             TempData["Error"] = ex.Message;
-            return RedirectToAction(nameof(Index));
+            return RedirectToAction(nameof(Menu));
         }
         catch (DbUpdateException)
         {
             TempData["Error"] = "A product with this code or category/name already exists for this restaurant.";
-            return RedirectToAction(nameof(Index));
+            return RedirectToAction(nameof(Menu));
         }
 
         TempData["Success"] = "Menu product saved.";
-        return RedirectToAction(nameof(Index));
+        return RedirectToAction(nameof(Menu));
     }
 
     [HttpPost("portal/menu-items/{id:guid}/deactivate")]
@@ -303,7 +356,37 @@ public sealed class PortalController(
         await menuService.DeactivateItemAsync(id, cancellationToken);
 
         TempData["Success"] = "Menu product deactivated.";
-        return RedirectToAction(nameof(Index));
+        return RedirectToAction(nameof(Menu));
+    }
+
+    [HttpPost("portal/menu-items/{id:guid}/delete")]
+    [Authorize(Roles = AppRoles.BusinessOwner + "," + AppRoles.BusinessManager)]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> DeleteMenuItem(Guid id, CancellationToken cancellationToken)
+    {
+        var item = await dbContext.MenuItems.FirstOrDefaultAsync(x => x.Id == id, cancellationToken);
+
+        if (item is null)
+        {
+            return NotFound();
+        }
+
+        if (item.RestaurantId != GetBusinessId())
+        {
+            return Forbid();
+        }
+
+        if (await dbContext.OrderItems.AnyAsync(x => x.MenuItemId == id, cancellationToken))
+        {
+            TempData["Error"] = "This item has order history. Deactivate it instead of deleting it.";
+            return RedirectToAction(nameof(Menu));
+        }
+
+        dbContext.MenuItems.Remove(item);
+        await dbContext.SaveChangesAsync(cancellationToken);
+
+        TempData["Success"] = "Menu product deleted.";
+        return RedirectToAction(nameof(Menu));
     }
 
     [HttpPost("portal/menu-items/{id:guid}/availability")]
@@ -327,7 +410,32 @@ public sealed class PortalController(
         await dbContext.SaveChangesAsync(cancellationToken);
 
         TempData["Success"] = $"{item.Name} is now {(item.IsAvailable ? "available" : "unavailable")}.";
-        return RedirectToAction(nameof(Index));
+        return RedirectToAction(nameof(Menu));
+    }
+
+    [HttpPost("portal/customers/{id:guid}")]
+    [Authorize(Roles = AppRoles.BusinessOwner + "," + AppRoles.BusinessManager)]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> UpdateCustomer(Guid id, CustomerEditFormModel form, CancellationToken cancellationToken)
+    {
+        var customer = await dbContext.Customers.FirstOrDefaultAsync(x => x.Id == id, cancellationToken);
+
+        if (customer is null)
+        {
+            return NotFound();
+        }
+
+        if (customer.RestaurantId != GetBusinessId())
+        {
+            return Forbid();
+        }
+
+        customer.Name = string.IsNullOrWhiteSpace(form.Name) ? null : form.Name.Trim();
+        customer.LastAddress = string.IsNullOrWhiteSpace(form.LastAddress) ? null : form.LastAddress.Trim();
+        await dbContext.SaveChangesAsync(cancellationToken);
+
+        TempData["Success"] = "Customer saved.";
+        return RedirectToAction(nameof(Customers));
     }
 
     [AllowAnonymous]

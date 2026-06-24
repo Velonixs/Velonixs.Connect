@@ -9,9 +9,6 @@ public sealed class PortalDashboardViewModel
     public RestaurantResponse Restaurant { get; set; } = null!;
     public IReadOnlyCollection<OrderSummaryResponse> Orders { get; set; } = Array.Empty<OrderSummaryResponse>();
     public MenuResponse? Menu { get; set; }
-    public MasterCatalogResponse? MasterCatalog { get; set; }
-    public MenuCategoryPortalFormModel NewCategory { get; set; } = new();
-    public MenuItemPortalFormModel NewItem { get; set; } = new();
     public int PendingOrderCount { get; set; }
     public int TodayOrderCount { get; set; }
     public decimal TodayRevenue { get; set; }
@@ -20,12 +17,35 @@ public sealed class PortalDashboardViewModel
     public string CurrentRole { get; set; } = string.Empty;
 }
 
+public sealed class PortalMenuViewModel
+{
+    public RestaurantResponse Restaurant { get; set; } = null!;
+    public MenuResponse? Menu { get; set; }
+    public MasterCatalogResponse? MasterCatalog { get; set; }
+    public MenuCategoryPortalFormModel NewCategory { get; set; } = new();
+    public MenuItemPortalFormModel NewItem { get; set; } = new();
+    public bool CanManageMenu { get; set; }
+}
+
+public sealed class PortalCustomersViewModel
+{
+    public RestaurantResponse Restaurant { get; set; } = null!;
+    public IReadOnlyCollection<CustomerPortalSummary> Customers { get; set; } = Array.Empty<CustomerPortalSummary>();
+}
+
 public sealed class CustomerPortalSummary
 {
+    public Guid Id { get; set; }
     public string PhoneNumber { get; set; } = string.Empty;
     public string? Name { get; set; }
     public string? LastAddress { get; set; }
     public DateTimeOffset LastInteractionAt { get; set; }
+}
+
+public sealed class CustomerEditFormModel
+{
+    public string? Name { get; set; }
+    public string? LastAddress { get; set; }
 }
 
 public sealed class PortalOrderViewModel

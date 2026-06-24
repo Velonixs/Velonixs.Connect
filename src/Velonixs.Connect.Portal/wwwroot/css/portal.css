@@ -593,6 +593,39 @@ textarea,
     min-height: 44px;
 }
 
+input[type="checkbox"],
+.form-check-input {
+    border-radius: 0.35rem !important;
+    flex: 0 0 auto;
+    height: 1.1rem !important;
+    margin-top: 0 !important;
+    min-height: 1.1rem !important;
+    padding: 0 !important;
+    width: 1.1rem !important;
+}
+
+.form-check {
+    align-items: center;
+    display: inline-flex;
+    gap: 0.5rem;
+    min-height: 44px;
+    padding-left: 0;
+}
+
+.form-check .form-check-input {
+    margin-left: 0;
+}
+
+.module-tile {
+    color: inherit;
+    transition: transform 0.18s ease, box-shadow 0.18s ease;
+}
+
+.module-tile:hover {
+    color: inherit;
+    transform: translateY(-2px);
+}
+
 input:focus,
 select:focus,
 textarea:focus,
@@ -659,7 +692,7 @@ tbody tr:hover {
     border-radius: 18px;
     display: grid;
     gap: 10px;
-    grid-template-columns: 76px minmax(130px, 0.9fr) minmax(180px, 1.3fr) 110px minmax(150px, 1fr) 118px 90px auto auto;
+    grid-template-columns: 76px minmax(130px, 0.9fr) minmax(180px, 1.3fr) 110px minmax(130px, 0.8fr) minmax(110px, 0.7fr) auto auto auto;
     padding: 12px;
 }
 
@@ -667,17 +700,12 @@ tbody tr:hover {
     grid-template-columns: minmax(170px, 1.4fr) minmax(120px, 1fr) 110px auto auto;
 }
 
-.portal-menu-row .form-check {
+.customer-row {
     align-items: center;
-    display: inline-flex;
-    gap: 8px;
-}
-
-.portal-menu-row .form-check-input {
-    height: 18px;
-    margin: 0;
-    min-height: 18px;
-    width: 18px;
+    display: grid;
+    gap: 12px;
+    grid-template-columns: minmax(180px, 0.8fr) 150px minmax(260px, 1.4fr) 150px auto;
+    padding: 12px;
 }
 
 .line-item {
@@ -720,6 +748,10 @@ tbody tr:hover {
         grid-template-columns: repeat(2, minmax(0, 1fr));
     }
 
+    .customer-row {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
     .portal-menu-row button {
         width: 100%;
     }
@@ -751,7 +783,8 @@ tbody tr:hover {
     }
 
     .portal-menu-row,
-    .portal-menu-row.readonly {
+    .portal-menu-row.readonly,
+    .customer-row {
         grid-template-columns: 1fr;
     }
 

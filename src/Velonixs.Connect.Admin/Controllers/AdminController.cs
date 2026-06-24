@@ -58,7 +58,6 @@ public sealed class AdminController(
         var model = new AdminIndexViewModel
         {
             Restaurants = summaries.OrderBy(x => x.Restaurant.Name).ToArray(),
-            MasterCatalog = await menuService.GetMasterCatalogAsync(cancellationToken),
             TotalRestaurants = restaurants.Count,
             ActiveRestaurants = restaurants.Count(x => x.IsActive),
             TotalOrders = summaries.Sum(x => x.OrderCount),
@@ -66,6 +65,15 @@ public sealed class AdminController(
         };
 
         return View(model);
+    }
+
+    [HttpGet("admin/master-catalog")]
+    public async Task<IActionResult> MasterCatalog(CancellationToken cancellationToken)
+    {
+        return View(new MasterCatalogManageViewModel
+        {
+            MasterCatalog = await menuService.GetMasterCatalogAsync(cancellationToken)
+        });
     }
 
     [HttpPost("admin/master-categories")]
@@ -77,7 +85,7 @@ public sealed class AdminController(
         if (!ModelState.IsValid)
         {
             TempData["Error"] = "Enter a valid master category name.";
-            return RedirectToAction(nameof(Index));
+            return RedirectToAction(nameof(MasterCatalog));
         }
 
         try
@@ -89,11 +97,77 @@ public sealed class AdminController(
         catch (DbUpdateException)
         {
             TempData["Error"] = "A master category with this name already exists.";
-            return RedirectToAction(nameof(Index));
+            return RedirectToAction(nameof(MasterCatalog));
         }
 
         TempData["Success"] = "Master category added.";
-        return RedirectToAction(nameof(Index));
+        return RedirectToAction(nameof(MasterCatalog));
+    }
+
+    [HttpPost("admin/master-categories/{id:guid}")]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> UpdateMasterCategory(
+        Guid id,
+        MasterCatalogCategoryFormModel form,
+        CancellationToken cancellationToken)
+    {
+        if (!ModelState.IsValid)
+        {
+            TempData["Error"] = "Enter a valid master category name.";
+            return RedirectToAction(nameof(MasterCatalog));
+        }
+
+        var category = await dbContext.MasterMenuCategories.FirstOrDefaultAsync(x => x.Id == id, cancellationToken);
+
+        if (category is null)
+        {
+            return NotFound();
+        }
+
+        category.Name = form.Name.Trim();
+        category.DisplayOrder = form.DisplayOrder;
+        category.IsActive = form.IsActive;
+
+        try
+        {
+            await dbContext.SaveChangesAsync(cancellationToken);
+        }
+        catch (DbUpdateException)
+        {
+            TempData["Error"] = "A master category with this name already exists.";
+            return RedirectToAction(nameof(MasterCatalog));
+        }
+
+        TempData["Success"] = "Master category saved.";
+        return RedirectToAction(nameof(MasterCatalog));
+    }
+
+    [HttpPost("admin/master-categories/{id:guid}/delete")]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> DeleteMasterCategory(Guid id, CancellationToken cancellationToken)
+    {
+        var category = await dbContext.MasterMenuCategories.FirstOrDefaultAsync(x => x.Id == id, cancellationToken);
+
+        if (category is null)
+        {
+            return NotFound();
+        }
+
+        var isInUse =
+            await dbContext.MasterMenuItems.AnyAsync(x => x.MasterCategoryId == id, cancellationToken) ||
+            await dbContext.MenuCategories.AnyAsync(x => x.MasterCategoryId == id, cancellationToken);
+
+        if (isInUse)
+        {
+            TempData["Error"] = "This master category is in use. Mark it inactive instead of deleting it.";
+            return RedirectToAction(nameof(MasterCatalog));
+        }
+
+        dbContext.MasterMenuCategories.Remove(category);
+        await dbContext.SaveChangesAsync(cancellationToken);
+
+        TempData["Success"] = "Master category deleted.";
+        return RedirectToAction(nameof(MasterCatalog));
     }
 
     [HttpPost("admin/master-items")]
@@ -105,7 +179,7 @@ public sealed class AdminController(
         if (!ModelState.IsValid)
         {
             TempData["Error"] = "Enter valid master menu item details.";
-            return RedirectToAction(nameof(Index));
+            return RedirectToAction(nameof(MasterCatalog));
         }
 
         try
@@ -121,16 +195,85 @@ public sealed class AdminController(
         catch (InvalidOperationException ex)
         {
             TempData["Error"] = ex.Message;
-            return RedirectToAction(nameof(Index));
+            return RedirectToAction(nameof(MasterCatalog));
         }
         catch (DbUpdateException)
         {
             TempData["Error"] = "A master item with this name already exists in the selected category.";
-            return RedirectToAction(nameof(Index));
+            return RedirectToAction(nameof(MasterCatalog));
         }
 
         TempData["Success"] = "Master menu item added.";
-        return RedirectToAction(nameof(Index));
+        return RedirectToAction(nameof(MasterCatalog));
+    }
+
+    [HttpPost("admin/master-items/{id:guid}")]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> UpdateMasterItem(
+        Guid id,
+        MasterCatalogItemFormModel form,
+        CancellationToken cancellationToken)
+    {
+        if (!ModelState.IsValid)
+        {
+            TempData["Error"] = "Enter valid master menu item details.";
+            return RedirectToAction(nameof(MasterCatalog));
+        }
+
+        var item = await dbContext.MasterMenuItems.FirstOrDefaultAsync(x => x.Id == id, cancellationToken);
+
+        if (item is null)
+        {
+            return NotFound();
+        }
+
+        if (!await dbContext.MasterMenuCategories.AnyAsync(x => x.Id == form.MasterCategoryId, cancellationToken))
+        {
+            TempData["Error"] = "Select a valid master category.";
+            return RedirectToAction(nameof(MasterCatalog));
+        }
+
+        item.MasterCategoryId = form.MasterCategoryId;
+        item.Name = form.Name.Trim();
+        item.Description = string.IsNullOrWhiteSpace(form.Description) ? null : form.Description.Trim();
+        item.IsActive = form.IsActive;
+
+        try
+        {
+            await dbContext.SaveChangesAsync(cancellationToken);
+        }
+        catch (DbUpdateException)
+        {
+            TempData["Error"] = "A master item with this name already exists in the selected category.";
+            return RedirectToAction(nameof(MasterCatalog));
+        }
+
+        TempData["Success"] = "Master menu item saved.";
+        return RedirectToAction(nameof(MasterCatalog));
+    }
+
+    [HttpPost("admin/master-items/{id:guid}/delete")]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> DeleteMasterItem(Guid id, CancellationToken cancellationToken)
+    {
+        var item = await dbContext.MasterMenuItems.FirstOrDefaultAsync(x => x.Id == id, cancellationToken);
+
+        if (item is null)
+        {
+            return NotFound();
+        }
+
+        if (await dbContext.MenuItems.AnyAsync(x => x.MasterMenuItemId == id, cancellationToken))
+        {
+            TempData["Error"] = "This master item is mapped by restaurants. Mark it inactive instead of deleting it.";
+            return RedirectToAction(nameof(MasterCatalog));
+        }
+
+        dbContext.MasterMenuItems.Remove(item);
+        await dbContext.SaveChangesAsync(cancellationToken);
+
+        TempData["Success"] = "Master menu item deleted.";
+        return RedirectToAction(nameof(MasterCatalog));
     }
 
     [AllowAnonymous]

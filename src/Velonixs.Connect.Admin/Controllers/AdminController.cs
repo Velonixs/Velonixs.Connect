@@ -22,9 +22,13 @@ public sealed class AdminController(
 {
     private static readonly string[] OrderStatusOptions =
     [
+        OrderStatuses.PendingConfirmation,
         OrderStatuses.Confirmed,
-        OrderStatuses.Notified,
-        OrderStatuses.Handled,
+        OrderStatuses.Preparing,
+        OrderStatuses.ReadyForPickup,
+        OrderStatuses.OutForDelivery,
+        OrderStatuses.Delivered,
+        OrderStatuses.Rejected,
         OrderStatuses.Cancelled,
         OrderStatuses.Failed
     ];
@@ -187,7 +191,7 @@ public sealed class AdminController(
             Orders = orders.Take(25).ToArray(),
             Customers = customers,
             ActiveMenuItemCount = menu?.Items.Count(x => x.IsActive && x.IsAvailable) ?? 0,
-            PendingOrderCount = orders.Count(x => x.OrderStatus is OrderStatuses.Confirmed or OrderStatuses.Notified),
+            PendingOrderCount = orders.Count(x => x.OrderStatus == OrderStatuses.PendingConfirmation),
             Revenue = orders.Sum(x => x.TotalAmount),
             Users = userSummaries
         };

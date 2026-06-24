@@ -174,6 +174,45 @@ public static class MenuTextFormatter
         return builder.ToString().Trim();
     }
 
+    public static string BuildCustomerStatusUpdate(Order order)
+    {
+        var builder = new StringBuilder();
+        builder.AppendLine($"Order ID: *{order.OrderNumber}*");
+        builder.AppendLine($"Status: *{FormatStatus(order.OrderStatus)}*");
+
+        if (order.OrderStatus == OrderStatuses.Confirmed && order.EstimatedMinutes is int estimatedMinutes)
+        {
+            builder.AppendLine($"Estimated time: *{estimatedMinutes} minutes*");
+        }
+
+        if (!string.IsNullOrWhiteSpace(order.RestaurantComment))
+        {
+            builder.AppendLine();
+            builder.AppendLine(order.RestaurantComment);
+        }
+
+        return builder.ToString().Trim();
+    }
+
+    public static string BuildCustomerRejectionUpdate(Order order, string reason)
+    {
+        var builder = new StringBuilder();
+        builder.AppendLine($"Order ID: *{order.OrderNumber}*");
+        builder.AppendLine("Status: *Rejected*");
+        builder.AppendLine();
+        builder.AppendLine($"Reason: {reason}");
+        return builder.ToString().Trim();
+    }
+
+    private static string FormatStatus(string status) =>
+        status switch
+        {
+            OrderStatuses.PendingConfirmation => "Pending confirmation",
+            OrderStatuses.ReadyForPickup => "Ready for pickup",
+            OrderStatuses.OutForDelivery => "Out for delivery",
+            _ => status
+        };
+
     private static string FormatAmount(decimal amount) =>
         amount.ToString("0.##", CultureInfo.InvariantCulture);
 }

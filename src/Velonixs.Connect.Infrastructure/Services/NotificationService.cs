@@ -3,6 +3,7 @@ using System.Net.Mail;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Velonixs.Connect.Application.Abstractions;
+using Velonixs.Connect.Application.Models;
 using Velonixs.Connect.Domain.Entities;
 using Velonixs.Connect.Infrastructure.Configuration;
 
@@ -73,6 +74,18 @@ public sealed class NotificationService(
             body,
             cancellationToken);
     }
+
+    public Task<WhatsAppSendResult> NotifyCustomerOrderStatusAsync(
+        Domain.Entities.Restaurant restaurant,
+        Customer customer,
+        Order order,
+        string message,
+        CancellationToken cancellationToken = default) =>
+        whatsAppMessageSender.SendTextMessageAsync(
+            restaurant.WhatsAppPhoneNumberId,
+            customer.PhoneNumber,
+            message,
+            cancellationToken);
 
     private async Task SendEmailIfConfiguredAsync(
         string? to,

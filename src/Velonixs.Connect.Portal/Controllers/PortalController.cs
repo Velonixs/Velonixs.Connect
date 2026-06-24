@@ -23,8 +23,10 @@ public sealed class PortalController(
 {
     private static readonly string[] StatusOptions =
     [
-        OrderStatuses.Notified,
-        OrderStatuses.Handled,
+        OrderStatuses.Preparing,
+        OrderStatuses.ReadyForPickup,
+        OrderStatuses.OutForDelivery,
+        OrderStatuses.Delivered,
         OrderStatuses.Cancelled
     ];
 
@@ -61,7 +63,7 @@ public sealed class PortalController(
             Restaurant = restaurant,
             Orders = orders.Take(20).ToArray(),
             Menu = menu,
-            PendingOrderCount = orders.Count(x => x.OrderStatus is OrderStatuses.Confirmed or OrderStatuses.Notified),
+            PendingOrderCount = orders.Count(x => x.OrderStatus == OrderStatuses.PendingConfirmation),
             TodayOrderCount = orders.Count(x => x.CreatedAt.UtcDateTime.Date == today),
             TodayRevenue = orders.Where(x => x.CreatedAt.UtcDateTime.Date == today).Sum(x => x.TotalAmount),
             AvailableItemCount = menu?.Items.Count(x => x.IsActive && x.IsAvailable) ?? 0,
@@ -100,7 +102,7 @@ public sealed class PortalController(
         {
             Restaurant = restaurant,
             Order = order,
-            StatusOptions = StatusOptions
+            StatusOptions = ResolveStatusOptions(order.OrderStatus)
         });
     }
 
@@ -120,7 +122,23 @@ public sealed class PortalController(
             return Forbid();
         }
 
-        var order = await orderService.UpdateStatusAsync(id, new UpdateOrderStatusRequest(form.Status), cancellationToken);
+        OrderDetailResponse? order;
+        try
+        {
+            order = await orderService.UpdateStatusAsync(
+                id,
+                new UpdateOrderStatusRequest(
+                    form.Status,
+                    form.Comment,
+                    ResolveUpdatedBy(),
+                    form.EffectiveEstimatedMinutes),
+                cancellationToken);
+        }
+        catch (InvalidOperationException ex)
+        {
+            TempData["Error"] = ex.Message;
+            return RedirectToAction(nameof(Order), new { id });
+        }
 
         if (order is null)
         {
@@ -281,4 +299,40 @@ public sealed class PortalController(
             ? businessId
             : throw new InvalidOperationException("The signed-in user is not assigned to a business.");
     }
+
+    private string ResolveUpdatedBy() =>
+        User.FindFirstValue(ClaimTypes.Email) ??
+        User.Identity?.Name ??
+        "Portal staff";
+
+    private static IReadOnlyCollection<string> ResolveStatusOptions(string currentStatus) =>
+        currentStatus switch
+        {
+            OrderStatuses.Confirmed =>
+            [
+                OrderStatuses.Preparing,
+                OrderStatuses.ReadyForPickup,
+                OrderStatuses.OutForDelivery,
+                OrderStatuses.Delivered,
+                OrderStatuses.Cancelled
+            ],
+            OrderStatuses.Preparing =>
+            [
+                OrderStatuses.ReadyForPickup,
+                OrderStatuses.OutForDelivery,
+                OrderStatuses.Delivered,
+                OrderStatuses.Cancelled
+            ],
+            OrderStatuses.ReadyForPickup =>
+            [
+                OrderStatuses.Delivered,
+                OrderStatuses.Cancelled
+            ],
+            OrderStatuses.OutForDelivery =>
+            [
+                OrderStatuses.Delivered,
+                OrderStatuses.Cancelled
+            ],
+            _ => StatusOptions
+        };
 }

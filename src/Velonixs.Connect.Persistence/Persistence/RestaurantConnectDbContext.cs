@@ -20,6 +20,7 @@ public sealed class RestaurantConnectDbContext(
     public DbSet<Conversation> Conversations => Set<Conversation>();
     public DbSet<Order> Orders => Set<Order>();
     public DbSet<OrderItem> OrderItems => Set<OrderItem>();
+    public DbSet<OrderStatusHistory> OrderStatusHistory => Set<OrderStatusHistory>();
     public DbSet<MessageLog> MessageLogs => Set<MessageLog>();
     public DbSet<DataProtectionState> DataProtectionStates => Set<DataProtectionState>();
 
@@ -40,8 +41,9 @@ public sealed class RestaurantConnectDbContext(
         ConfigureMenuItem(modelBuilder);
         ConfigureCustomer(modelBuilder, nullableEncryptedStringConverter);
         ConfigureConversation(modelBuilder, encryptedStringConverter, nullableEncryptedStringConverter);
-        ConfigureOrder(modelBuilder, encryptedStringConverter);
+        ConfigureOrder(modelBuilder, encryptedStringConverter, nullableEncryptedStringConverter);
         ConfigureOrderItem(modelBuilder);
+        ConfigureOrderStatusHistory(modelBuilder, nullableEncryptedStringConverter);
         ConfigureMessageLog(modelBuilder, encryptedStringConverter);
     }
 
@@ -180,7 +182,10 @@ public sealed class RestaurantConnectDbContext(
         });
     }
 
-    private static void ConfigureOrder(ModelBuilder modelBuilder, ValueConverter<string, string> encryptedStringConverter)
+    private static void ConfigureOrder(
+        ModelBuilder modelBuilder,
+        ValueConverter<string, string> encryptedStringConverter,
+        ValueConverter<string?, string?> nullableEncryptedStringConverter)
     {
         modelBuilder.Entity<Order>(entity =>
         {
@@ -192,6 +197,7 @@ public sealed class RestaurantConnectDbContext(
             entity.Property(x => x.CustomerPhone).HasColumnType("nvarchar(max)").HasConversion(encryptedStringConverter).IsRequired();
             entity.Property(x => x.Address).HasColumnType("nvarchar(max)").HasConversion(encryptedStringConverter).IsRequired();
             entity.Property(x => x.OrderStatus).HasMaxLength(50).IsRequired();
+            entity.Property(x => x.RestaurantComment).HasColumnType("nvarchar(max)").HasConversion(nullableEncryptedStringConverter);
             entity.Property(x => x.TotalAmount).HasPrecision(18, 2);
             entity.Property(x => x.Source).HasMaxLength(30).IsRequired();
 
@@ -204,6 +210,28 @@ public sealed class RestaurantConnectDbContext(
                 .WithMany(x => x.Orders)
                 .HasForeignKey(x => x.CustomerId)
                 .OnDelete(DeleteBehavior.Restrict);
+        });
+    }
+
+    private static void ConfigureOrderStatusHistory(
+        ModelBuilder modelBuilder,
+        ValueConverter<string?, string?> nullableEncryptedStringConverter)
+    {
+        modelBuilder.Entity<OrderStatusHistory>(entity =>
+        {
+            entity.ToTable("OrderStatusHistory");
+            entity.HasKey(x => x.Id);
+
+            entity.Property(x => x.PreviousStatus).HasMaxLength(50).IsRequired();
+            entity.Property(x => x.NewStatus).HasMaxLength(50).IsRequired();
+            entity.Property(x => x.Comment).HasColumnType("nvarchar(max)").HasConversion(nullableEncryptedStringConverter);
+            entity.Property(x => x.UpdatedBy).HasMaxLength(200).IsRequired();
+
+            entity.HasIndex(x => new { x.OrderId, x.NewStatus, x.UpdatedAtUtc });
+            entity.HasOne(x => x.Order)
+                .WithMany(x => x.StatusHistory)
+                .HasForeignKey(x => x.OrderId)
+                .OnDelete(DeleteBehavior.Cascade);
         });
     }
 

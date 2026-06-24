@@ -8,6 +8,8 @@ public sealed record OrderSummaryResponse(
     string CustomerPhone,
     string Address,
     string OrderStatus,
+    int? EstimatedMinutes,
+    string? RestaurantComment,
     decimal TotalAmount,
     string Source,
     DateTimeOffset CreatedAt);
@@ -21,10 +23,13 @@ public sealed record OrderDetailResponse(
     string CustomerPhone,
     string Address,
     string OrderStatus,
+    int? EstimatedMinutes,
+    string? RestaurantComment,
     decimal TotalAmount,
     string Source,
     DateTimeOffset CreatedAt,
     IReadOnlyCollection<OrderItemResponse> Items,
+    IReadOnlyCollection<OrderStatusHistoryResponse> StatusHistory,
     IReadOnlyCollection<MessageLogResponse> Messages);
 
 public sealed record OrderItemResponse(
@@ -43,4 +48,16 @@ public sealed record MessageLogResponse(
     string Status,
     DateTimeOffset CreatedAt);
 
-public sealed record UpdateOrderStatusRequest(string Status);
+public sealed record OrderStatusHistoryResponse(
+    Guid Id,
+    string PreviousStatus,
+    string NewStatus,
+    string? Comment,
+    string UpdatedBy,
+    DateTimeOffset UpdatedAtUtc);
+
+public sealed record UpdateOrderStatusRequest(
+    string Status,
+    string? Comment = null,
+    string? UpdatedBy = null,
+    int? EstimatedMinutes = null);

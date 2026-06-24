@@ -44,6 +44,7 @@ public sealed class RestaurantManageViewModel
 
 public sealed class BusinessUserSummary
 {
+    public Guid Id { get; set; }
     public string DisplayName { get; set; } = string.Empty;
     public string Email { get; set; } = string.Empty;
     public string Role { get; set; } = string.Empty;
@@ -63,6 +64,14 @@ public sealed class OwnerAccountFormModel
     [MinLength(8)]
     [DataType(DataType.Password)]
     public string Password { get; set; } = string.Empty;
+}
+
+public sealed class ResetPortalUserPasswordFormModel
+{
+    [Required]
+    [MinLength(8)]
+    [DataType(DataType.Password)]
+    public string NewPassword { get; set; } = string.Empty;
 }
 
 public sealed class CustomerAdminSummary

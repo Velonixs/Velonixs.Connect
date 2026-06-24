@@ -179,6 +179,7 @@ public sealed class AdminController(
         {
             userSummaries.Add(new BusinessUserSummary
             {
+                Id = user.Id,
                 DisplayName = user.DisplayName,
                 Email = user.Email ?? string.Empty,
                 Role = (await userManager.GetRolesAsync(user)).FirstOrDefault() ?? "Unassigned",
@@ -274,6 +275,68 @@ public sealed class AdminController(
 
         TempData["Success"] = $"Created owner account {email}.";
         return RedirectToAction(nameof(Restaurant), new { id });
+    }
+
+    [HttpPost("admin/restaurants/{restaurantId:guid}/users/{userId:guid}/password")]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> ResetPortalUserPassword(
+        Guid restaurantId,
+        Guid userId,
+        ResetPortalUserPasswordFormModel form,
+        CancellationToken cancellationToken)
+    {
+        if (!ModelState.IsValid)
+        {
+            TempData["Error"] = "Enter a temporary password with at least 8 characters.";
+            return RedirectToAction(nameof(Restaurant), new { id = restaurantId });
+        }
+
+        if (await restaurantService.GetRestaurantAsync(restaurantId, cancellationToken) is null)
+        {
+            return NotFound();
+        }
+
+        var user = await userManager.FindByIdAsync(userId.ToString());
+
+        if (user is null || user.BusinessId != restaurantId)
+        {
+            return NotFound();
+        }
+
+        var validationErrors = new List<IdentityError>();
+
+        foreach (var validator in userManager.PasswordValidators)
+        {
+            var validationResult = await validator.ValidateAsync(userManager, user, form.NewPassword);
+
+            if (!validationResult.Succeeded)
+            {
+                validationErrors.AddRange(validationResult.Errors);
+            }
+        }
+
+        if (validationErrors.Count > 0)
+        {
+            TempData["Error"] = string.Join(" ", validationErrors.Select(error => error.Description));
+            return RedirectToAction(nameof(Restaurant), new { id = restaurantId });
+        }
+
+        user.PasswordHash = userManager.PasswordHasher.HashPassword(user, form.NewPassword);
+        var result = await userManager.UpdateAsync(user);
+
+        if (result.Succeeded)
+        {
+            result = await userManager.UpdateSecurityStampAsync(user);
+        }
+
+        if (!result.Succeeded)
+        {
+            TempData["Error"] = string.Join(" ", result.Errors.Select(error => error.Description));
+            return RedirectToAction(nameof(Restaurant), new { id = restaurantId });
+        }
+
+        TempData["Success"] = $"Password reset for {user.Email}. Share the temporary password securely.";
+        return RedirectToAction(nameof(Restaurant), new { id = restaurantId });
     }
 
     [HttpPost("admin/restaurants/{restaurantId:guid}/categories")]

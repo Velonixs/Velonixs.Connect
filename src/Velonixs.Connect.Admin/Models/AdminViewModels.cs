@@ -7,12 +7,38 @@ namespace Velonixs.Connect.Admin.Models;
 public sealed class AdminIndexViewModel
 {
     public IReadOnlyCollection<RestaurantAdminSummary> Restaurants { get; set; } = Array.Empty<RestaurantAdminSummary>();
+    public MasterCatalogResponse? MasterCatalog { get; set; }
+    public MasterCatalogCategoryFormModel NewMasterCategory { get; set; } = new();
+    public MasterCatalogItemFormModel NewMasterItem { get; set; } = new();
     public RestaurantFormModel NewRestaurant { get; set; } = new();
     public IReadOnlyCollection<string> BusinessTypeOptions { get; set; } = BusinessTypes.All;
     public int TotalRestaurants { get; set; }
     public int ActiveRestaurants { get; set; }
     public int TotalOrders { get; set; }
     public decimal TotalRevenue { get; set; }
+}
+
+public sealed class MasterCatalogCategoryFormModel
+{
+    [Required]
+    public string Name { get; set; } = string.Empty;
+
+    public int DisplayOrder { get; set; }
+
+    public bool IsActive { get; set; } = true;
+}
+
+public sealed class MasterCatalogItemFormModel
+{
+    [Required]
+    public Guid MasterCategoryId { get; set; }
+
+    [Required]
+    public string Name { get; set; } = string.Empty;
+
+    public string? Description { get; set; }
+
+    public bool IsActive { get; set; } = true;
 }
 
 public sealed class RestaurantAdminSummary

@@ -14,6 +14,8 @@ public sealed class RestaurantConnectDbContext(
     : IdentityDbContext<ApplicationUser, IdentityRole<Guid>, Guid>(options)
 {
     public DbSet<Domain.Entities.Restaurant> Restaurants => Set<Domain.Entities.Restaurant>();
+    public DbSet<MasterMenuCategory> MasterMenuCategories => Set<MasterMenuCategory>();
+    public DbSet<MasterMenuItem> MasterMenuItems => Set<MasterMenuItem>();
     public DbSet<MenuCategory> MenuCategories => Set<MenuCategory>();
     public DbSet<MenuItem> MenuItems => Set<MenuItem>();
     public DbSet<Customer> Customers => Set<Customer>();
@@ -37,6 +39,8 @@ public sealed class RestaurantConnectDbContext(
         ConfigureIdentity(modelBuilder);
         ConfigureDataProtectionState(modelBuilder);
         ConfigureRestaurant(modelBuilder, nullableEncryptedStringConverter);
+        ConfigureMasterMenuCategory(modelBuilder);
+        ConfigureMasterMenuItem(modelBuilder);
         ConfigureMenuCategory(modelBuilder);
         ConfigureMenuItem(modelBuilder);
         ConfigureCustomer(modelBuilder, nullableEncryptedStringConverter);
@@ -97,6 +101,35 @@ public sealed class RestaurantConnectDbContext(
         });
     }
 
+    private static void ConfigureMasterMenuCategory(ModelBuilder modelBuilder)
+    {
+        modelBuilder.Entity<MasterMenuCategory>(entity =>
+        {
+            entity.ToTable("MasterMenuCategory");
+            entity.HasKey(x => x.Id);
+
+            entity.Property(x => x.Name).HasMaxLength(150).IsRequired();
+            entity.HasIndex(x => x.Name).IsUnique();
+        });
+    }
+
+    private static void ConfigureMasterMenuItem(ModelBuilder modelBuilder)
+    {
+        modelBuilder.Entity<MasterMenuItem>(entity =>
+        {
+            entity.ToTable("MasterMenuItem");
+            entity.HasKey(x => x.Id);
+
+            entity.Property(x => x.Name).HasMaxLength(200).IsRequired();
+            entity.Property(x => x.Description).HasMaxLength(1000);
+            entity.HasIndex(x => new { x.MasterCategoryId, x.Name }).IsUnique();
+            entity.HasOne(x => x.MasterCategory)
+                .WithMany(x => x.Items)
+                .HasForeignKey(x => x.MasterCategoryId)
+                .OnDelete(DeleteBehavior.Restrict);
+        });
+    }
+
     private static void ConfigureMenuCategory(ModelBuilder modelBuilder)
     {
         modelBuilder.Entity<MenuCategory>(entity =>
@@ -111,6 +144,10 @@ public sealed class RestaurantConnectDbContext(
                 .WithMany(x => x.MenuCategories)
                 .HasForeignKey(x => x.RestaurantId)
                 .OnDelete(DeleteBehavior.Restrict);
+            entity.HasOne(x => x.MasterCategory)
+                .WithMany(x => x.RestaurantCategories)
+                .HasForeignKey(x => x.MasterCategoryId)
+                .OnDelete(DeleteBehavior.SetNull);
         });
     }
 
@@ -134,6 +171,10 @@ public sealed class RestaurantConnectDbContext(
                 .WithMany(x => x.MenuItems)
                 .HasForeignKey(x => x.CategoryId)
                 .OnDelete(DeleteBehavior.Restrict);
+            entity.HasOne(x => x.MasterMenuItem)
+                .WithMany(x => x.RestaurantMenuItems)
+                .HasForeignKey(x => x.MasterMenuItemId)
+                .OnDelete(DeleteBehavior.SetNull);
         });
     }
 

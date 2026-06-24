@@ -9,6 +9,9 @@ public sealed class PortalDashboardViewModel
     public RestaurantResponse Restaurant { get; set; } = null!;
     public IReadOnlyCollection<OrderSummaryResponse> Orders { get; set; } = Array.Empty<OrderSummaryResponse>();
     public MenuResponse? Menu { get; set; }
+    public MasterCatalogResponse? MasterCatalog { get; set; }
+    public MenuCategoryPortalFormModel NewCategory { get; set; } = new();
+    public MenuItemPortalFormModel NewItem { get; set; } = new();
     public int PendingOrderCount { get; set; }
     public int TodayOrderCount { get; set; }
     public decimal TodayRevenue { get; set; }
@@ -47,6 +50,41 @@ public sealed class PortalOrderStatusFormModel
 public sealed class MenuAvailabilityFormModel
 {
     public bool IsAvailable { get; set; }
+}
+
+public sealed class MenuCategoryPortalFormModel
+{
+    [Required]
+    public Guid MasterCategoryId { get; set; }
+
+    public string Name { get; set; } = string.Empty;
+
+    public int DisplayOrder { get; set; }
+
+    public bool IsActive { get; set; } = true;
+}
+
+public sealed class MenuItemPortalFormModel
+{
+    [Required]
+    public Guid MasterMenuItemId { get; set; }
+
+    [Required]
+    public Guid CategoryId { get; set; }
+
+    [Range(1, int.MaxValue)]
+    public int ItemCode { get; set; }
+
+    public string Name { get; set; } = string.Empty;
+
+    public string? Description { get; set; }
+
+    [Range(0, 999999)]
+    public decimal Price { get; set; }
+
+    public bool IsAvailable { get; set; } = true;
+
+    public bool IsActive { get; set; } = true;
 }
 
 public sealed class StaffIndexViewModel

@@ -13,6 +13,7 @@ public sealed record MenuResponse(
 public sealed record MenuCategoryResponse(
     Guid Id,
     Guid RestaurantId,
+    Guid? MasterCategoryId,
     string Name,
     int DisplayOrder,
     bool IsActive)
@@ -24,6 +25,7 @@ public sealed record MenuItemResponse(
     Guid Id,
     Guid RestaurantId,
     Guid CategoryId,
+    Guid? MasterMenuItemId,
     string CategoryName,
     int ItemCode,
     string Name,
@@ -39,10 +41,12 @@ public sealed record MenuItemResponse(
 public sealed record CreateMenuCategoryRequest(
     string Name,
     int DisplayOrder = 0,
-    bool IsActive = true);
+    bool IsActive = true,
+    Guid? MasterCategoryId = null);
 
 public sealed record CreateMenuItemRequest(
     Guid CategoryId,
+    Guid? MasterMenuItemId,
     int ItemCode,
     string Name,
     string? Description,
@@ -52,9 +56,39 @@ public sealed record CreateMenuItemRequest(
 
 public sealed record UpdateMenuItemRequest(
     Guid CategoryId,
+    Guid? MasterMenuItemId,
     int ItemCode,
     string Name,
     string? Description,
     decimal Price,
     bool IsAvailable,
     bool IsActive);
+
+public sealed record MasterCatalogResponse(
+    IReadOnlyCollection<MasterMenuCategoryResponse> Categories,
+    IReadOnlyCollection<MasterMenuItemResponse> Items);
+
+public sealed record MasterMenuCategoryResponse(
+    Guid Id,
+    string Name,
+    int DisplayOrder,
+    bool IsActive);
+
+public sealed record MasterMenuItemResponse(
+    Guid Id,
+    Guid MasterCategoryId,
+    string MasterCategoryName,
+    string Name,
+    string? Description,
+    bool IsActive);
+
+public sealed record CreateMasterMenuCategoryRequest(
+    string Name,
+    int DisplayOrder = 0,
+    bool IsActive = true);
+
+public sealed record CreateMasterMenuItemRequest(
+    Guid MasterCategoryId,
+    string Name,
+    string? Description,
+    bool IsActive = true);

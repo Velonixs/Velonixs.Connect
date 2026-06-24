@@ -5,6 +5,9 @@ namespace Velonixs.Connect.Application.Abstractions;
 public interface IMenuService
 {
     Task<MenuResponse?> GetMenuAsync(Guid restaurantId, CancellationToken cancellationToken = default);
+    Task<MasterCatalogResponse> GetMasterCatalogAsync(CancellationToken cancellationToken = default);
+    Task<MasterMenuCategoryResponse> CreateMasterCategoryAsync(CreateMasterMenuCategoryRequest request, CancellationToken cancellationToken = default);
+    Task<MasterMenuItemResponse> CreateMasterItemAsync(CreateMasterMenuItemRequest request, CancellationToken cancellationToken = default);
     Task<MenuCategoryResponse> CreateCategoryAsync(Guid restaurantId, CreateMenuCategoryRequest request, CancellationToken cancellationToken = default);
     Task<MenuItemResponse> CreateItemAsync(Guid restaurantId, CreateMenuItemRequest request, CancellationToken cancellationToken = default);
     Task<MenuItemResponse?> UpdateItemAsync(Guid id, UpdateMenuItemRequest request, CancellationToken cancellationToken = default);

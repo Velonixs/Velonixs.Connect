@@ -40,12 +40,92 @@ public sealed class MenuService(RestaurantConnectDbContext dbContext) : IMenuSer
             items.Select(ToItemResponse).ToArray());
     }
 
+    public async Task<MasterCatalogResponse> GetMasterCatalogAsync(CancellationToken cancellationToken = default)
+    {
+        var categories = await dbContext.MasterMenuCategories
+            .AsNoTracking()
+            .OrderBy(x => x.DisplayOrder)
+            .ThenBy(x => x.Name)
+            .ToArrayAsync(cancellationToken);
+        var items = await dbContext.MasterMenuItems
+            .AsNoTracking()
+            .Include(x => x.MasterCategory)
+            .OrderBy(x => x.MasterCategory.DisplayOrder)
+            .ThenBy(x => x.MasterCategory.Name)
+            .ThenBy(x => x.Name)
+            .ToArrayAsync(cancellationToken);
+
+        return new MasterCatalogResponse(
+            categories.Select(ToMasterCategoryResponse).ToArray(),
+            items.Select(ToMasterItemResponse).ToArray());
+    }
+
+    public async Task<MasterMenuCategoryResponse> CreateMasterCategoryAsync(
+        CreateMasterMenuCategoryRequest request,
+        CancellationToken cancellationToken = default)
+    {
+        var category = new MasterMenuCategory
+        {
+            Name = request.Name.Trim(),
+            DisplayOrder = request.DisplayOrder,
+            IsActive = request.IsActive
+        };
+
+        dbContext.MasterMenuCategories.Add(category);
+        await dbContext.SaveChangesAsync(cancellationToken);
+
+        return ToMasterCategoryResponse(category);
+    }
+
+    public async Task<MasterMenuItemResponse> CreateMasterItemAsync(
+        CreateMasterMenuItemRequest request,
+        CancellationToken cancellationToken = default)
+    {
+        var category = await dbContext.MasterMenuCategories
+            .FirstOrDefaultAsync(x => x.Id == request.MasterCategoryId, cancellationToken);
+
+        if (category is null)
+        {
+            throw new InvalidOperationException("Master category was not found.");
+        }
+
+        var item = new MasterMenuItem
+        {
+            MasterCategoryId = category.Id,
+            MasterCategory = category,
+            Name = request.Name.Trim(),
+            Description = request.Description?.Trim(),
+            IsActive = request.IsActive
+        };
+
+        dbContext.MasterMenuItems.Add(item);
+        await dbContext.SaveChangesAsync(cancellationToken);
+
+        return ToMasterItemResponse(item);
+    }
+
     public async Task<MenuCategoryResponse> CreateCategoryAsync(Guid restaurantId, CreateMenuCategoryRequest request, CancellationToken cancellationToken = default)
     {
+        var name = request.Name.Trim();
+        if (request.MasterCategoryId is Guid masterCategoryId)
+        {
+            var masterCategory = await dbContext.MasterMenuCategories
+                .AsNoTracking()
+                .FirstOrDefaultAsync(x => x.Id == masterCategoryId, cancellationToken);
+
+            if (masterCategory is null)
+            {
+                throw new InvalidOperationException("Master category was not found.");
+            }
+
+            name = masterCategory.Name;
+        }
+
         var category = new MenuCategory
         {
             RestaurantId = restaurantId,
-            Name = request.Name.Trim(),
+            MasterCategoryId = request.MasterCategoryId,
+            Name = name,
             DisplayOrder = request.DisplayOrder,
             IsActive = request.IsActive
         };
@@ -60,14 +140,32 @@ public sealed class MenuService(RestaurantConnectDbContext dbContext) : IMenuSer
     {
         var category = await dbContext.MenuCategories
             .FirstAsync(x => x.RestaurantId == restaurantId && x.Id == request.CategoryId, cancellationToken);
+        var name = request.Name.Trim();
+        var description = request.Description?.Trim();
+
+        if (request.MasterMenuItemId is Guid masterMenuItemId)
+        {
+            var masterItem = await dbContext.MasterMenuItems
+                .AsNoTracking()
+                .FirstOrDefaultAsync(x => x.Id == masterMenuItemId && x.IsActive, cancellationToken);
+
+            if (masterItem is null)
+            {
+                throw new InvalidOperationException("Master menu item was not found or is inactive.");
+            }
+
+            name = masterItem.Name;
+            description = masterItem.Description;
+        }
 
         var item = new MenuItem
         {
             RestaurantId = restaurantId,
             CategoryId = request.CategoryId,
+            MasterMenuItemId = request.MasterMenuItemId,
             ItemCode = request.ItemCode,
-            Name = request.Name.Trim(),
-            Description = request.Description?.Trim(),
+            Name = name,
+            Description = description,
             Price = request.Price,
             IsAvailable = request.IsAvailable,
             IsActive = request.IsActive,
@@ -101,9 +199,26 @@ public sealed class MenuService(RestaurantConnectDbContext dbContext) : IMenuSer
 
         item.CategoryId = request.CategoryId;
         item.Category = category;
+        item.MasterMenuItemId = request.MasterMenuItemId;
         item.ItemCode = request.ItemCode;
         item.Name = request.Name.Trim();
         item.Description = request.Description?.Trim();
+
+        if (request.MasterMenuItemId is Guid masterMenuItemId)
+        {
+            var masterItem = await dbContext.MasterMenuItems
+                .AsNoTracking()
+                .FirstOrDefaultAsync(x => x.Id == masterMenuItemId && x.IsActive, cancellationToken);
+
+            if (masterItem is null)
+            {
+                throw new InvalidOperationException("Master menu item was not found or is inactive.");
+            }
+
+            item.Name = masterItem.Name;
+            item.Description = masterItem.Description;
+        }
+
         item.Price = request.Price;
         item.IsAvailable = request.IsAvailable;
         item.IsActive = request.IsActive;
@@ -134,6 +249,7 @@ public sealed class MenuService(RestaurantConnectDbContext dbContext) : IMenuSer
         return new MenuCategoryResponse(
             category.Id,
             category.RestaurantId,
+            category.MasterCategoryId,
             category.Name,
             category.DisplayOrder,
             category.IsActive);
@@ -145,12 +261,33 @@ public sealed class MenuService(RestaurantConnectDbContext dbContext) : IMenuSer
             item.Id,
             item.RestaurantId,
             item.CategoryId,
+            item.MasterMenuItemId,
             item.Category?.Name ?? string.Empty,
             item.ItemCode,
             item.Name,
             item.Description,
             item.Price,
             item.IsAvailable,
+            item.IsActive);
+    }
+
+    private static MasterMenuCategoryResponse ToMasterCategoryResponse(MasterMenuCategory category)
+    {
+        return new MasterMenuCategoryResponse(
+            category.Id,
+            category.Name,
+            category.DisplayOrder,
+            category.IsActive);
+    }
+
+    private static MasterMenuItemResponse ToMasterItemResponse(MasterMenuItem item)
+    {
+        return new MasterMenuItemResponse(
+            item.Id,
+            item.MasterCategoryId,
+            item.MasterCategory?.Name ?? string.Empty,
+            item.Name,
+            item.Description,
             item.IsActive);
     }
 }

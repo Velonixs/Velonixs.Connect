@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using System.Text;
 using System.Text.Json;
 using System.Text.RegularExpressions;
@@ -25,6 +26,8 @@ public sealed partial class ConversationService(
         IncomingWhatsAppMessage message,
         CancellationToken cancellationToken = default)
     {
+        var stopwatch = Stopwatch.StartNew();
+
         if (string.IsNullOrWhiteSpace(message.PhoneNumberId) ||
             string.IsNullOrWhiteSpace(message.FromPhoneNumber) ||
             string.IsNullOrWhiteSpace(message.MessageText))
@@ -93,7 +96,24 @@ public sealed partial class ConversationService(
         }
 
         await dbContext.SaveChangesAsync(cancellationToken);
-        var sendResult = await SendReplyAsync(restaurant, customer, reply, cancellationToken);
+        var sendStopwatch = Stopwatch.StartNew();
+        WhatsAppSendResult sendResult;
+        try
+        {
+            sendResult = await SendReplyAsync(restaurant, customer, reply, cancellationToken);
+        }
+        catch (Exception ex)
+        {
+            sendStopwatch.Stop();
+            logger.LogError(
+                ex,
+                "Failed to send WhatsApp reply after {ElapsedMilliseconds} ms for restaurant {RestaurantId} and conversation {ConversationId}",
+                sendStopwatch.ElapsedMilliseconds,
+                restaurant.Id,
+                conversation.Id);
+            sendResult = new WhatsAppSendResult(false, false, Error: ex.Message);
+        }
+        sendStopwatch.Stop();
 
         dbContext.MessageLogs.Add(new MessageLog
         {
@@ -106,6 +126,14 @@ public sealed partial class ConversationService(
             Status = sendResult.IsSuccess ? MessageStatuses.Sent : MessageStatuses.Failed
         });
         await dbContext.SaveChangesAsync(cancellationToken);
+        stopwatch.Stop();
+
+        logger.LogInformation(
+            "Processed WhatsApp message in {ElapsedMilliseconds} ms. SendElapsedMilliseconds={SendElapsedMilliseconds}, RestaurantId={RestaurantId}, ConversationId={ConversationId}",
+            stopwatch.ElapsedMilliseconds,
+            sendStopwatch.ElapsedMilliseconds,
+            restaurant.Id,
+            conversation.Id);
 
         return new WhatsAppWebhookProcessResult(
             true,

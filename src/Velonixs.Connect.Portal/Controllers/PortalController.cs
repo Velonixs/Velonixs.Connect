@@ -43,6 +43,7 @@ public sealed class PortalController(
 
         var orders = await orderService.GetRestaurantOrdersAsync(restaurant.Id, cancellationToken);
         var menu = await menuService.GetMenuAsync(restaurant.Id, cancellationToken);
+        var masterCatalog = await menuService.GetMasterCatalogAsync(cancellationToken);
         var today = DateTimeOffset.UtcNow.Date;
         var recentCustomers = await dbContext.Customers
             .AsNoTracking()
@@ -63,6 +64,17 @@ public sealed class PortalController(
             Restaurant = restaurant,
             Orders = orders.Take(20).ToArray(),
             Menu = menu,
+            MasterCatalog = masterCatalog,
+            NewItem =
+            {
+                ItemCode = (menu?.Items.Select(x => x.ItemCode).DefaultIfEmpty().Max() ?? 0) + 1,
+                CategoryId = menu?.Categories.FirstOrDefault(x => x.IsActive)?.Id ?? Guid.Empty,
+                MasterMenuItemId = masterCatalog.Items.FirstOrDefault(x => x.IsActive)?.Id ?? Guid.Empty
+            },
+            NewCategory =
+            {
+                MasterCategoryId = masterCatalog.Categories.FirstOrDefault(x => x.IsActive)?.Id ?? Guid.Empty
+            },
             PendingOrderCount = orders.Count(x => x.OrderStatus == OrderStatuses.PendingConfirmation),
             TodayOrderCount = orders.Count(x => x.CreatedAt.UtcDateTime.Date == today),
             TodayRevenue = orders.Where(x => x.CreatedAt.UtcDateTime.Date == today).Sum(x => x.TotalAmount),
@@ -147,6 +159,151 @@ public sealed class PortalController(
 
         TempData["Success"] = $"Order {order.OrderNumber} marked {order.OrderStatus}.";
         return RedirectToAction(nameof(Order), new { id });
+    }
+
+    [HttpPost("portal/categories")]
+    [Authorize(Roles = AppRoles.BusinessOwner + "," + AppRoles.BusinessManager)]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> CreateCategory(MenuCategoryPortalFormModel form, CancellationToken cancellationToken)
+    {
+        if (!ModelState.IsValid)
+        {
+            TempData["Error"] = "Enter a valid category name.";
+            return RedirectToAction(nameof(Index));
+        }
+
+        try
+        {
+            await menuService.CreateCategoryAsync(
+                GetBusinessId(),
+                new CreateMenuCategoryRequest(form.Name, form.DisplayOrder, form.IsActive, form.MasterCategoryId),
+                cancellationToken);
+        }
+        catch (DbUpdateException)
+        {
+            TempData["Error"] = "A category with this name already exists for this restaurant.";
+            return RedirectToAction(nameof(Index));
+        }
+
+        TempData["Success"] = "Menu category added.";
+        return RedirectToAction(nameof(Index));
+    }
+
+    [HttpPost("portal/menu-items")]
+    [Authorize(Roles = AppRoles.BusinessOwner + "," + AppRoles.BusinessManager)]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> CreateMenuItem(MenuItemPortalFormModel form, CancellationToken cancellationToken)
+    {
+        if (!ModelState.IsValid)
+        {
+            TempData["Error"] = "Enter valid product details.";
+            return RedirectToAction(nameof(Index));
+        }
+
+        try
+        {
+            await menuService.CreateItemAsync(
+                GetBusinessId(),
+                new CreateMenuItemRequest(
+                    form.CategoryId,
+                    form.MasterMenuItemId,
+                    form.ItemCode,
+                    form.Name,
+                    form.Description,
+                    form.Price,
+                    form.IsAvailable,
+                    form.IsActive),
+                cancellationToken);
+        }
+        catch (InvalidOperationException ex)
+        {
+            TempData["Error"] = ex.Message;
+            return RedirectToAction(nameof(Index));
+        }
+        catch (DbUpdateException)
+        {
+            TempData["Error"] = "A product with this code or category/name already exists for this restaurant.";
+            return RedirectToAction(nameof(Index));
+        }
+
+        TempData["Success"] = "Menu product added.";
+        return RedirectToAction(nameof(Index));
+    }
+
+    [HttpPost("portal/menu-items/{id:guid}")]
+    [Authorize(Roles = AppRoles.BusinessOwner + "," + AppRoles.BusinessManager)]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> UpdateMenuItem(Guid id, MenuItemPortalFormModel form, CancellationToken cancellationToken)
+    {
+        if (!ModelState.IsValid)
+        {
+            TempData["Error"] = "Enter valid product details.";
+            return RedirectToAction(nameof(Index));
+        }
+
+        var item = await dbContext.MenuItems.AsNoTracking().FirstOrDefaultAsync(x => x.Id == id, cancellationToken);
+
+        if (item is null)
+        {
+            return NotFound();
+        }
+
+        if (item.RestaurantId != GetBusinessId())
+        {
+            return Forbid();
+        }
+
+        try
+        {
+            await menuService.UpdateItemAsync(
+                id,
+                new UpdateMenuItemRequest(
+                    form.CategoryId,
+                    form.MasterMenuItemId,
+                    form.ItemCode,
+                    form.Name,
+                    form.Description,
+                    form.Price,
+                    form.IsAvailable,
+                    form.IsActive),
+                cancellationToken);
+        }
+        catch (InvalidOperationException ex)
+        {
+            TempData["Error"] = ex.Message;
+            return RedirectToAction(nameof(Index));
+        }
+        catch (DbUpdateException)
+        {
+            TempData["Error"] = "A product with this code or category/name already exists for this restaurant.";
+            return RedirectToAction(nameof(Index));
+        }
+
+        TempData["Success"] = "Menu product saved.";
+        return RedirectToAction(nameof(Index));
+    }
+
+    [HttpPost("portal/menu-items/{id:guid}/deactivate")]
+    [Authorize(Roles = AppRoles.BusinessOwner + "," + AppRoles.BusinessManager)]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> DeactivateMenuItem(Guid id, CancellationToken cancellationToken)
+    {
+        var item = await dbContext.MenuItems.AsNoTracking().FirstOrDefaultAsync(x => x.Id == id, cancellationToken);
+
+        if (item is null)
+        {
+            return NotFound();
+        }
+
+        if (item.RestaurantId != GetBusinessId())
+        {
+            return Forbid();
+        }
+
+        await menuService.DeactivateItemAsync(id, cancellationToken);
+
+        TempData["Success"] = "Menu product deactivated.";
+        return RedirectToAction(nameof(Index));
     }
 
     [HttpPost("portal/menu-items/{id:guid}/availability")]

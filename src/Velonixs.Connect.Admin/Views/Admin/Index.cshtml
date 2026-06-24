@@ -32,6 +32,117 @@
 <section class="card shadow-sm mb-4">
     <div class="card-body">
     <div class="section-heading">
+        <div>
+            <h2>Master Catalog</h2>
+            <p class="text-secondary mb-0">Create common categories and menu items once. Restaurants can map these items and set their own price/stock.</p>
+        </div>
+    </div>
+
+    <div class="row g-3 mb-4">
+        <div class="col-12 col-lg-5">
+            <form class="card h-100 bg-light border-0 p-3" asp-action="CreateMasterCategory" method="post">
+                @Html.AntiForgeryToken()
+                <h3 class="h5">Add master category</h3>
+                <div class="row g-2">
+                    <div class="col-12 col-md-7">
+                        <label class="form-label">Category name</label>
+                        <input class="form-control" asp-for="NewMasterCategory.Name" name="Name" placeholder="Pizza, Burger, Main Course" required />
+                    </div>
+                    <div class="col-12 col-md-3">
+                        <label class="form-label">Order</label>
+                        <input class="form-control" asp-for="NewMasterCategory.DisplayOrder" name="DisplayOrder" type="number" />
+                    </div>
+                    <div class="col-12 col-md-2 d-flex align-items-end">
+                        <div class="form-check">
+                            <input class="form-check-input" asp-for="NewMasterCategory.IsActive" name="IsActive" />
+                            <label class="form-check-label">Active</label>
+                        </div>
+                    </div>
+                    <div class="col-12">
+                        <button class="btn btn-success" type="submit">Add category</button>
+                    </div>
+                </div>
+            </form>
+        </div>
+
+        <div class="col-12 col-lg-7">
+            <form class="card h-100 bg-light border-0 p-3" asp-action="CreateMasterItem" method="post">
+                @Html.AntiForgeryToken()
+                <h3 class="h5">Add master menu item</h3>
+                @if ((Model.MasterCatalog?.Categories ?? Array.Empty<MasterMenuCategoryResponse>()).Any(x => x.IsActive))
+                {
+                    <div class="row g-2">
+                        <div class="col-12 col-md-4">
+                            <label class="form-label">Master category</label>
+                            <select class="form-select" asp-for="NewMasterItem.MasterCategoryId" name="MasterCategoryId" required>
+                                @foreach (var category in (Model.MasterCatalog?.Categories ?? Array.Empty<MasterMenuCategoryResponse>()).Where(x => x.IsActive))
+                                {
+                                    <option value="@category.Id">@category.Name</option>
+                                }
+                            </select>
+                        </div>
+                        <div class="col-12 col-md-4">
+                            <label class="form-label">Item name</label>
+                            <input class="form-control" asp-for="NewMasterItem.Name" name="Name" placeholder="Paneer Pizza" required />
+                        </div>
+                        <div class="col-12 col-md-4">
+                            <label class="form-label">Description</label>
+                            <input class="form-control" asp-for="NewMasterItem.Description" name="Description" />
+                        </div>
+                        <div class="col-12">
+                            <div class="form-check">
+                                <input class="form-check-input" asp-for="NewMasterItem.IsActive" name="IsActive" />
+                                <label class="form-check-label">Active</label>
+                            </div>
+                        </div>
+                        <div class="col-12">
+                            <button class="btn btn-success" type="submit">Add master item</button>
+                        </div>
+                    </div>
+                }
+                else
+                {
+                    <p class="text-secondary mb-0">Add an active master category first.</p>
+                }
+            </form>
+        </div>
+    </div>
+
+    <div class="table-responsive">
+        <table class="table table-hover align-middle mb-0">
+            <thead>
+                <tr>
+                    <th>Category</th>
+                    <th>Menu item</th>
+                    <th>Description</th>
+                    <th>Status</th>
+                </tr>
+            </thead>
+            <tbody>
+            @foreach (var item in Model.MasterCatalog?.Items ?? Array.Empty<MasterMenuItemResponse>())
+            {
+                <tr>
+                    <td>@item.MasterCategoryName</td>
+                    <td><strong>@item.Name</strong></td>
+                    <td>@item.Description</td>
+                    <td><span class="badge @(item.IsActive ? "text-bg-success" : "text-bg-secondary")">@(item.IsActive ? "Active" : "Inactive")</span></td>
+                </tr>
+            }
+            @if (!(Model.MasterCatalog?.Items ?? Array.Empty<MasterMenuItemResponse>()).Any())
+            {
+                <tr>
+                    <td colspan="4" class="text-secondary">No master menu items yet.</td>
+                </tr>
+            }
+            </tbody>
+        </table>
+    </div>
+    </div>
+</section>
+
+<section class="card shadow-sm mb-4">
+    <div class="card-body">
+    <div class="section-heading">
         <h2>Businesses</h2>
     </div>
 

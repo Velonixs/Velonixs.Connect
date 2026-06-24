@@ -40,10 +40,12 @@ public sealed class ConversationContinuationFlowTests
 
         var greeting = await Send(service, "Hi");
 
-        Assert.Contains("Welcome to 99 Restaurant!", greeting.ReplyText);
+        Assert.Contains("🍽️ Welcome to 99 Restaurant!", greeting.ReplyText);
         Assert.Contains("Pizza", greeting.ReplyText);
-        Assert.Contains("1. Paneer Pizza - Rs 249", greeting.ReplyText);
-        Assert.Contains("2. Margherita Pizza - Rs 199", greeting.ReplyText);
+        Assert.Contains("1. Paneer Pizza", greeting.ReplyText);
+        Assert.Contains("Rs 249", greeting.ReplyText);
+        Assert.Contains("2. Margherita Pizza", greeting.ReplyText);
+        Assert.Contains("Rs 199", greeting.ReplyText);
         Assert.Empty(sender.LastSections);
         Assert.Equal(new[] { "cart.view", "cart.checkout", "main.staff" }, sender.LastButtons.Select(x => x.Id));
         Assert.All(sender.LastButtons, button => Assert.True(button.Title.Length <= 20));
@@ -90,7 +92,8 @@ public sealed class ConversationContinuationFlowTests
         Assert.Equal(0, sender.InteractiveListSendCount);
         Assert.Empty(sender.TextMessages);
         Assert.Contains("Welcome to 99 Restaurant", sender.LastButtonBodyText);
-        Assert.Contains("1. Paneer Pizza - Rs 249", sender.LastButtonBodyText);
+        Assert.Contains("1. Paneer Pizza", sender.LastButtonBodyText);
+        Assert.Contains("Rs 249", sender.LastButtonBodyText);
         Assert.Equal(new[] { "View Cart", "Checkout", "Contact Us" }, sender.LastButtons.Select(x => x.Title));
     }
 
@@ -156,7 +159,8 @@ public sealed class ConversationContinuationFlowTests
         Assert.Contains("Your cart is currently empty", cart.ReplyText);
         Assert.Contains("Select an item from the menu", cart.ReplyText);
         Assert.Empty(sender.LastSections);
-        Assert.Contains("1. Paneer Pizza - Rs 249", cart.ReplyText);
+        Assert.Contains("1. Paneer Pizza", cart.ReplyText);
+        Assert.Contains("Rs 249", cart.ReplyText);
         Assert.Equal(new[] { "View Cart", "Checkout", "Contact Us" }, sender.LastButtons.Select(x => x.Title));
     }
 
@@ -189,19 +193,22 @@ public sealed class ConversationContinuationFlowTests
         var firstPage = await Send(service, "Hi");
 
         Assert.Contains("Page 1 of 3", firstPage.ReplyText);
-        Assert.Contains("1. Pizza 1 - Rs 101", firstPage.ReplyText);
+        Assert.Contains("1. Pizza 1", firstPage.ReplyText);
+        Assert.Contains("Rs 101", firstPage.ReplyText);
         Assert.Equal(new[] { "Next", "View Cart", "Checkout" }, sender.LastButtons.Select(x => x.Title));
 
         var middlePage = await Send(service, "menu.next");
 
         Assert.Contains("Page 2 of 3", middlePage.ReplyText);
-        Assert.Contains("1. Pizza 7 - Rs 107", middlePage.ReplyText);
+        Assert.Contains("1. Pizza 7", middlePage.ReplyText);
+        Assert.Contains("Rs 107", middlePage.ReplyText);
         Assert.Equal(new[] { "Previous", "Next", "View Cart" }, sender.LastButtons.Select(x => x.Title));
 
         var lastPage = await Send(service, "menu.next");
 
         Assert.Contains("Page 3 of 3", lastPage.ReplyText);
-        Assert.Contains("1. Pizza 13 - Rs 113", lastPage.ReplyText);
+        Assert.Contains("1. Pizza 13", lastPage.ReplyText);
+        Assert.Contains("Rs 113", lastPage.ReplyText);
         Assert.Equal(new[] { "Previous", "View Cart", "Checkout" }, sender.LastButtons.Select(x => x.Title));
         Assert.All(sender.LastButtons, _ => Assert.True(sender.LastButtons.Count <= 3));
     }
@@ -289,7 +296,8 @@ public sealed class ConversationContinuationFlowTests
         Assert.DoesNotContain("What would you like to do?", firstAdd.ReplyText);
         Assert.Empty(sender.LastSections);
         Assert.Contains("Pizza", firstAdd.ReplyText);
-        Assert.Contains("2. Farmhouse Pizza - Rs 299", firstAdd.ReplyText);
+        Assert.Contains("2. Farmhouse Pizza", firstAdd.ReplyText);
+        Assert.Contains("Rs 299", firstAdd.ReplyText);
         Assert.Contains(sender.LastButtons, button => button.Id == "cart.checkout");
         Assert.All(sender.LastButtons, button => Assert.True(sender.LastButtons.Count <= 3));
 
@@ -348,7 +356,8 @@ public sealed class ConversationContinuationFlowTests
 
         Assert.Contains("1 × Farmhouse Pizza", added.ReplyText);
         Assert.Contains("Burgers", added.ReplyText);
-        Assert.Contains("1. Veg Burger - Rs 99", added.ReplyText);
+        Assert.Contains("1. Veg Burger", added.ReplyText);
+        Assert.Contains("Rs 99", added.ReplyText);
     }
 
     [Fact]

@@ -98,6 +98,9 @@
         <div class="col-12 col-md-6">
             <label class="form-label">WhatsApp Phone Number ID</label>
             <input class="form-control" asp-for="NewRestaurant.WhatsAppPhoneNumberId" name="WhatsAppPhoneNumberId" required />
+            <div class="form-text">
+                Use Meta's WhatsApp Phone Number ID, not the visible phone number. Incoming webhook messages are routed by this ID.
+            </div>
         </div>
         <div class="col-12 col-md-6">
             <label class="form-label">Business Phone</label>

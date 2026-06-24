@@ -34,6 +34,54 @@
     </div></div>
 </section>
 
+<section class="card shadow-sm mb-4">
+    <div class="card-body">
+        <div class="section-heading">
+            <h2>WhatsApp Messaging Setup</h2>
+        </div>
+        <div class="row g-3">
+            <div class="col-12 col-md-6 col-xl-3">
+                <span class="badge @(Model.Restaurant.IsActive ? "text-bg-success" : "text-bg-warning")">
+                    @(Model.Restaurant.IsActive ? "Ready" : "Needs attention")
+                </span>
+                <div class="mt-2 fw-semibold">Business is active</div>
+                <small class="text-secondary">Inactive businesses will not receive WhatsApp orders.</small>
+            </div>
+            <div class="col-12 col-md-6 col-xl-3">
+                <span class="badge @(!string.IsNullOrWhiteSpace(Model.Restaurant.WhatsAppPhoneNumberId) ? "text-bg-success" : "text-bg-warning")">
+                    @(!string.IsNullOrWhiteSpace(Model.Restaurant.WhatsAppPhoneNumberId) ? "Ready" : "Missing")
+                </span>
+                <div class="mt-2 fw-semibold">WhatsApp Phone Number ID</div>
+                <small class="text-secondary">
+                    <code>@(string.IsNullOrWhiteSpace(Model.Restaurant.WhatsAppPhoneNumberId) ? "Not configured" : Model.Restaurant.WhatsAppPhoneNumberId)</code>
+                </small>
+            </div>
+            <div class="col-12 col-md-6 col-xl-3">
+                <span class="badge @(Model.ActiveMenuItemCount > 0 ? "text-bg-success" : "text-bg-warning")">
+                    @(Model.ActiveMenuItemCount > 0 ? "Ready" : "Add menu")
+                </span>
+                <div class="mt-2 fw-semibold">Available menu items</div>
+                <small class="text-secondary">@Model.ActiveMenuItemCount active and available item(s).</small>
+            </div>
+            <div class="col-12 col-md-6 col-xl-3">
+                <span class="badge @(!string.IsNullOrWhiteSpace(Model.Restaurant.StaffWhatsAppNumber) ? "text-bg-success" : "text-bg-secondary")">
+                    @(!string.IsNullOrWhiteSpace(Model.Restaurant.StaffWhatsAppNumber) ? "Configured" : "Optional")
+                </span>
+                <div class="mt-2 fw-semibold">Staff WhatsApp alerts</div>
+                <small class="text-secondary">
+                    @(!string.IsNullOrWhiteSpace(Model.Restaurant.StaffWhatsAppNumber)
+                        ? Model.Restaurant.StaffWhatsAppNumber
+                        : "Add a staff number to receive order alerts.")
+                </small>
+            </div>
+        </div>
+        <div class="alert alert-info mt-3 mb-0">
+            Incoming WhatsApp messages are routed by the webhook <code>metadata.phone_number_id</code>.
+            Use the exact Phone Number ID from Meta for this restaurant, then add at least one active category and available item.
+        </div>
+    </div>
+</section>
+
 <section class="section-band">
     <div class="section-heading">
         <h2>Business Settings</h2>

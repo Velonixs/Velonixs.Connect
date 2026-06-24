@@ -87,10 +87,17 @@ public sealed class AdminController(
         }
 
         var ownerEmail = form.OwnerEmail.Trim();
+        var whatsAppPhoneNumberId = form.WhatsAppPhoneNumberId.Trim();
 
         if (await userManager.FindByEmailAsync(ownerEmail) is not null)
         {
             TempData["Error"] = "An account already exists for the owner email.";
+            return RedirectToAction(nameof(Index));
+        }
+
+        if (await dbContext.Restaurants.AnyAsync(x => x.WhatsAppPhoneNumberId == whatsAppPhoneNumberId, cancellationToken))
+        {
+            TempData["Error"] = "Another business already uses this WhatsApp Phone Number ID.";
             return RedirectToAction(nameof(Index));
         }
 
@@ -100,7 +107,7 @@ public sealed class AdminController(
                 new CreateRestaurantRequest(
                     form.Name,
                     form.BusinessType,
-                    form.WhatsAppPhoneNumberId,
+                    whatsAppPhoneNumberId,
                     form.BusinessPhone,
                     form.NotificationEmail,
                     form.StaffWhatsAppNumber,
@@ -210,12 +217,22 @@ public sealed class AdminController(
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> UpdateRestaurant(Guid id, RestaurantFormModel form, CancellationToken cancellationToken)
     {
+        var whatsAppPhoneNumberId = form.WhatsAppPhoneNumberId.Trim();
+
+        if (await dbContext.Restaurants.AnyAsync(
+                x => x.Id != id && x.WhatsAppPhoneNumberId == whatsAppPhoneNumberId,
+                cancellationToken))
+        {
+            TempData["Error"] = "Another business already uses this WhatsApp Phone Number ID.";
+            return RedirectToAction(nameof(Restaurant), new { id });
+        }
+
         var restaurant = await restaurantService.UpdateRestaurantAsync(
             id,
             new UpdateRestaurantRequest(
                 form.Name,
                 form.BusinessType,
-                form.WhatsAppPhoneNumberId,
+                whatsAppPhoneNumberId,
                 form.BusinessPhone,
                 form.NotificationEmail,
                 form.StaffWhatsAppNumber,

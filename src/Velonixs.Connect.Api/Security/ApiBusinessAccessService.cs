@@ -15,6 +15,8 @@ public sealed class ApiBusinessAccessService(
 
     public bool IsPlatformAdmin => User.IsInRole(AppRoles.PlatformAdmin);
 
+    public Guid? AssignedBusinessId => GetBusinessId();
+
     public bool CanReadBusiness(Guid businessId)
     {
         return IsPlatformAdmin || GetBusinessId() == businessId;
@@ -71,6 +73,17 @@ public sealed class ApiBusinessAccessService(
             .FirstOrDefaultAsync(cancellationToken);
 
         return businessId is Guid id && CanManageCatalog(id);
+    }
+
+    public async Task<bool> CanManageCustomerAsync(Guid customerId, CancellationToken cancellationToken)
+    {
+        var businessId = await dbContext.Customers
+            .AsNoTracking()
+            .Where(x => x.Id == customerId)
+            .Select(x => (Guid?)x.RestaurantId)
+            .FirstOrDefaultAsync(cancellationToken);
+
+        return businessId is Guid id && CanReadBusinessDetails(id);
     }
 
     private Guid? GetBusinessId()

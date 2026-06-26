@@ -2,16 +2,16 @@ using System.Security.Claims;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Authorization;
-using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
-using Velonixs.Connect.Persistence.Identity;
+using Velonixs.Connect.Application.Abstractions;
+using Velonixs.Connect.Application.Models;
 using Velonixs.Connect.Portal.Models;
 using Velonixs.Connect.Shared.Security;
 
 namespace Velonixs.Connect.Portal.Controllers;
 
 [AllowAnonymous]
-public sealed class AccountController(UserManager<ApplicationUser> userManager) : Controller
+public sealed class AccountController(IAccountSessionService accountSessionService) : Controller
 {
     [HttpGet("portal/login")]
     public IActionResult Login(string? returnUrl = null)
@@ -28,15 +28,12 @@ public sealed class AccountController(UserManager<ApplicationUser> userManager) 
             return View(model);
         }
 
-        var user = await userManager.FindByEmailAsync(model.Email.Trim());
+        var session = await accountSessionService.AuthenticatePortalAsync(
+            model.Email,
+            model.Password,
+            HttpContext.RequestAborted);
 
-        var roles = user is null ? [] : await userManager.GetRolesAsync(user);
-
-        if (user is null ||
-            !user.IsActive ||
-            user.BusinessId is null ||
-            !await userManager.CheckPasswordAsync(user, model.Password) ||
-            !roles.Any(role => AppRoles.StaffAssignable.Contains(role) || role == AppRoles.BusinessOwner))
+        if (session is null)
         {
             TempData["Error"] = "This account cannot access the Business Portal.";
             return View(model);
@@ -44,7 +41,7 @@ public sealed class AccountController(UserManager<ApplicationUser> userManager) 
 
         await HttpContext.SignInAsync(
             CookieAuthenticationDefaults.AuthenticationScheme,
-            BuildPrincipal(user, roles),
+            BuildPrincipal(session),
             new AuthenticationProperties
             {
                 IsPersistent = true,
@@ -66,17 +63,17 @@ public sealed class AccountController(UserManager<ApplicationUser> userManager) 
         return RedirectToAction(nameof(Login));
     }
 
-    private static ClaimsPrincipal BuildPrincipal(ApplicationUser user, IEnumerable<string> roles)
+    private static ClaimsPrincipal BuildPrincipal(AccountSessionResponse session)
     {
         var claims = new List<Claim>
         {
-            new Claim(ClaimTypes.NameIdentifier, user.Id.ToString()),
-            new Claim(ClaimTypes.Name, string.IsNullOrWhiteSpace(user.DisplayName) ? user.Email ?? string.Empty : user.DisplayName),
-            new Claim(ClaimTypes.Email, user.Email ?? string.Empty),
-            new Claim(AppClaimTypes.BusinessId, user.BusinessId!.Value.ToString())
+            new Claim(ClaimTypes.NameIdentifier, session.UserId.ToString()),
+            new Claim(ClaimTypes.Name, session.DisplayName),
+            new Claim(ClaimTypes.Email, session.Email),
+            new Claim(AppClaimTypes.BusinessId, session.BusinessId!.Value.ToString())
         };
 
-        claims.AddRange(roles.Select(role => new Claim(ClaimTypes.Role, role)));
+        claims.AddRange(session.Roles.Select(role => new Claim(ClaimTypes.Role, role)));
         return new ClaimsPrincipal(new ClaimsIdentity(claims, CookieAuthenticationDefaults.AuthenticationScheme));
     }
 }

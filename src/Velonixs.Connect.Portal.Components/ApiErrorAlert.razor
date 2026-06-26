@@ -1,0 +1,20 @@
+@using Velonixs.Connect.Api.Client
+
+@if (Error is not null)
+{
+    <div class="vc-alert" role="alert">
+        <div>
+            <strong>@Title</strong>
+            <p>@Error.Message</p>
+        </div>
+        @if (!string.IsNullOrWhiteSpace(Error.Error?.TraceId))
+        {
+            <span>Trace @Error.Error.TraceId</span>
+        }
+    </div>
+}
+
+@code {
+    [Parameter] public ApiClientException? Error { get; set; }
+    [Parameter] public string Title { get; set; } = "Request failed";
+}

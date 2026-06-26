@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Mvc;
 using Velonixs.Connect.Api.Security;
 using Velonixs.Connect.Application.Abstractions;
 using Velonixs.Connect.Application.Models;
+using Velonixs.Connect.Contracts.Menu;
 
 namespace Velonixs.Connect.Api.Controllers;
 
@@ -13,6 +14,7 @@ public sealed class MenuController(
     ApiBusinessAccessService access) : ControllerBase
 {
     [HttpGet("api/restaurants/{restaurantId:guid}/menu")]
+    [HttpGet("api/v1/restaurants/{restaurantId:guid}/menu")]
     public async Task<IActionResult> GetMenu(Guid restaurantId, CancellationToken cancellationToken)
     {
         if (!access.CanReadBusiness(restaurantId))
@@ -25,6 +27,8 @@ public sealed class MenuController(
     }
 
     [HttpPost("api/restaurants/{restaurantId:guid}/menu-categories")]
+    [HttpPost("api/v1/restaurants/{restaurantId:guid}/menu-categories")]
+    [HttpPost("api/v1/categories")]
     public async Task<IActionResult> CreateCategory(
         Guid restaurantId,
         [FromBody] CreateMenuCategoryRequest request,
@@ -40,6 +44,7 @@ public sealed class MenuController(
     }
 
     [HttpPost("api/restaurants/{restaurantId:guid}/menu-items")]
+    [HttpPost("api/v1/restaurants/{restaurantId:guid}/menu-items")]
     public async Task<IActionResult> CreateItem(
         Guid restaurantId,
         [FromBody] CreateMenuItemRequest request,
@@ -55,6 +60,7 @@ public sealed class MenuController(
     }
 
     [HttpPut("api/menu-items/{id:guid}")]
+    [HttpPut("api/v1/menu-items/{id:guid}")]
     public async Task<IActionResult> UpdateItem(
         Guid id,
         [FromBody] UpdateMenuItemRequest request,
@@ -69,7 +75,23 @@ public sealed class MenuController(
         return item is null ? NotFound() : Ok(item);
     }
 
+    [HttpPatch("api/v1/menu-items/{id:guid}/availability")]
+    public async Task<IActionResult> UpdateAvailability(
+        Guid id,
+        [FromBody] UpdateMenuItemAvailabilityRequest request,
+        CancellationToken cancellationToken)
+    {
+        if (!await access.CanManageProductAsync(id, cancellationToken))
+        {
+            return Forbid();
+        }
+
+        var item = await menuService.UpdateItemAvailabilityAsync(id, request.IsAvailable, cancellationToken);
+        return item is null ? NotFound() : Ok(item);
+    }
+
     [HttpDelete("api/menu-items/{id:guid}")]
+    [HttpDelete("api/v1/menu-items/{id:guid}")]
     public async Task<IActionResult> DeactivateItem(Guid id, CancellationToken cancellationToken)
     {
         if (!await access.CanManageProductAsync(id, cancellationToken))

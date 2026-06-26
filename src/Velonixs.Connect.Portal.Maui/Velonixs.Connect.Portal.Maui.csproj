@@ -1,0 +1,105 @@
+﻿<Project Sdk="Microsoft.NET.Sdk.Razor">
+
+    <PropertyGroup>
+        <TargetFramework>net10.0-android</TargetFramework>
+
+        <!-- Note for MacCatalyst:
+            The default runtime is maccatalyst-x64, except in Release config, in which case the default is maccatalyst-x64;maccatalyst-arm64.
+            When specifying both architectures, use the plural <RuntimeIdentifiers> instead of the singular <RuntimeIdentifier>.
+            The Mac App Store will NOT accept apps with ONLY maccatalyst-arm64 indicated;
+            either BOTH runtimes must be indicated or ONLY macatalyst-x64. -->
+        <!-- For example: <RuntimeIdentifiers>maccatalyst-x64;maccatalyst-arm64</RuntimeIdentifiers> -->
+
+        <OutputType>Exe</OutputType>
+        <RootNamespace>Velonixs.Connect.Portal.Maui</RootNamespace>
+        <UseMaui>true</UseMaui>
+        <SingleProject>true</SingleProject>
+        <ImplicitUsings>enable</ImplicitUsings>
+        <EnableDefaultCssItems>false</EnableDefaultCssItems>
+        <Nullable>enable</Nullable>
+
+        <!-- Enable XAML source generation for faster build times and improved performance.
+             This generates C# code from XAML at compile time instead of runtime inflation.
+             To disable, remove this line.
+             For individual files, you can override by setting Inflator metadata:
+               <MauiXaml Update="MyPage.xaml" Inflator="Default" /> (reverts to defaults: Runtime for Debug, XamlC for Release)
+               <MauiXaml Update="MyPage.xaml" Inflator="Runtime" /> (force runtime inflation) -->
+        <MauiXamlInflator>SourceGen</MauiXamlInflator>
+
+        <!-- Display name -->
+        <ApplicationTitle>Velonixs Restaurant Portal</ApplicationTitle>
+
+        <!-- App Identifier -->
+        <ApplicationId>com.velonixs.connect.portal</ApplicationId>
+
+        <!-- Versions -->
+        <ApplicationDisplayVersion>1.0</ApplicationDisplayVersion>
+        <ApplicationVersion>1</ApplicationVersion>
+
+        <!-- To develop, package, and publish an app to the Microsoft Store, see: https://aka.ms/MauiTemplateUnpackaged -->
+        <SupportedOSPlatformVersion Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'android'">24.0</SupportedOSPlatformVersion>
+    </PropertyGroup>
+
+    <PropertyGroup>
+        <AndroidSdkDirectory Condition="'$(AndroidSdkDirectory)' == '' and '$(ANDROID_HOME)' != ''">$(ANDROID_HOME)</AndroidSdkDirectory>
+        <AndroidSdkDirectory Condition="'$(AndroidSdkDirectory)' == '' and Exists('$(LOCALAPPDATA)\Android\Sdk')">$(LOCALAPPDATA)\Android\Sdk</AndroidSdkDirectory>
+        <JavaSdkDirectory Condition="'$(JavaSdkDirectory)' == '' and '$(JAVA_HOME)' != ''">$(JAVA_HOME)</JavaSdkDirectory>
+        <JavaSdkDirectory Condition="'$(JavaSdkDirectory)' == '' and Exists('C:\Program Files\Microsoft\jdk-17.0.19.10-hotspot')">C:\Program Files\Microsoft\jdk-17.0.19.10-hotspot</JavaSdkDirectory>
+        <ApiBaseAddress Condition="'$(ApiBaseAddress)' == ''">https://10.0.2.2:7011/</ApiBaseAddress>
+    </PropertyGroup>
+
+    <PropertyGroup Condition="'$(Configuration)' == 'Debug'">
+        <AndroidFastDeployment>false</AndroidFastDeployment>
+        <EmbedAssembliesIntoApk>true</EmbedAssembliesIntoApk>
+    </PropertyGroup>
+
+    <ItemGroup>
+        <AssemblyAttribute Include="System.Reflection.AssemblyMetadataAttribute">
+            <_Parameter1>ApiBaseAddress</_Parameter1>
+            <_Parameter2>$(ApiBaseAddress)</_Parameter2>
+        </AssemblyAttribute>
+    </ItemGroup>
+
+    <PropertyGroup Condition="'$(Configuration)' == 'Release'">
+        <AndroidPackageFormat>aab</AndroidPackageFormat>
+    </PropertyGroup>
+
+    <PropertyGroup Condition="'$(Configuration)' == 'Release' and '$(VELONIXS_ANDROID_KEYSTORE)' != ''">
+        <AndroidKeyStore>true</AndroidKeyStore>
+        <AndroidSigningKeyStore>$(VELONIXS_ANDROID_KEYSTORE)</AndroidSigningKeyStore>
+        <AndroidSigningStorePass>$(VELONIXS_ANDROID_KEYSTORE_PASSWORD)</AndroidSigningStorePass>
+        <AndroidSigningKeyAlias>$(VELONIXS_ANDROID_KEY_ALIAS)</AndroidSigningKeyAlias>
+        <AndroidSigningKeyPass>$(VELONIXS_ANDROID_KEY_PASSWORD)</AndroidSigningKeyPass>
+    </PropertyGroup>
+
+    <ItemGroup>
+        <ProjectReference Include="..\Velonixs.Connect.Api.Client\Velonixs.Connect.Api.Client.csproj" />
+        <ProjectReference Include="..\Velonixs.Connect.Mobile.Abstractions\Velonixs.Connect.Mobile.Abstractions.csproj" />
+        <ProjectReference Include="..\Velonixs.Connect.Portal.Components\Velonixs.Connect.Portal.Components.csproj" />
+    </ItemGroup>
+
+    <ItemGroup>
+        <!-- App Icon -->
+        <MauiIcon Include="Resources\AppIcon\appicon.svg" ForegroundFile="Resources\AppIcon\appiconfg.svg" Color="#512BD4" />
+
+        <!-- Splash Screen -->
+        <MauiSplashScreen Include="Resources\Splash\splash.svg" Color="#512BD4" BaseSize="128,128" />
+
+        <!-- Images -->
+        <MauiImage Include="Resources\Images\*" />
+        <MauiImage Update="Resources\Images\dotnet_bot.svg" BaseSize="168,208" />
+
+        <!-- Custom Fonts -->
+        <MauiFont Include="Resources\Fonts\*" />
+
+        <!-- Raw Assets (also remove the "Resources\Raw" prefix) -->
+        <MauiAsset Include="Resources\Raw\**" LogicalName="%(RecursiveDir)%(Filename)%(Extension)" />
+    </ItemGroup>
+
+    <ItemGroup>
+        <PackageReference Include="Microsoft.Maui.Controls" Version="$(MauiVersion)" />
+        <PackageReference Include="Microsoft.AspNetCore.Components.WebView.Maui" Version="$(MauiVersion)" />
+        <PackageReference Include="Microsoft.Extensions.Logging.Debug" Version="10.0.0" />
+    </ItemGroup>
+
+</Project>

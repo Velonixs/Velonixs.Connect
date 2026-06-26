@@ -1,13 +1,10 @@
 using System.Security.Claims;
 using Microsoft.AspNetCore.Authorization;
-using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Velonixs.Connect.Application.Abstractions;
 using Velonixs.Connect.Application.Models;
 using Velonixs.Connect.Domain.Entities;
-using Velonixs.Connect.Persistence.Identity;
-using Velonixs.Connect.Persistence.Persistence;
 using Velonixs.Connect.Portal.Models;
 using Velonixs.Connect.Shared.Security;
 
@@ -18,8 +15,9 @@ public sealed class PortalController(
     IRestaurantService restaurantService,
     IMenuService menuService,
     IOrderService orderService,
-    RestaurantConnectDbContext dbContext,
-    UserManager<ApplicationUser> userManager) : Controller
+    IDashboardService dashboardService,
+    ICustomerService customerService,
+    IStaffService staffService) : Controller
 {
     private static readonly string[] StatusOptions =
     [
@@ -34,41 +32,23 @@ public sealed class PortalController(
     [HttpGet("portal")]
     public async Task<IActionResult> Index(CancellationToken cancellationToken)
     {
-        var restaurant = await ResolveRestaurantAsync(cancellationToken);
+        var dashboard = await dashboardService.GetRestaurantDashboardAsync(GetBusinessId(), cancellationToken: cancellationToken);
 
-        if (restaurant is null)
+        if (dashboard is null)
         {
             return View("NoRestaurant");
         }
 
-        var orders = await orderService.GetRestaurantOrdersAsync(restaurant.Id, cancellationToken);
-        var menu = await menuService.GetMenuAsync(restaurant.Id, cancellationToken);
-        var today = DateTimeOffset.UtcNow.Date;
-        var recentCustomers = await dbContext.Customers
-            .AsNoTracking()
-            .Where(x => x.RestaurantId == restaurant.Id)
-            .OrderByDescending(x => x.LastInteractionAt)
-            .Take(10)
-            .Select(x => new CustomerPortalSummary
-            {
-                Id = x.Id,
-                PhoneNumber = x.PhoneNumber,
-                Name = x.Name,
-                LastAddress = x.LastAddress,
-                LastInteractionAt = x.LastInteractionAt
-            })
-            .ToArrayAsync(cancellationToken);
-
         var model = new PortalDashboardViewModel
         {
-            Restaurant = restaurant,
-            Orders = orders.Take(20).ToArray(),
-            Menu = menu,
-            PendingOrderCount = orders.Count(x => x.OrderStatus == OrderStatuses.PendingConfirmation),
-            TodayOrderCount = orders.Count(x => x.CreatedAt.UtcDateTime.Date == today),
-            TodayRevenue = orders.Where(x => x.CreatedAt.UtcDateTime.Date == today).Sum(x => x.TotalAmount),
-            AvailableItemCount = menu?.Items.Count(x => x.IsActive && x.IsAvailable) ?? 0,
-            RecentCustomers = recentCustomers,
+            Restaurant = dashboard.Restaurant,
+            Orders = dashboard.RecentOrders,
+            Menu = dashboard.Menu,
+            PendingOrderCount = dashboard.PendingOrderCount,
+            TodayOrderCount = dashboard.TodayOrderCount,
+            TodayRevenue = dashboard.TodayRevenue,
+            AvailableItemCount = dashboard.AvailableItemCount,
+            RecentCustomers = dashboard.RecentCustomers.Select(ToPortalCustomerSummary).ToArray(),
             CurrentRole = User.Claims.FirstOrDefault(x => x.Type == ClaimTypes.Role)?.Value ?? string.Empty
         };
 
@@ -122,25 +102,15 @@ public sealed class PortalController(
             return View("NoRestaurant");
         }
 
-        var customers = await dbContext.Customers
-            .AsNoTracking()
-            .Where(x => x.RestaurantId == restaurant.Id)
-            .OrderByDescending(x => x.LastInteractionAt)
-            .Take(100)
-            .Select(x => new CustomerPortalSummary
-            {
-                Id = x.Id,
-                PhoneNumber = x.PhoneNumber,
-                Name = x.Name,
-                LastAddress = x.LastAddress,
-                LastInteractionAt = x.LastInteractionAt
-            })
-            .ToArrayAsync(cancellationToken);
+        var customers = await customerService.GetRestaurantCustomersAsync(
+            restaurant.Id,
+            100,
+            cancellationToken: cancellationToken);
 
         return View(new PortalCustomersViewModel
         {
             Restaurant = restaurant,
-            Customers = customers
+            Customers = customers.Select(ToPortalCustomerSummary).ToArray()
         });
     }
 
@@ -258,16 +228,16 @@ public sealed class PortalController(
             return RedirectToAction(nameof(Menu));
         }
 
-        var restaurant = await dbContext.Restaurants.FirstOrDefaultAsync(x => x.Id == GetBusinessId(), cancellationToken);
+        var restaurant = await restaurantService.UpdateRestaurantTaxSettingAsync(
+            GetBusinessId(),
+            form.CgstPercent,
+            form.SgstPercent,
+            cancellationToken);
 
         if (restaurant is null)
         {
             return NotFound();
         }
-
-        restaurant.CgstPercent = form.CgstPercent;
-        restaurant.SgstPercent = form.SgstPercent;
-        await dbContext.SaveChangesAsync(cancellationToken);
 
         TempData["Success"] = "GST settings saved. New carts and orders will use these values.";
         return RedirectToAction(nameof(Menu));
@@ -325,7 +295,7 @@ public sealed class PortalController(
             return RedirectToAction(nameof(Menu));
         }
 
-        var item = await dbContext.MenuItems.AsNoTracking().FirstOrDefaultAsync(x => x.Id == id, cancellationToken);
+        var item = await menuService.GetItemAsync(id, cancellationToken);
 
         if (item is null)
         {
@@ -372,7 +342,7 @@ public sealed class PortalController(
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> DeactivateMenuItem(Guid id, CancellationToken cancellationToken)
     {
-        var item = await dbContext.MenuItems.AsNoTracking().FirstOrDefaultAsync(x => x.Id == id, cancellationToken);
+        var item = await menuService.GetItemAsync(id, cancellationToken);
 
         if (item is null)
         {
@@ -395,7 +365,7 @@ public sealed class PortalController(
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> DeleteMenuItem(Guid id, CancellationToken cancellationToken)
     {
-        var item = await dbContext.MenuItems.FirstOrDefaultAsync(x => x.Id == id, cancellationToken);
+        var item = await menuService.GetItemAsync(id, cancellationToken);
 
         if (item is null)
         {
@@ -407,14 +377,15 @@ public sealed class PortalController(
             return Forbid();
         }
 
-        if (await dbContext.OrderItems.AnyAsync(x => x.MenuItemId == id, cancellationToken))
+        try
         {
-            TempData["Error"] = "This item has order history. Deactivate it instead of deleting it.";
+            await menuService.DeleteItemAsync(id, cancellationToken);
+        }
+        catch (InvalidOperationException ex)
+        {
+            TempData["Error"] = ex.Message;
             return RedirectToAction(nameof(Menu));
         }
-
-        dbContext.MenuItems.Remove(item);
-        await dbContext.SaveChangesAsync(cancellationToken);
 
         TempData["Success"] = "Menu product deleted.";
         return RedirectToAction(nameof(Menu));
@@ -425,7 +396,7 @@ public sealed class PortalController(
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> UpdateAvailability(Guid id, MenuAvailabilityFormModel form, CancellationToken cancellationToken)
     {
-        var item = await dbContext.MenuItems.FirstOrDefaultAsync(x => x.Id == id, cancellationToken);
+        var item = await menuService.GetItemAsync(id, cancellationToken);
 
         if (item is null)
         {
@@ -437,10 +408,9 @@ public sealed class PortalController(
             return Forbid();
         }
 
-        item.IsAvailable = form.IsAvailable;
-        await dbContext.SaveChangesAsync(cancellationToken);
+        var updated = await menuService.UpdateItemAvailabilityAsync(id, form.IsAvailable, cancellationToken);
 
-        TempData["Success"] = $"{item.Name} is now {(item.IsAvailable ? "available" : "unavailable")}.";
+        TempData["Success"] = $"{updated?.Name ?? item.Name} is now {(form.IsAvailable ? "available" : "unavailable")}.";
         return RedirectToAction(nameof(Menu));
     }
 
@@ -449,7 +419,7 @@ public sealed class PortalController(
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> UpdateCustomer(Guid id, CustomerEditFormModel form, CancellationToken cancellationToken)
     {
-        var customer = await dbContext.Customers.FirstOrDefaultAsync(x => x.Id == id, cancellationToken);
+        var customer = await customerService.GetCustomerAsync(id, cancellationToken: cancellationToken);
 
         if (customer is null)
         {
@@ -461,9 +431,10 @@ public sealed class PortalController(
             return Forbid();
         }
 
-        customer.Name = string.IsNullOrWhiteSpace(form.Name) ? null : form.Name.Trim();
-        customer.LastAddress = string.IsNullOrWhiteSpace(form.LastAddress) ? null : form.LastAddress.Trim();
-        await dbContext.SaveChangesAsync(cancellationToken);
+        await customerService.UpdateCustomerAsync(
+            id,
+            new UpdateCustomerRequest(form.Name, form.LastAddress),
+            cancellationToken);
 
         TempData["Success"] = "Customer saved.";
         return RedirectToAction(nameof(Customers));
@@ -495,29 +466,12 @@ public sealed class PortalController(
             return NotFound();
         }
 
-        var users = await userManager.Users
-            .AsNoTracking()
-            .Where(x => x.BusinessId == businessId)
-            .OrderBy(x => x.DisplayName)
-            .ToArrayAsync(cancellationToken);
-        var summaries = new List<StaffUserSummary>();
-
-        foreach (var user in users)
-        {
-            summaries.Add(new StaffUserSummary
-            {
-                Id = user.Id,
-                DisplayName = user.DisplayName,
-                Email = user.Email ?? string.Empty,
-                Role = (await userManager.GetRolesAsync(user)).FirstOrDefault() ?? "Unassigned",
-                IsActive = user.IsActive
-            });
-        }
+        var users = await staffService.GetBusinessStaffAsync(businessId, cancellationToken);
 
         return View(new StaffIndexViewModel
         {
             Business = business,
-            Users = summaries
+            Users = users.Select(ToStaffUserSummary).ToArray()
         });
     }
 
@@ -532,64 +486,65 @@ public sealed class PortalController(
             return RedirectToAction(nameof(Staff));
         }
 
-        var email = form.Email.Trim();
-
-        if (await userManager.FindByEmailAsync(email) is not null)
-        {
-            TempData["Error"] = "An account already exists for this email.";
-            return RedirectToAction(nameof(Staff));
-        }
-
-        var user = new ApplicationUser
-        {
-            UserName = email,
-            Email = email,
-            EmailConfirmed = true,
-            DisplayName = form.DisplayName.Trim(),
-            BusinessId = GetBusinessId(),
-            IsActive = true
-        };
-
-        var result = await userManager.CreateAsync(user, form.Password);
-
-        if (result.Succeeded)
-        {
-            result = await userManager.AddToRoleAsync(user, form.Role);
-        }
+        var result = await staffService.CreateStaffUserAsync(
+            GetBusinessId(),
+            new CreateStaffUserRequest(form.DisplayName, form.Email, form.Password, form.Role),
+            cancellationToken);
 
         if (!result.Succeeded)
         {
-            TempData["Error"] = string.Join(" ", result.Errors.Select(error => error.Description));
+            TempData["Error"] = string.Join(" ", result.Errors);
             return RedirectToAction(nameof(Staff));
         }
 
-        TempData["Success"] = $"Created {form.Role} account for {email}.";
+        TempData["Success"] = $"Created {form.Role} account for {result.User?.Email ?? form.Email.Trim()}.";
         return RedirectToAction(nameof(Staff));
     }
 
     [Authorize(Roles = AppRoles.BusinessOwner)]
     [HttpPost("portal/staff/{id:guid}/status")]
     [ValidateAntiForgeryToken]
-    public async Task<IActionResult> UpdateStaffStatus(Guid id, bool isActive)
+    public async Task<IActionResult> UpdateStaffStatus(Guid id, bool isActive, CancellationToken cancellationToken)
     {
-        var user = await userManager.FindByIdAsync(id.ToString());
+        var currentUserId = Guid.TryParse(User.FindFirstValue(ClaimTypes.NameIdentifier), out var parsed)
+            ? parsed
+            : (Guid?)null;
+        var result = await staffService.UpdateStaffStatusAsync(
+            GetBusinessId(),
+            id,
+            isActive,
+            currentUserId,
+            cancellationToken);
 
-        if (user is null || user.BusinessId != GetBusinessId())
+        if (!result.Succeeded)
         {
-            return NotFound();
-        }
-
-        if (user.Id.ToString() == User.FindFirstValue(ClaimTypes.NameIdentifier))
-        {
-            TempData["Error"] = "You cannot deactivate your own account.";
+            TempData["Error"] = string.Join(" ", result.Errors);
             return RedirectToAction(nameof(Staff));
         }
 
-        user.IsActive = isActive;
-        await userManager.UpdateAsync(user);
-        TempData["Success"] = $"{user.DisplayName} is now {(isActive ? "active" : "inactive")}.";
+        TempData["Success"] = $"{result.User?.DisplayName ?? "Staff account"} is now {(isActive ? "active" : "inactive")}.";
         return RedirectToAction(nameof(Staff));
     }
+
+    private static CustomerPortalSummary ToPortalCustomerSummary(CustomerSummaryResponse customer) =>
+        new()
+        {
+            Id = customer.Id,
+            PhoneNumber = customer.PhoneNumber,
+            Name = customer.Name,
+            LastAddress = customer.LastAddress,
+            LastInteractionAt = customer.LastInteractionAt
+        };
+
+    private static StaffUserSummary ToStaffUserSummary(StaffUserResponse user) =>
+        new()
+        {
+            Id = user.Id,
+            DisplayName = user.DisplayName,
+            Email = user.Email,
+            Role = user.Role,
+            IsActive = user.IsActive
+        };
 
     private Guid GetBusinessId()
     {

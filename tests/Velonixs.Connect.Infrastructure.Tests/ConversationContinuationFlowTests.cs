@@ -497,6 +497,7 @@ public sealed class ConversationContinuationFlowTests
             dbContext,
             sender,
             new FakeNotificationService(),
+            new NoOpOrderRealtimeNotifier(),
             menuSearch,
             new FreeTextOrderParser(menuSearch),
             new OrderingCartService(),

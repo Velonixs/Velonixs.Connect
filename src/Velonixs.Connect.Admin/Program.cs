@@ -1,12 +1,10 @@
 using System.Security.Claims;
 using Microsoft.AspNetCore.Authentication.Cookies;
-using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc.Authorization;
+using Velonixs.Connect.Application.Abstractions;
 using Velonixs.Connect.Application;
 using Velonixs.Connect.Infrastructure;
-using Velonixs.Connect.Persistence.Identity;
 using Velonixs.Connect.Persistence.Persistence;
-using Velonixs.Connect.Shared.Security;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -23,10 +21,12 @@ builder.Services
         options.Events.OnValidatePrincipal = async context =>
         {
             var userId = context.Principal?.FindFirstValue(ClaimTypes.NameIdentifier);
-            var userManager = context.HttpContext.RequestServices.GetRequiredService<UserManager<ApplicationUser>>();
-            var user = string.IsNullOrWhiteSpace(userId) ? null : await userManager.FindByIdAsync(userId);
+            var accountSessionService = context.HttpContext.RequestServices.GetRequiredService<IAccountSessionService>();
+            var session = Guid.TryParse(userId, out var parsedUserId)
+                ? await accountSessionService.ValidateAdminSessionAsync(parsedUserId)
+                : null;
 
-            if (user is null || !user.IsActive || !await userManager.IsInRoleAsync(user, AppRoles.PlatformAdmin))
+            if (session is null)
             {
                 context.RejectPrincipal();
             }

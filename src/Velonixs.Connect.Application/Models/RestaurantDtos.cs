@@ -1,3 +1,5 @@
+using System.ComponentModel.DataAnnotations;
+
 namespace Velonixs.Connect.Application.Models;
 
 public sealed record RestaurantResponse(
@@ -15,26 +17,44 @@ public sealed record RestaurantResponse(
     DateTimeOffset CreatedAt);
 
 public sealed record CreateRestaurantRequest(
+    [Required]
     string Name,
     string? BusinessType,
+
+    [Required]
     string WhatsAppPhoneNumberId,
     string? BusinessPhone,
+
+    [EmailAddress]
     string? NotificationEmail,
     string? StaffWhatsAppNumber,
     string? Address,
+
+    [Range(typeof(decimal), "0", "100")]
     decimal CgstPercent = 0,
+
+    [Range(typeof(decimal), "0", "100")]
     decimal SgstPercent = 0,
     bool IsActive = true);
 
 public sealed record UpdateRestaurantRequest(
+    [Required]
     string Name,
     string? BusinessType,
+
+    [Required]
     string WhatsAppPhoneNumberId,
     string? BusinessPhone,
+
+    [EmailAddress]
     string? NotificationEmail,
     string? StaffWhatsAppNumber,
     string? Address,
+
+    [Range(typeof(decimal), "0", "100")]
     decimal CgstPercent,
+
+    [Range(typeof(decimal), "0", "100")]
     decimal SgstPercent,
     bool IsActive);
 

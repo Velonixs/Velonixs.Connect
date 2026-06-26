@@ -26,6 +26,7 @@ public sealed class RestaurantConnectDbContext(
     public DbSet<OrderStatusHistory> OrderStatusHistory => Set<OrderStatusHistory>();
     public DbSet<MessageLog> MessageLogs => Set<MessageLog>();
     public DbSet<DataProtectionState> DataProtectionStates => Set<DataProtectionState>();
+    public DbSet<AuthRefreshToken> AuthRefreshTokens => Set<AuthRefreshToken>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -38,6 +39,7 @@ public sealed class RestaurantConnectDbContext(
             value => value == null ? null : fieldEncryption.Decrypt(value));
 
         ConfigureIdentity(modelBuilder);
+        ConfigureAuthRefreshToken(modelBuilder);
         ConfigureDataProtectionState(modelBuilder);
         ConfigureRestaurant(modelBuilder, nullableEncryptedStringConverter);
         ConfigurePlatformTaxSetting(modelBuilder);
@@ -82,6 +84,23 @@ public sealed class RestaurantConnectDbContext(
         modelBuilder.Entity<IdentityUserLogin<Guid>>().ToTable("AuthUserLogin");
         modelBuilder.Entity<IdentityRoleClaim<Guid>>().ToTable("AuthRoleClaim");
         modelBuilder.Entity<IdentityUserToken<Guid>>().ToTable("AuthUserToken");
+    }
+
+    private static void ConfigureAuthRefreshToken(ModelBuilder modelBuilder)
+    {
+        modelBuilder.Entity<AuthRefreshToken>(entity =>
+        {
+            entity.ToTable("AuthRefreshToken");
+            entity.HasKey(x => x.Id);
+            entity.Property(x => x.TokenHash).HasMaxLength(128).IsRequired();
+            entity.Property(x => x.ReplacedByTokenHash).HasMaxLength(128);
+            entity.HasIndex(x => x.TokenHash).IsUnique();
+            entity.HasIndex(x => new { x.UserId, x.ExpiresAtUtc, x.RevokedAtUtc });
+            entity.HasOne(x => x.User)
+                .WithMany()
+                .HasForeignKey(x => x.UserId)
+                .OnDelete(DeleteBehavior.Cascade);
+        });
     }
 
     private static void ConfigureRestaurant(ModelBuilder modelBuilder, ValueConverter<string?, string?> encryptedStringConverter)

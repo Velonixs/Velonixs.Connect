@@ -10,6 +10,7 @@ namespace Velonixs.Connect.Api.Controllers;
 [ApiController]
 [Authorize]
 [Route("api/businesses")]
+[Route("api/v1/businesses")]
 public sealed class BusinessesController(
     IBusinessService businessService,
     ApiBusinessAccessService access) : ControllerBase

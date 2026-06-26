@@ -1,0 +1,113 @@
+@inherits LayoutComponentBase
+@inject IVelonixsConnectApiClient ApiClient
+@inject IApiTokenStore TokenStore
+@inject IOrderRealtimeClient RealtimeClient
+@inject NavigationManager Navigation
+@implements IDisposable
+
+<div class="app-shell">
+    <aside class="sidebar">
+        <NavMenu />
+    </aside>
+
+    <main class="workspace">
+        <header class="workspace-header">
+            <div>
+                <span>Platform Console</span>
+                <strong>Velonixs Restaurant Connect</strong>
+            </div>
+            <div class="header-actions">
+                @if (!IsLoginRoute())
+                {
+                    <span class="realtime-state @RealtimeStateClass">@RealtimeStateLabel</span>
+                }
+                <button type="button" class="link-button" @onclick="LogoutAsync">Sign out</button>
+            </div>
+        </header>
+
+        <section class="content">
+            @Body
+        </section>
+    </main>
+</div>
+
+@code {
+    private bool realtimeStarted;
+    private OrderRealtimeConnectionState realtimeState;
+
+    private string RealtimeStateLabel =>
+        realtimeState switch
+        {
+            OrderRealtimeConnectionState.Connected => "Live",
+            OrderRealtimeConnectionState.Connecting => "Connecting",
+            OrderRealtimeConnectionState.Reconnecting => "Reconnecting",
+            _ => "Offline"
+        };
+
+    private string RealtimeStateClass =>
+        realtimeState == OrderRealtimeConnectionState.Connected ? "is-live" : "is-muted";
+
+    protected override async Task OnInitializedAsync()
+    {
+        Navigation.LocationChanged += OnLocationChanged;
+        RealtimeClient.ConnectionStateChanged += OnRealtimeStateChanged;
+        await SyncRealtimeStateAsync();
+    }
+
+    private async Task SyncRealtimeStateAsync()
+    {
+        if (!IsLoginRoute() && await TokenStore.GetAsync() is null)
+        {
+            Navigation.NavigateTo("/login");
+            return;
+        }
+
+        if (IsLoginRoute())
+        {
+            if (realtimeStarted)
+            {
+                await RealtimeClient.StopAsync();
+                realtimeStarted = false;
+            }
+
+            return;
+        }
+
+        if (!realtimeStarted)
+        {
+            await RealtimeClient.StartAsync();
+            realtimeStarted = true;
+        }
+    }
+
+    private async Task LogoutAsync()
+    {
+        await RealtimeClient.StopAsync();
+        realtimeStarted = false;
+        await ApiClient.LogoutAsync();
+        Navigation.NavigateTo("/login", forceLoad: false);
+    }
+
+    private bool IsLoginRoute()
+    {
+        var relative = Navigation.ToBaseRelativePath(Navigation.Uri);
+        return relative.StartsWith("login", StringComparison.OrdinalIgnoreCase);
+    }
+
+    private void OnRealtimeStateChanged(object? sender, OrderRealtimeConnectionState state)
+    {
+        realtimeState = state;
+        _ = InvokeAsync(StateHasChanged);
+    }
+
+    private async void OnLocationChanged(object? sender, LocationChangedEventArgs args)
+    {
+        await SyncRealtimeStateAsync();
+    }
+
+    public void Dispose()
+    {
+        Navigation.LocationChanged -= OnLocationChanged;
+        RealtimeClient.ConnectionStateChanged -= OnRealtimeStateChanged;
+    }
+}

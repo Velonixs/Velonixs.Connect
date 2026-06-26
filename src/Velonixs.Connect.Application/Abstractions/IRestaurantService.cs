@@ -8,6 +8,8 @@ public interface IRestaurantService
     Task<RestaurantResponse?> GetRestaurantAsync(Guid id, CancellationToken cancellationToken = default);
     Task<RestaurantResponse> CreateRestaurantAsync(CreateRestaurantRequest request, CancellationToken cancellationToken = default);
     Task<RestaurantResponse?> UpdateRestaurantAsync(Guid id, UpdateRestaurantRequest request, CancellationToken cancellationToken = default);
+    Task<RestaurantResponse?> UpdateRestaurantTaxSettingAsync(Guid id, decimal cgstPercent, decimal sgstPercent, CancellationToken cancellationToken = default);
+    Task<RestaurantResponse?> UpdateRestaurantAvailabilityAsync(Guid id, bool isActive, CancellationToken cancellationToken = default);
     Task<PlatformTaxSettingResponse> GetPlatformTaxSettingAsync(CancellationToken cancellationToken = default);
     Task<PlatformTaxSettingResponse> UpdatePlatformTaxSettingAsync(decimal cgstPercent, decimal sgstPercent, CancellationToken cancellationToken = default);
 }

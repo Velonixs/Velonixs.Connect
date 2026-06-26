@@ -1,0 +1,225 @@
+@page "/staff"
+@using System.ComponentModel.DataAnnotations
+@inject IVelonixsConnectApiClient ApiClient
+@inject NavigationManager Navigation
+@inject IMobileConnectivityService ConnectivityService
+
+<PageTitle>Staff</PageTitle>
+
+<section class="page-heading">
+    <div>
+        <p class="eyebrow">Restaurant portal</p>
+        <h1>Staff</h1>
+    </div>
+    <button class="secondary-button" type="button" @onclick="LoadAsync">Refresh</button>
+</section>
+
+<div class="connectivity @ConnectivityClass">@ConnectivityLabel</div>
+
+<ApiErrorAlert Error="error" Title="Staff unavailable" />
+<LoadingPanel IsLoading="isLoading" Message="Loading staff" />
+
+<section class="data-section">
+    <div class="section-heading">
+        <h2>Staff accounts</h2>
+        <span>@staff.Count entries</span>
+    </div>
+    <div class="mobile-list">
+        @foreach (var user in staff.OrderBy(x => x.DisplayName))
+        {
+            <article>
+                <div>
+                    <strong>@user.DisplayName</strong>
+                    <span>@user.Email</span>
+                    <span>@user.Role</span>
+                </div>
+                <div>
+                    <span>@(user.IsActive ? "Active" : "Inactive")</span>
+                    <button class="small-action" type="button" disabled="@IsOffline" @onclick="() => ToggleStatusAsync(user)">
+                        @(user.IsActive ? "Deactivate" : "Activate")
+                    </button>
+                </div>
+            </article>
+        }
+    </div>
+</section>
+
+<section class="data-section">
+    <div class="section-heading">
+        <h2>Create staff</h2>
+    </div>
+    @if (!string.IsNullOrWhiteSpace(successMessage))
+    {
+        <div class="success-alert">@successMessage</div>
+    }
+    <EditForm Model="form" OnValidSubmit="CreateAsync" class="form-stack">
+        <DataAnnotationsValidator />
+        <ValidationSummary />
+        <label>
+            <span>Name</span>
+            <InputText @bind-Value="form.DisplayName" />
+        </label>
+        <label>
+            <span>Email</span>
+            <InputText @bind-Value="form.Email" type="email" />
+        </label>
+        <label>
+            <span>Temporary password</span>
+            <InputText @bind-Value="form.Password" type="password" />
+        </label>
+        <label>
+            <span>Role</span>
+            <InputSelect @bind-Value="form.Role">
+                <option value="BusinessManager">Business manager</option>
+                <option value="Cashier">Cashier</option>
+                <option value="Staff">Staff</option>
+            </InputSelect>
+        </label>
+        <button class="primary-button" type="submit" disabled="@(isSubmitting || IsOffline)">
+            @(isSubmitting ? "Creating" : "Create staff")
+        </button>
+    </EditForm>
+</section>
+
+@code {
+    private IReadOnlyCollection<StaffUserResponse> staff = Array.Empty<StaffUserResponse>();
+    private readonly StaffForm form = new();
+    private MobileConnectivityStatus connectivityStatus;
+    private bool isLoading;
+    private bool isSubmitting;
+    private string? successMessage;
+    private ApiClientException? error;
+
+    private bool IsOffline => connectivityStatus is MobileConnectivityStatus.Offline or MobileConnectivityStatus.Unknown;
+
+    private string ConnectivityLabel =>
+        connectivityStatus == MobileConnectivityStatus.Online
+            ? "Online"
+            : connectivityStatus == MobileConnectivityStatus.Constrained
+                ? "Limited connection"
+                : "Offline";
+
+    private string ConnectivityClass =>
+        connectivityStatus == MobileConnectivityStatus.Online ? "is-online" : "is-offline";
+
+    protected override async Task OnInitializedAsync()
+    {
+        connectivityStatus = ConnectivityService.CurrentStatus;
+        ConnectivityService.StatusChanged += OnConnectivityChanged;
+        await LoadAsync();
+    }
+
+    private async Task LoadAsync()
+    {
+        isLoading = true;
+        error = null;
+
+        try
+        {
+            staff = await ApiClient.GetStaffAsync();
+        }
+        catch (ApiClientException exception)
+        {
+            error = exception;
+            RedirectIfUnauthorized(exception);
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private async Task CreateAsync()
+    {
+        if (IsOffline)
+        {
+            return;
+        }
+
+        isSubmitting = true;
+        error = null;
+        successMessage = null;
+
+        try
+        {
+            var created = await ApiClient.CreateStaffAsync(
+                restaurantId: null,
+                new CreateStaffUserRequest(form.DisplayName, form.Email, form.Password, form.Role));
+            successMessage = $"Created {created.Email}.";
+            form.Reset();
+            await LoadAsync();
+        }
+        catch (ApiClientException exception)
+        {
+            error = exception;
+            RedirectIfUnauthorized(exception);
+        }
+        finally
+        {
+            isSubmitting = false;
+        }
+    }
+
+    private async Task ToggleStatusAsync(StaffUserResponse user)
+    {
+        if (IsOffline)
+        {
+            return;
+        }
+
+        error = null;
+
+        try
+        {
+            await ApiClient.UpdateStaffStatusAsync(
+                user.Id,
+                restaurantId: null,
+                new UpdateStaffStatusRequest(!user.IsActive));
+            await LoadAsync();
+        }
+        catch (ApiClientException exception)
+        {
+            error = exception;
+            RedirectIfUnauthorized(exception);
+        }
+    }
+
+    private void OnConnectivityChanged(object? sender, MobileConnectivityStatus status)
+    {
+        connectivityStatus = status;
+        _ = InvokeAsync(StateHasChanged);
+    }
+
+    private void RedirectIfUnauthorized(ApiClientException exception)
+    {
+        if ((int)exception.StatusCode == 401)
+        {
+            Navigation.NavigateTo("/login");
+        }
+    }
+
+    private sealed class StaffForm
+    {
+        [Required]
+        public string DisplayName { get; set; } = string.Empty;
+
+        [Required]
+        [EmailAddress]
+        public string Email { get; set; } = string.Empty;
+
+        [Required]
+        [MinLength(8)]
+        public string Password { get; set; } = string.Empty;
+
+        [Required]
+        public string Role { get; set; } = "Staff";
+
+        public void Reset()
+        {
+            DisplayName = string.Empty;
+            Email = string.Empty;
+            Password = string.Empty;
+            Role = "Staff";
+        }
+    }
+}

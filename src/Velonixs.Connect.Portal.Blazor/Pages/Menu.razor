@@ -1,0 +1,116 @@
+@page "/menu"
+@using Velonixs.Connect.Contracts.Menu
+@inject IVelonixsConnectApiClient ApiClient
+@inject NavigationManager Navigation
+
+<PageTitle>Menu</PageTitle>
+
+<section class="page-heading">
+    <div>
+        <p class="eyebrow">Restaurant portal</p>
+        <h1>@(menu?.RestaurantName ?? "Menu")</h1>
+    </div>
+    <button class="secondary-button" type="button" @onclick="LoadAsync">Refresh</button>
+</section>
+
+<ApiErrorAlert Error="error" Title="Menu unavailable" />
+<LoadingPanel IsLoading="isLoading" Message="Loading menu" />
+
+@if (menu is not null)
+{
+    <section class="data-section">
+        <div class="section-heading">
+            <h2>Menu items</h2>
+            <span>@menu.Items.Count entries</span>
+        </div>
+
+        @if (menu.Items.Count == 0)
+        {
+            <div class="empty-state">No menu items are configured yet.</div>
+        }
+        else
+        {
+            <div class="menu-list">
+                @foreach (var group in menu.Items.GroupBy(item => item.CategoryName).OrderBy(group => group.Key))
+                {
+                    <section>
+                        <h3>@group.Key</h3>
+                        @foreach (var item in group.OrderBy(x => x.ItemCode))
+                        {
+                            <article class="menu-row">
+                                <div>
+                                    <strong>@item.ItemCode. @item.Name</strong>
+                                    <span>@(string.IsNullOrWhiteSpace(item.Description) ? "No description" : item.Description)</span>
+                                </div>
+                                <div class="menu-row-actions">
+                                    <span>@item.Price.ToString("C0")</span>
+                                    <span class="availability @(item.IsAvailable ? "is-on" : "is-off")">
+                                        @(item.IsAvailable ? "Available" : "Unavailable")
+                                    </span>
+                                    <button class="small-action" type="button" @onclick="() => ToggleAvailabilityAsync(item)">
+                                        @(item.IsAvailable ? "Mark unavailable" : "Mark available")
+                                    </button>
+                                </div>
+                            </article>
+                        }
+                    </section>
+                }
+            </div>
+        }
+    </section>
+}
+
+@code {
+    private MenuResponse? menu;
+    private bool isLoading;
+    private ApiClientException? error;
+
+    protected override Task OnInitializedAsync() => LoadAsync();
+
+    private async Task LoadAsync()
+    {
+        isLoading = true;
+        error = null;
+
+        try
+        {
+            var dashboard = await ApiClient.GetRestaurantDashboardAsync();
+            menu = dashboard.Menu;
+        }
+        catch (ApiClientException exception)
+        {
+            error = exception;
+            RedirectIfUnauthorized(exception);
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private async Task ToggleAvailabilityAsync(MenuItemResponse item)
+    {
+        error = null;
+
+        try
+        {
+            await ApiClient.UpdateMenuItemAvailabilityAsync(
+                item.Id,
+                new UpdateMenuItemAvailabilityRequest(!item.IsAvailable));
+            await LoadAsync();
+        }
+        catch (ApiClientException exception)
+        {
+            error = exception;
+            RedirectIfUnauthorized(exception);
+        }
+    }
+
+    private void RedirectIfUnauthorized(ApiClientException exception)
+    {
+        if ((int)exception.StatusCode == 401)
+        {
+            Navigation.NavigateTo("/login");
+        }
+    }
+}

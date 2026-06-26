@@ -77,6 +77,50 @@ public sealed class MenuService(RestaurantConnectDbContext dbContext) : IMenuSer
         return ToMasterCategoryResponse(category);
     }
 
+    public async Task<MasterMenuCategoryResponse?> UpdateMasterCategoryAsync(
+        Guid id,
+        CreateMasterMenuCategoryRequest request,
+        CancellationToken cancellationToken = default)
+    {
+        var category = await dbContext.MasterMenuCategories.FirstOrDefaultAsync(x => x.Id == id, cancellationToken);
+
+        if (category is null)
+        {
+            return null;
+        }
+
+        category.Name = request.Name.Trim();
+        category.DisplayOrder = request.DisplayOrder;
+        category.IsActive = request.IsActive;
+        await dbContext.SaveChangesAsync(cancellationToken);
+
+        return ToMasterCategoryResponse(category);
+    }
+
+    public async Task<bool> DeleteMasterCategoryAsync(Guid id, CancellationToken cancellationToken = default)
+    {
+        var category = await dbContext.MasterMenuCategories.FirstOrDefaultAsync(x => x.Id == id, cancellationToken);
+
+        if (category is null)
+        {
+            return false;
+        }
+
+        var isInUse =
+            await dbContext.MasterMenuItems.AnyAsync(x => x.MasterCategoryId == id, cancellationToken) ||
+            await dbContext.MenuCategories.AnyAsync(x => x.MasterCategoryId == id, cancellationToken);
+
+        if (isInUse)
+        {
+            throw new InvalidOperationException("This master category is in use. Mark it inactive instead of deleting it.");
+        }
+
+        dbContext.MasterMenuCategories.Remove(category);
+        await dbContext.SaveChangesAsync(cancellationToken);
+
+        return true;
+    }
+
     public async Task<MasterMenuItemResponse> CreateMasterItemAsync(
         CreateMasterMenuItemRequest request,
         CancellationToken cancellationToken = default)
@@ -102,6 +146,58 @@ public sealed class MenuService(RestaurantConnectDbContext dbContext) : IMenuSer
         await dbContext.SaveChangesAsync(cancellationToken);
 
         return ToMasterItemResponse(item);
+    }
+
+    public async Task<MasterMenuItemResponse?> UpdateMasterItemAsync(
+        Guid id,
+        CreateMasterMenuItemRequest request,
+        CancellationToken cancellationToken = default)
+    {
+        var item = await dbContext.MasterMenuItems
+            .Include(x => x.MasterCategory)
+            .FirstOrDefaultAsync(x => x.Id == id, cancellationToken);
+
+        if (item is null)
+        {
+            return null;
+        }
+
+        var category = await dbContext.MasterMenuCategories
+            .FirstOrDefaultAsync(x => x.Id == request.MasterCategoryId, cancellationToken);
+
+        if (category is null)
+        {
+            throw new InvalidOperationException("Master category was not found.");
+        }
+
+        item.MasterCategoryId = category.Id;
+        item.MasterCategory = category;
+        item.Name = request.Name.Trim();
+        item.Description = string.IsNullOrWhiteSpace(request.Description) ? null : request.Description.Trim();
+        item.IsActive = request.IsActive;
+        await dbContext.SaveChangesAsync(cancellationToken);
+
+        return ToMasterItemResponse(item);
+    }
+
+    public async Task<bool> DeleteMasterItemAsync(Guid id, CancellationToken cancellationToken = default)
+    {
+        var item = await dbContext.MasterMenuItems.FirstOrDefaultAsync(x => x.Id == id, cancellationToken);
+
+        if (item is null)
+        {
+            return false;
+        }
+
+        if (await dbContext.MenuItems.AnyAsync(x => x.MasterMenuItemId == id, cancellationToken))
+        {
+            throw new InvalidOperationException("This master item is mapped by restaurants. Mark it inactive instead of deleting it.");
+        }
+
+        dbContext.MasterMenuItems.Remove(item);
+        await dbContext.SaveChangesAsync(cancellationToken);
+
+        return true;
     }
 
     public async Task<MenuCategoryResponse> CreateCategoryAsync(Guid restaurantId, CreateMenuCategoryRequest request, CancellationToken cancellationToken = default)
@@ -228,6 +324,36 @@ public sealed class MenuService(RestaurantConnectDbContext dbContext) : IMenuSer
         return ToItemResponse(item);
     }
 
+    public async Task<MenuItemResponse?> GetItemAsync(Guid id, CancellationToken cancellationToken = default)
+    {
+        var item = await dbContext.MenuItems
+            .AsNoTracking()
+            .Include(x => x.Category)
+            .FirstOrDefaultAsync(x => x.Id == id, cancellationToken);
+
+        return item is null ? null : ToItemResponse(item);
+    }
+
+    public async Task<MenuItemResponse?> UpdateItemAvailabilityAsync(
+        Guid id,
+        bool isAvailable,
+        CancellationToken cancellationToken = default)
+    {
+        var item = await dbContext.MenuItems
+            .Include(x => x.Category)
+            .FirstOrDefaultAsync(x => x.Id == id, cancellationToken);
+
+        if (item is null)
+        {
+            return null;
+        }
+
+        item.IsAvailable = isAvailable;
+        await dbContext.SaveChangesAsync(cancellationToken);
+
+        return ToItemResponse(item);
+    }
+
     public async Task<bool> DeactivateItemAsync(Guid id, CancellationToken cancellationToken = default)
     {
         var item = await dbContext.MenuItems.FirstOrDefaultAsync(x => x.Id == id, cancellationToken);
@@ -239,6 +365,26 @@ public sealed class MenuService(RestaurantConnectDbContext dbContext) : IMenuSer
 
         item.IsActive = false;
         item.IsAvailable = false;
+        await dbContext.SaveChangesAsync(cancellationToken);
+
+        return true;
+    }
+
+    public async Task<bool> DeleteItemAsync(Guid id, CancellationToken cancellationToken = default)
+    {
+        var item = await dbContext.MenuItems.FirstOrDefaultAsync(x => x.Id == id, cancellationToken);
+
+        if (item is null)
+        {
+            return false;
+        }
+
+        if (await dbContext.OrderItems.AnyAsync(x => x.MenuItemId == id, cancellationToken))
+        {
+            throw new InvalidOperationException("This item has order history. Deactivate it instead of deleting it.");
+        }
+
+        dbContext.MenuItems.Remove(item);
         await dbContext.SaveChangesAsync(cancellationToken);
 
         return true;

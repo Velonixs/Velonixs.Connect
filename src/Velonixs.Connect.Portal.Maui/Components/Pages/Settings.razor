@@ -1,0 +1,191 @@
+@page "/settings"
+@using System.ComponentModel.DataAnnotations
+@inject IVelonixsConnectApiClient ApiClient
+@inject NavigationManager Navigation
+@inject IMobileConnectivityService ConnectivityService
+
+<PageTitle>Restaurant Settings</PageTitle>
+
+<section class="page-heading">
+    <div>
+        <p class="eyebrow">Restaurant portal</p>
+        <h1>@(restaurant?.Name ?? "Settings")</h1>
+    </div>
+    <button class="secondary-button" type="button" @onclick="LoadAsync">Refresh</button>
+</section>
+
+<div class="connectivity @ConnectivityClass">@ConnectivityLabel</div>
+
+<ApiErrorAlert Error="error" Title="Settings unavailable" />
+<LoadingPanel IsLoading="isLoading" Message="Loading settings" />
+
+@if (restaurant is not null)
+{
+    <section class="data-section">
+        <div class="section-heading">
+            <h2>Tax settings</h2>
+        </div>
+        @if (!string.IsNullOrWhiteSpace(successMessage))
+        {
+            <div class="success-alert">@successMessage</div>
+        }
+        <EditForm Model="taxForm" OnValidSubmit="SaveTaxAsync" class="form-stack">
+            <DataAnnotationsValidator />
+            <ValidationSummary />
+            <div class="two-column-form">
+                <label>
+                    <span>CGST %</span>
+                    <InputNumber @bind-Value="taxForm.CgstPercent" />
+                </label>
+                <label>
+                    <span>SGST %</span>
+                    <InputNumber @bind-Value="taxForm.SgstPercent" />
+                </label>
+            </div>
+            <button class="primary-button" type="submit" disabled="@(isSubmitting || IsOffline)">
+                @(isSubmitting ? "Saving" : "Save tax settings")
+            </button>
+        </EditForm>
+    </section>
+
+    <section class="data-section">
+        <div class="section-heading">
+            <h2>Availability</h2>
+        </div>
+        <div class="detail-list">
+            <div><span>Status</span><strong>@(restaurant.IsActive ? "Accepting orders" : "Paused")</strong></div>
+            <div><span>WhatsApp Phone ID</span><strong>@restaurant.WhatsAppPhoneNumberId</strong></div>
+        </div>
+        <button class="secondary-button availability-action" type="button" disabled="@IsOffline" @onclick="ToggleAvailabilityAsync">
+            @(restaurant.IsActive ? "Pause ordering" : "Resume ordering")
+        </button>
+    </section>
+}
+
+@code {
+    private readonly TaxForm taxForm = new();
+    private RestaurantResponse? restaurant;
+    private MobileConnectivityStatus connectivityStatus;
+    private bool isLoading;
+    private bool isSubmitting;
+    private string? successMessage;
+    private ApiClientException? error;
+
+    private bool IsOffline => connectivityStatus is MobileConnectivityStatus.Offline or MobileConnectivityStatus.Unknown;
+
+    private string ConnectivityLabel =>
+        connectivityStatus == MobileConnectivityStatus.Online
+            ? "Online"
+            : connectivityStatus == MobileConnectivityStatus.Constrained
+                ? "Limited connection"
+                : "Offline";
+
+    private string ConnectivityClass =>
+        connectivityStatus == MobileConnectivityStatus.Online ? "is-online" : "is-offline";
+
+    protected override async Task OnInitializedAsync()
+    {
+        connectivityStatus = ConnectivityService.CurrentStatus;
+        ConnectivityService.StatusChanged += OnConnectivityChanged;
+        await LoadAsync();
+    }
+
+    private async Task LoadAsync()
+    {
+        isLoading = true;
+        error = null;
+
+        try
+        {
+            var dashboard = await ApiClient.GetRestaurantDashboardAsync();
+            restaurant = dashboard.Restaurant;
+            taxForm.CgstPercent = restaurant.CgstPercent;
+            taxForm.SgstPercent = restaurant.SgstPercent;
+        }
+        catch (ApiClientException exception)
+        {
+            error = exception;
+            RedirectIfUnauthorized(exception);
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private async Task SaveTaxAsync()
+    {
+        if (restaurant is null || IsOffline)
+        {
+            return;
+        }
+
+        isSubmitting = true;
+        error = null;
+        successMessage = null;
+
+        try
+        {
+            restaurant = await ApiClient.UpdateRestaurantTaxSettingsAsync(
+                restaurant.Id,
+                new UpdateRestaurantTaxSettingRequest(taxForm.CgstPercent, taxForm.SgstPercent));
+            successMessage = "Tax settings saved.";
+        }
+        catch (ApiClientException exception)
+        {
+            error = exception;
+            RedirectIfUnauthorized(exception);
+        }
+        finally
+        {
+            isSubmitting = false;
+        }
+    }
+
+    private async Task ToggleAvailabilityAsync()
+    {
+        if (restaurant is null || IsOffline)
+        {
+            return;
+        }
+
+        error = null;
+        successMessage = null;
+
+        try
+        {
+            restaurant = await ApiClient.UpdateRestaurantAvailabilityAsync(
+                restaurant.Id,
+                new UpdateRestaurantAvailabilityRequest(!restaurant.IsActive));
+            successMessage = restaurant.IsActive ? "Ordering resumed." : "Ordering paused.";
+        }
+        catch (ApiClientException exception)
+        {
+            error = exception;
+            RedirectIfUnauthorized(exception);
+        }
+    }
+
+    private void OnConnectivityChanged(object? sender, MobileConnectivityStatus status)
+    {
+        connectivityStatus = status;
+        _ = InvokeAsync(StateHasChanged);
+    }
+
+    private void RedirectIfUnauthorized(ApiClientException exception)
+    {
+        if ((int)exception.StatusCode == 401)
+        {
+            Navigation.NavigateTo("/login");
+        }
+    }
+
+    private sealed class TaxForm
+    {
+        [Range(typeof(decimal), "0", "100")]
+        public decimal CgstPercent { get; set; }
+
+        [Range(typeof(decimal), "0", "100")]
+        public decimal SgstPercent { get; set; }
+    }
+}

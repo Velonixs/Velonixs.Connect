@@ -1,0 +1,274 @@
+@page "/master-catalog"
+@using System.ComponentModel.DataAnnotations
+@inject IVelonixsConnectApiClient ApiClient
+@inject NavigationManager Navigation
+
+<PageTitle>Master Catalog</PageTitle>
+
+<section class="page-heading">
+    <div>
+        <p class="eyebrow">Admin</p>
+        <h1>Master catalog</h1>
+    </div>
+    <button class="secondary-button" type="button" @onclick="LoadAsync">Refresh</button>
+</section>
+
+<ApiErrorAlert Error="error" Title="Master catalog unavailable" />
+<LoadingPanel IsLoading="isLoading" Message="Loading master catalog" />
+
+<section class="split-grid">
+    <div class="data-section">
+        <div class="section-heading">
+            <h2>Categories</h2>
+            <span>@catalog.Categories.Count entries</span>
+        </div>
+        <div class="catalog-list">
+            @foreach (var category in catalog.Categories.OrderBy(x => x.DisplayOrder).ThenBy(x => x.Name))
+            {
+                <article>
+                    <div>
+                        <strong>@category.Name</strong>
+                        <span>Order @category.DisplayOrder - @(category.IsActive ? "Active" : "Inactive")</span>
+                    </div>
+                    <button class="small-action danger" type="button" @onclick="() => DeleteCategoryAsync(category.Id)">Delete</button>
+                </article>
+            }
+        </div>
+
+        <div class="section-heading sub-section-heading">
+            <h2>Items</h2>
+            <span>@catalog.Items.Count entries</span>
+        </div>
+        <div class="catalog-list">
+            @foreach (var item in catalog.Items.OrderBy(x => x.MasterCategoryName).ThenBy(x => x.Name))
+            {
+                <article>
+                    <div>
+                        <strong>@item.Name</strong>
+                        <span>@item.MasterCategoryName - @(item.IsActive ? "Active" : "Inactive")</span>
+                    </div>
+                    <button class="small-action danger" type="button" @onclick="() => DeleteItemAsync(item.Id)">Delete</button>
+                </article>
+            }
+        </div>
+    </div>
+
+    <div class="data-section">
+        <div class="section-heading">
+            <h2>Create category</h2>
+        </div>
+        <EditForm Model="categoryForm" OnValidSubmit="CreateCategoryAsync" class="form-stack">
+            <DataAnnotationsValidator />
+            <ValidationSummary />
+            <label>
+                <span>Name</span>
+                <InputText @bind-Value="categoryForm.Name" />
+            </label>
+            <label>
+                <span>Display order</span>
+                <InputNumber @bind-Value="categoryForm.DisplayOrder" />
+            </label>
+            <label class="checkbox-line">
+                <InputCheckbox @bind-Value="categoryForm.IsActive" />
+                <span>Active</span>
+            </label>
+            <button class="primary-button" type="submit" disabled="@isSubmitting">Create category</button>
+        </EditForm>
+
+        <div class="section-heading sub-section-heading">
+            <h2>Create item</h2>
+        </div>
+        <EditForm Model="itemForm" OnValidSubmit="CreateItemAsync" class="form-stack">
+            <DataAnnotationsValidator />
+            <ValidationSummary />
+            <label>
+                <span>Category</span>
+                <InputSelect @bind-Value="itemForm.MasterCategoryId">
+                    <option value="">Select category</option>
+                    @foreach (var category in catalog.Categories.OrderBy(x => x.DisplayOrder).ThenBy(x => x.Name))
+                    {
+                        <option value="@category.Id">@category.Name</option>
+                    }
+                </InputSelect>
+            </label>
+            <label>
+                <span>Name</span>
+                <InputText @bind-Value="itemForm.Name" />
+            </label>
+            <label>
+                <span>Description</span>
+                <InputTextArea @bind-Value="itemForm.Description" />
+            </label>
+            <label class="checkbox-line">
+                <InputCheckbox @bind-Value="itemForm.IsActive" />
+                <span>Active</span>
+            </label>
+            <button class="primary-button" type="submit" disabled="@isSubmitting">Create item</button>
+        </EditForm>
+    </div>
+</section>
+
+@code {
+    private MasterCatalogResponse catalog = new(Array.Empty<MasterMenuCategoryResponse>(), Array.Empty<MasterMenuItemResponse>());
+    private readonly MasterCategoryForm categoryForm = new();
+    private readonly MasterItemForm itemForm = new();
+    private bool isLoading;
+    private bool isSubmitting;
+    private ApiClientException? error;
+
+    protected override Task OnInitializedAsync() => LoadAsync();
+
+    private async Task LoadAsync()
+    {
+        isLoading = true;
+        error = null;
+
+        try
+        {
+            catalog = await ApiClient.GetMasterCatalogAsync();
+        }
+        catch (ApiClientException exception)
+        {
+            error = exception;
+            RedirectIfUnauthorized(exception);
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private async Task CreateCategoryAsync()
+    {
+        isSubmitting = true;
+        error = null;
+
+        try
+        {
+            await ApiClient.CreateMasterCategoryAsync(new CreateMasterMenuCategoryRequest(
+                categoryForm.Name,
+                categoryForm.DisplayOrder,
+                categoryForm.IsActive));
+            categoryForm.Reset();
+            await LoadAsync();
+        }
+        catch (ApiClientException exception)
+        {
+            error = exception;
+            RedirectIfUnauthorized(exception);
+        }
+        finally
+        {
+            isSubmitting = false;
+        }
+    }
+
+    private async Task CreateItemAsync()
+    {
+        if (itemForm.MasterCategoryId is null)
+        {
+            return;
+        }
+
+        isSubmitting = true;
+        error = null;
+
+        try
+        {
+            await ApiClient.CreateMasterItemAsync(new CreateMasterMenuItemRequest(
+                itemForm.MasterCategoryId.Value,
+                itemForm.Name,
+                itemForm.Description,
+                itemForm.IsActive));
+            itemForm.Reset();
+            await LoadAsync();
+        }
+        catch (ApiClientException exception)
+        {
+            error = exception;
+            RedirectIfUnauthorized(exception);
+        }
+        finally
+        {
+            isSubmitting = false;
+        }
+    }
+
+    private async Task DeleteCategoryAsync(Guid id)
+    {
+        error = null;
+
+        try
+        {
+            await ApiClient.DeleteMasterCategoryAsync(id);
+            await LoadAsync();
+        }
+        catch (ApiClientException exception)
+        {
+            error = exception;
+            RedirectIfUnauthorized(exception);
+        }
+    }
+
+    private async Task DeleteItemAsync(Guid id)
+    {
+        error = null;
+
+        try
+        {
+            await ApiClient.DeleteMasterItemAsync(id);
+            await LoadAsync();
+        }
+        catch (ApiClientException exception)
+        {
+            error = exception;
+            RedirectIfUnauthorized(exception);
+        }
+    }
+
+    private void RedirectIfUnauthorized(ApiClientException exception)
+    {
+        if ((int)exception.StatusCode == 401)
+        {
+            Navigation.NavigateTo("/login");
+        }
+    }
+
+    private sealed class MasterCategoryForm
+    {
+        [Required]
+        public string Name { get; set; } = string.Empty;
+
+        public int DisplayOrder { get; set; }
+
+        public bool IsActive { get; set; } = true;
+
+        public void Reset()
+        {
+            Name = string.Empty;
+            DisplayOrder = 0;
+            IsActive = true;
+        }
+    }
+
+    private sealed class MasterItemForm
+    {
+        [Required]
+        public Guid? MasterCategoryId { get; set; }
+
+        [Required]
+        public string Name { get; set; } = string.Empty;
+
+        public string? Description { get; set; }
+
+        public bool IsActive { get; set; } = true;
+
+        public void Reset()
+        {
+            MasterCategoryId = null;
+            Name = string.Empty;
+            Description = null;
+            IsActive = true;
+        }
+    }
+}

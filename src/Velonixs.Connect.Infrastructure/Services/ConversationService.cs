@@ -15,6 +15,7 @@ public sealed partial class ConversationService(
     RestaurantConnectDbContext dbContext,
     IWhatsAppMessageSender whatsAppMessageSender,
     INotificationService notificationService,
+    IOrderRealtimeNotifier orderRealtimeNotifier,
     MenuSearchService menuSearchService,
     FreeTextOrderParser freeTextOrderParser,
     OrderingCartService cartService,
@@ -1068,6 +1069,17 @@ public sealed partial class ConversationService(
         conversation.IsActive = false;
         conversation.TempOrderJson = null;
         await dbContext.SaveChangesAsync(cancellationToken);
+        await orderRealtimeNotifier.NotifyAsync(
+            new OrderRealtimeEvent(
+                $"{order.Id:N}:created",
+                "created",
+                order.RestaurantId,
+                order.Id,
+                order.OrderNumber,
+                order.OrderStatus,
+                order.TotalAmount,
+                DateTimeOffset.UtcNow),
+            cancellationToken);
 
         try
         {

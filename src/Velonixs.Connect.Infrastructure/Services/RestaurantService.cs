@@ -28,12 +28,18 @@ public sealed class RestaurantService(RestaurantConnectDbContext dbContext) : IR
     {
         ValidateTaxPercent(request.CgstPercent, nameof(request.CgstPercent));
         ValidateTaxPercent(request.SgstPercent, nameof(request.SgstPercent));
+        var whatsAppPhoneNumberId = request.WhatsAppPhoneNumberId.Trim();
+
+        if (await dbContext.Restaurants.AnyAsync(x => x.WhatsAppPhoneNumberId == whatsAppPhoneNumberId, cancellationToken))
+        {
+            throw new InvalidOperationException("Another business already uses this WhatsApp Phone Number ID.");
+        }
 
         var restaurant = new Domain.Entities.Restaurant
         {
             Name = request.Name.Trim(),
             BusinessType = BusinessTypes.Normalize(request.BusinessType),
-            WhatsAppPhoneNumberId = request.WhatsAppPhoneNumberId.Trim(),
+            WhatsAppPhoneNumberId = whatsAppPhoneNumberId,
             BusinessPhone = request.BusinessPhone?.Trim(),
             NotificationEmail = request.NotificationEmail?.Trim(),
             StaffWhatsAppNumber = request.StaffWhatsAppNumber?.Trim(),
@@ -51,6 +57,15 @@ public sealed class RestaurantService(RestaurantConnectDbContext dbContext) : IR
 
     public async Task<RestaurantResponse?> UpdateRestaurantAsync(Guid id, UpdateRestaurantRequest request, CancellationToken cancellationToken = default)
     {
+        var whatsAppPhoneNumberId = request.WhatsAppPhoneNumberId.Trim();
+
+        if (await dbContext.Restaurants.AnyAsync(
+                x => x.Id != id && x.WhatsAppPhoneNumberId == whatsAppPhoneNumberId,
+                cancellationToken))
+        {
+            throw new InvalidOperationException("Another business already uses this WhatsApp Phone Number ID.");
+        }
+
         var restaurant = await dbContext.Restaurants.FirstOrDefaultAsync(x => x.Id == id, cancellationToken);
 
         if (restaurant is null)
@@ -60,7 +75,7 @@ public sealed class RestaurantService(RestaurantConnectDbContext dbContext) : IR
 
         restaurant.Name = request.Name.Trim();
         restaurant.BusinessType = BusinessTypes.Normalize(request.BusinessType);
-        restaurant.WhatsAppPhoneNumberId = request.WhatsAppPhoneNumberId.Trim();
+        restaurant.WhatsAppPhoneNumberId = whatsAppPhoneNumberId;
         restaurant.BusinessPhone = request.BusinessPhone?.Trim();
         restaurant.NotificationEmail = request.NotificationEmail?.Trim();
         restaurant.StaffWhatsAppNumber = request.StaffWhatsAppNumber?.Trim();
@@ -71,6 +86,47 @@ public sealed class RestaurantService(RestaurantConnectDbContext dbContext) : IR
         restaurant.SgstPercent = request.SgstPercent;
         restaurant.IsActive = request.IsActive;
 
+        await dbContext.SaveChangesAsync(cancellationToken);
+
+        return ToResponse(restaurant);
+    }
+
+    public async Task<RestaurantResponse?> UpdateRestaurantTaxSettingAsync(
+        Guid id,
+        decimal cgstPercent,
+        decimal sgstPercent,
+        CancellationToken cancellationToken = default)
+    {
+        ValidateTaxPercent(cgstPercent, nameof(cgstPercent));
+        ValidateTaxPercent(sgstPercent, nameof(sgstPercent));
+
+        var restaurant = await dbContext.Restaurants.FirstOrDefaultAsync(x => x.Id == id, cancellationToken);
+
+        if (restaurant is null)
+        {
+            return null;
+        }
+
+        restaurant.CgstPercent = cgstPercent;
+        restaurant.SgstPercent = sgstPercent;
+        await dbContext.SaveChangesAsync(cancellationToken);
+
+        return ToResponse(restaurant);
+    }
+
+    public async Task<RestaurantResponse?> UpdateRestaurantAvailabilityAsync(
+        Guid id,
+        bool isActive,
+        CancellationToken cancellationToken = default)
+    {
+        var restaurant = await dbContext.Restaurants.FirstOrDefaultAsync(x => x.Id == id, cancellationToken);
+
+        if (restaurant is null)
+        {
+            return null;
+        }
+
+        restaurant.IsActive = isActive;
         await dbContext.SaveChangesAsync(cancellationToken);
 
         return ToResponse(restaurant);

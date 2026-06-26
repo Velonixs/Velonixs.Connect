@@ -2,63 +2,16 @@ using Microsoft.EntityFrameworkCore;
 using Velonixs.Connect.Application.Abstractions;
 using Velonixs.Connect.Application.Models;
 using Velonixs.Connect.Domain.Entities;
+using Velonixs.Connect.Domain.Services;
 using Velonixs.Connect.Persistence.Persistence;
 
 namespace Velonixs.Connect.Infrastructure.Services;
 
 public sealed class OrderService(
     RestaurantConnectDbContext dbContext,
-    INotificationService notificationService) : IOrderService
+    INotificationService notificationService,
+    IOrderRealtimeNotifier orderRealtimeNotifier) : IOrderService
 {
-    private static readonly IReadOnlyDictionary<string, string[]> AllowedTransitions =
-        new Dictionary<string, string[]>(StringComparer.OrdinalIgnoreCase)
-        {
-            [OrderStatuses.PendingConfirmation] =
-            [
-                OrderStatuses.Confirmed,
-                OrderStatuses.Rejected,
-                OrderStatuses.Cancelled
-            ],
-            [OrderStatuses.Confirmed] =
-            [
-                OrderStatuses.Preparing,
-                OrderStatuses.ReadyForPickup,
-                OrderStatuses.OutForDelivery,
-                OrderStatuses.Delivered,
-                OrderStatuses.Cancelled
-            ],
-            [OrderStatuses.Preparing] =
-            [
-                OrderStatuses.ReadyForPickup,
-                OrderStatuses.OutForDelivery,
-                OrderStatuses.Delivered,
-                OrderStatuses.Cancelled
-            ],
-            [OrderStatuses.ReadyForPickup] =
-            [
-                OrderStatuses.Delivered,
-                OrderStatuses.Cancelled
-            ],
-            [OrderStatuses.OutForDelivery] =
-            [
-                OrderStatuses.Delivered,
-                OrderStatuses.Cancelled
-            ],
-            [OrderStatuses.Notified] =
-            [
-                OrderStatuses.Preparing,
-                OrderStatuses.ReadyForPickup,
-                OrderStatuses.OutForDelivery,
-                OrderStatuses.Delivered,
-                OrderStatuses.Cancelled
-            ],
-            [OrderStatuses.Handled] =
-            [
-                OrderStatuses.Delivered,
-                OrderStatuses.Cancelled
-            ]
-        };
-
     public async Task<IReadOnlyCollection<OrderSummaryResponse>> GetRestaurantOrdersAsync(Guid restaurantId, CancellationToken cancellationToken = default)
     {
         return await dbContext.Orders
@@ -115,7 +68,7 @@ public sealed class OrderService(
             return null;
         }
 
-        var newStatus = NormalizeStatus(request.Status);
+        var newStatus = OrderStatusTransitionPolicy.Normalize(request.Status);
         var comment = string.IsNullOrWhiteSpace(request.Comment) ? null : request.Comment.Trim();
         var updatedBy = string.IsNullOrWhiteSpace(request.UpdatedBy) ? "System" : request.UpdatedBy.Trim();
 
@@ -124,7 +77,11 @@ public sealed class OrderService(
             return ToDetailResponse(order, Array.Empty<MessageLogResponse>());
         }
 
-        ValidateStatusUpdate(order, newStatus, comment, request.EstimatedMinutes);
+        OrderStatusTransitionPolicy.ValidateTransition(
+            order.OrderStatus,
+            newStatus,
+            comment,
+            request.EstimatedMinutes);
 
         var previousStatus = order.OrderStatus;
         var alreadyNotified = order.StatusHistory.Any(
@@ -155,6 +112,17 @@ public sealed class OrderService(
 
         var notificationText = BuildCustomerNotification(order, comment);
         await dbContext.SaveChangesAsync(cancellationToken);
+        await orderRealtimeNotifier.NotifyAsync(
+            new OrderRealtimeEvent(
+                $"{order.Id:N}:{newStatus}",
+                "status_changed",
+                order.RestaurantId,
+                order.Id,
+                order.OrderNumber,
+                order.OrderStatus,
+                order.TotalAmount,
+                DateTimeOffset.UtcNow),
+            cancellationToken);
 
         if (!alreadyNotified && notificationText is not null)
         {
@@ -227,41 +195,6 @@ public sealed class OrderService(
                     x.UpdatedAtUtc))
                 .ToArray(),
             messages);
-    }
-
-    private static string NormalizeStatus(string status)
-    {
-        var trimmed = status.Trim();
-        var knownStatus = OrderStatuses.CustomerVisibleStatuses
-            .Concat([OrderStatuses.Notified, OrderStatuses.Handled, OrderStatuses.Failed])
-            .FirstOrDefault(x => string.Equals(x, trimmed, StringComparison.OrdinalIgnoreCase));
-
-        return knownStatus ?? throw new InvalidOperationException($"Unsupported order status '{status}'.");
-    }
-
-    private static void ValidateStatusUpdate(
-        Domain.Entities.Order order,
-        string newStatus,
-        string? comment,
-        int? estimatedMinutes)
-    {
-        if (newStatus == OrderStatuses.Confirmed &&
-            (estimatedMinutes is null or <= 0 or > 1440))
-        {
-            throw new InvalidOperationException("Estimated time is required when confirming an order.");
-        }
-
-        if (newStatus == OrderStatuses.Rejected && string.IsNullOrWhiteSpace(comment))
-        {
-            throw new InvalidOperationException("Rejection reason is required.");
-        }
-
-        if (!AllowedTransitions.TryGetValue(order.OrderStatus, out var allowed) ||
-            !allowed.Contains(newStatus, StringComparer.OrdinalIgnoreCase))
-        {
-            throw new InvalidOperationException(
-                $"Order cannot move from {order.OrderStatus} to {newStatus}.");
-        }
     }
 
     private static string? BuildCustomerNotification(Domain.Entities.Order order, string? comment)

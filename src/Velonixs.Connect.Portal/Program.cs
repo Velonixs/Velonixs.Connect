@@ -1,10 +1,9 @@
 using System.Security.Claims;
 using Microsoft.AspNetCore.Authentication.Cookies;
-using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc.Authorization;
+using Velonixs.Connect.Application.Abstractions;
 using Velonixs.Connect.Application;
 using Velonixs.Connect.Infrastructure;
-using Velonixs.Connect.Persistence.Identity;
 using Velonixs.Connect.Persistence.Persistence;
 using Velonixs.Connect.Shared.Security;
 
@@ -24,13 +23,14 @@ builder.Services
         {
             var userId = context.Principal?.FindFirstValue(ClaimTypes.NameIdentifier);
             var businessClaim = context.Principal?.FindFirstValue(AppClaimTypes.BusinessId);
-            var userManager = context.HttpContext.RequestServices.GetRequiredService<UserManager<ApplicationUser>>();
-            var user = string.IsNullOrWhiteSpace(userId) ? null : await userManager.FindByIdAsync(userId);
+            var accountSessionService = context.HttpContext.RequestServices.GetRequiredService<IAccountSessionService>();
 
-            if (user is null ||
-                !user.IsActive ||
-                user.BusinessId is null ||
-                !string.Equals(user.BusinessId.Value.ToString(), businessClaim, StringComparison.OrdinalIgnoreCase))
+            var session = Guid.TryParse(userId, out var parsedUserId) &&
+                          Guid.TryParse(businessClaim, out var parsedBusinessId)
+                ? await accountSessionService.ValidatePortalSessionAsync(parsedUserId, parsedBusinessId)
+                : null;
+
+            if (session is null)
             {
                 context.RejectPrincipal();
             }

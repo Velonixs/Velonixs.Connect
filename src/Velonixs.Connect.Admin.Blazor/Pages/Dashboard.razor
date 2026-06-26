@@ -1,0 +1,120 @@
+@page "/"
+@inject IVelonixsConnectApiClient ApiClient
+@inject IOrderRealtimeClient RealtimeClient
+@implements IDisposable
+
+<PageTitle>Admin Dashboard</PageTitle>
+
+<section class="page-heading">
+    <div>
+        <p class="eyebrow">Admin dashboard</p>
+        <h1>Platform overview</h1>
+    </div>
+    <button class="secondary-button" type="button" @onclick="LoadAsync">Refresh</button>
+</section>
+
+<ApiErrorAlert Error="error" Title="Dashboard unavailable" />
+<LoadingPanel IsLoading="isLoading" Message="Loading dashboard" />
+
+@if (dashboard is not null)
+{
+    <section class="metric-grid">
+        <MetricTile Label="Restaurants" Value="@dashboard.TotalRestaurants.ToString()" Detail="@($"{dashboard.ActiveRestaurants} active")" />
+        <MetricTile Label="Orders" Value="@dashboard.TotalOrders.ToString()" Detail="All tracked orders" />
+        <MetricTile Label="Revenue" Value="@dashboard.TotalRevenue.ToString("C0")" Detail="Delivered revenue" />
+        <MetricTile Label="Tax" Value="@($"{dashboard.TaxSetting.CgstPercent + dashboard.TaxSetting.SgstPercent:0.##}%")" Detail="CGST + SGST" />
+    </section>
+
+    <section class="data-section">
+        <div class="section-heading">
+            <h2>Restaurants</h2>
+            <span>@dashboard.Restaurants.Count entries</span>
+        </div>
+        <div class="table-wrap">
+            <table>
+                <thead>
+                    <tr>
+                        <th>Name</th>
+                        <th>Status</th>
+                        <th>Menu</th>
+                        <th>Customers</th>
+                        <th>Orders</th>
+                        <th>Revenue</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var item in dashboard.Restaurants.OrderByDescending(x => x.LastOrderAt ?? DateTimeOffset.MinValue))
+                    {
+                        <tr>
+                            <td>@item.Restaurant.Name</td>
+                            <td>@(item.Restaurant.IsActive ? "Active" : "Inactive")</td>
+                            <td>@item.MenuItemCount</td>
+                            <td>@item.CustomerCount</td>
+                            <td>@item.OrderCount</td>
+                            <td>@item.Revenue.ToString("C0")</td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    </section>
+}
+
+@code {
+    private PlatformDashboardResponse? dashboard;
+    private readonly HashSet<Guid> subscribedRestaurants = [];
+    private bool isLoading;
+    private ApiClientException? error;
+
+    protected override Task OnInitializedAsync()
+    {
+        RealtimeClient.OrderChanged += OnOrderChanged;
+        return LoadAsync();
+    }
+
+    private async Task LoadAsync()
+    {
+        isLoading = true;
+        error = null;
+
+        try
+        {
+            dashboard = await ApiClient.GetPlatformDashboardAsync();
+            await SubscribeVisibleRestaurantsAsync();
+        }
+        catch (ApiClientException exception)
+        {
+            error = exception;
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private async Task SubscribeVisibleRestaurantsAsync()
+    {
+        if (dashboard is null)
+        {
+            return;
+        }
+
+        foreach (var restaurantId in dashboard.Restaurants.Select(x => x.Restaurant.Id))
+        {
+            if (subscribedRestaurants.Add(restaurantId))
+            {
+                await RealtimeClient.SubscribeRestaurantAsync(restaurantId);
+            }
+        }
+    }
+
+    private async void OnOrderChanged(object? sender, OrderRealtimeEvent orderEvent)
+    {
+        await InvokeAsync(LoadAsync);
+    }
+
+    public void Dispose()
+    {
+        RealtimeClient.OrderChanged -= OnOrderChanged;
+    }
+}

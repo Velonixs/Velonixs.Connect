@@ -1,0 +1,116 @@
+@page "/"
+@inject IVelonixsConnectApiClient ApiClient
+@inject IOrderRealtimeClient RealtimeClient
+@implements IDisposable
+
+<PageTitle>Restaurant Dashboard</PageTitle>
+
+<section class="page-heading">
+    <div>
+        <p class="eyebrow">Restaurant dashboard</p>
+        <h1>@(dashboard?.Restaurant.Name ?? "Live operations")</h1>
+    </div>
+    <button class="secondary-button" type="button" @onclick="LoadAsync">Refresh</button>
+</section>
+
+<ApiErrorAlert Error="error" Title="Dashboard unavailable" />
+<LoadingPanel IsLoading="isLoading" Message="Loading restaurant dashboard" />
+
+@if (dashboard is not null)
+{
+    <section class="metric-grid">
+        <MetricTile Label="Pending" Value="@dashboard.PendingOrderCount.ToString()" Detail="Orders needing attention" />
+        <MetricTile Label="Today" Value="@dashboard.TodayOrderCount.ToString()" Detail="Orders received" />
+        <MetricTile Label="Revenue" Value="@dashboard.TodayRevenue.ToString("C0")" Detail="Today" />
+        <MetricTile Label="Available" Value="@dashboard.AvailableItemCount.ToString()" Detail="Menu items" />
+    </section>
+
+    <section class="data-grid">
+        <div class="data-section">
+            <div class="section-heading">
+                <h2>Recent orders</h2>
+                <span>@dashboard.RecentOrders.Count entries</span>
+            </div>
+            <div class="table-wrap">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Order</th>
+                            <th>Customer</th>
+                            <th>Status</th>
+                            <th>Total</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var order in dashboard.RecentOrders)
+                        {
+                            <tr>
+                                <td>@order.OrderNumber</td>
+                                <td>@order.CustomerName</td>
+                                <td><OrderStatusBadge Status="@order.OrderStatus" /></td>
+                                <td>@order.TotalAmount.ToString("C0")</td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <div class="data-section">
+            <div class="section-heading">
+                <h2>Recent customers</h2>
+                <span>@dashboard.RecentCustomers.Count entries</span>
+            </div>
+            <div class="compact-list">
+                @foreach (var customer in dashboard.RecentCustomers)
+                {
+                    <div>
+                        <strong>@(string.IsNullOrWhiteSpace(customer.Name) ? customer.PhoneNumber : customer.Name)</strong>
+                        <span>@customer.OrderCount orders</span>
+                    </div>
+                }
+            </div>
+        </div>
+    </section>
+}
+
+@code {
+    private RestaurantDashboardResponse? dashboard;
+    private bool isLoading;
+    private ApiClientException? error;
+
+    protected override Task OnInitializedAsync()
+    {
+        RealtimeClient.OrderChanged += OnOrderChanged;
+        return LoadAsync();
+    }
+
+    private async Task LoadAsync()
+    {
+        isLoading = true;
+        error = null;
+
+        try
+        {
+            dashboard = await ApiClient.GetRestaurantDashboardAsync();
+        }
+        catch (ApiClientException exception)
+        {
+            error = exception;
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private async void OnOrderChanged(object? sender, OrderRealtimeEvent orderEvent)
+    {
+        await InvokeAsync(LoadAsync);
+    }
+
+    public void Dispose()
+    {
+        RealtimeClient.OrderChanged -= OnOrderChanged;
+    }
+}

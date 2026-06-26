@@ -1,0 +1,14 @@
+<section class="vc-metric-tile">
+    <span>@Label</span>
+    <strong>@Value</strong>
+    @if (!string.IsNullOrWhiteSpace(Detail))
+    {
+        <small>@Detail</small>
+    }
+</section>
+
+@code {
+    [Parameter, EditorRequired] public string Label { get; set; } = string.Empty;
+    [Parameter, EditorRequired] public string Value { get; set; } = string.Empty;
+    [Parameter] public string? Detail { get; set; }
+}

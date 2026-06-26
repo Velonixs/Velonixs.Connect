@@ -2,16 +2,15 @@ using System.Security.Claims;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Authorization;
-using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
+using Velonixs.Connect.Application.Abstractions;
+using Velonixs.Connect.Application.Models;
 using Velonixs.Connect.Admin.Models;
-using Velonixs.Connect.Persistence.Identity;
-using Velonixs.Connect.Shared.Security;
 
 namespace Velonixs.Connect.Admin.Controllers;
 
 [AllowAnonymous]
-public sealed class AccountController(UserManager<ApplicationUser> userManager) : Controller
+public sealed class AccountController(IAccountSessionService accountSessionService) : Controller
 {
     [HttpGet("admin/login")]
     public IActionResult Login(string? returnUrl = null)
@@ -28,12 +27,12 @@ public sealed class AccountController(UserManager<ApplicationUser> userManager) 
             return View(model);
         }
 
-        var user = await userManager.FindByEmailAsync(model.Email.Trim());
+        var session = await accountSessionService.AuthenticateAdminAsync(
+            model.Email,
+            model.Password,
+            HttpContext.RequestAborted);
 
-        if (user is null ||
-            !user.IsActive ||
-            !await userManager.CheckPasswordAsync(user, model.Password) ||
-            !await userManager.IsInRoleAsync(user, AppRoles.PlatformAdmin))
+        if (session is null)
         {
             TempData["Error"] = "This account cannot access the Admin Portal.";
             return View(model);
@@ -41,7 +40,7 @@ public sealed class AccountController(UserManager<ApplicationUser> userManager) 
 
         await HttpContext.SignInAsync(
             CookieAuthenticationDefaults.AuthenticationScheme,
-            await BuildPrincipalAsync(user),
+            BuildPrincipal(session),
             new AuthenticationProperties
             {
                 IsPersistent = true,
@@ -63,16 +62,16 @@ public sealed class AccountController(UserManager<ApplicationUser> userManager) 
         return RedirectToAction(nameof(Login));
     }
 
-    private async Task<ClaimsPrincipal> BuildPrincipalAsync(ApplicationUser user)
+    private static ClaimsPrincipal BuildPrincipal(AccountSessionResponse session)
     {
         var claims = new List<Claim>
         {
-            new Claim(ClaimTypes.NameIdentifier, user.Id.ToString()),
-            new Claim(ClaimTypes.Name, string.IsNullOrWhiteSpace(user.DisplayName) ? user.Email ?? string.Empty : user.DisplayName),
-            new Claim(ClaimTypes.Email, user.Email ?? string.Empty)
+            new Claim(ClaimTypes.NameIdentifier, session.UserId.ToString()),
+            new Claim(ClaimTypes.Name, session.DisplayName),
+            new Claim(ClaimTypes.Email, session.Email)
         };
 
-        claims.AddRange((await userManager.GetRolesAsync(user)).Select(role => new Claim(ClaimTypes.Role, role)));
+        claims.AddRange(session.Roles.Select(role => new Claim(ClaimTypes.Role, role)));
         return new ClaimsPrincipal(new ClaimsIdentity(claims, CookieAuthenticationDefaults.AuthenticationScheme));
     }
 }

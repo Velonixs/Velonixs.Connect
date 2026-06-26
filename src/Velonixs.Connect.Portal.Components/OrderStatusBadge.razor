@@ -1,0 +1,17 @@
+<span class="vc-status @CssClass">@Status</span>
+
+@code {
+    [Parameter, EditorRequired] public string Status { get; set; } = string.Empty;
+
+    private string CssClass => Status.ToLowerInvariant() switch
+    {
+        "pending_confirmation" => "is-pending",
+        "confirmed" => "is-confirmed",
+        "preparing" => "is-active",
+        "out_for_delivery" => "is-active",
+        "delivered" => "is-complete",
+        "rejected" => "is-rejected",
+        "cancelled" => "is-rejected",
+        _ => "is-neutral"
+    };
+}

@@ -13,6 +13,7 @@ public sealed class CatalogController(
     ApiBusinessAccessService access) : ControllerBase
 {
     [HttpGet("api/businesses/{businessId:guid}/catalog")]
+    [HttpGet("api/v1/businesses/{businessId:guid}/catalog")]
     public async Task<IActionResult> GetCatalog(Guid businessId, CancellationToken cancellationToken)
     {
         if (!access.CanReadBusiness(businessId))
@@ -25,6 +26,7 @@ public sealed class CatalogController(
     }
 
     [HttpPost("api/businesses/{businessId:guid}/catalog-categories")]
+    [HttpPost("api/v1/businesses/{businessId:guid}/catalog-categories")]
     public async Task<IActionResult> CreateCategory(
         Guid businessId,
         [FromBody] CreateCatalogCategoryRequest request,
@@ -40,6 +42,7 @@ public sealed class CatalogController(
     }
 
     [HttpPost("api/businesses/{businessId:guid}/catalog-products")]
+    [HttpPost("api/v1/businesses/{businessId:guid}/catalog-products")]
     public async Task<IActionResult> CreateProduct(
         Guid businessId,
         [FromBody] CreateCatalogProductRequest request,
@@ -55,6 +58,7 @@ public sealed class CatalogController(
     }
 
     [HttpPut("api/catalog-products/{id:guid}")]
+    [HttpPut("api/v1/catalog-products/{id:guid}")]
     public async Task<IActionResult> UpdateProduct(
         Guid id,
         [FromBody] UpdateCatalogProductRequest request,
@@ -70,6 +74,7 @@ public sealed class CatalogController(
     }
 
     [HttpDelete("api/catalog-products/{id:guid}")]
+    [HttpDelete("api/v1/catalog-products/{id:guid}")]
     public async Task<IActionResult> DeactivateProduct(Guid id, CancellationToken cancellationToken)
     {
         if (!await access.CanManageProductAsync(id, cancellationToken))

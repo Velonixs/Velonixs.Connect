@@ -1,0 +1,214 @@
+@page "/orders/{OrderId:guid}"
+@inject IVelonixsConnectApiClient ApiClient
+@inject NavigationManager Navigation
+@inject IMobileConnectivityService ConnectivityService
+
+<PageTitle>Order Detail</PageTitle>
+
+<section class="page-heading">
+    <div>
+        <p class="eyebrow">Order detail</p>
+        <h1>@(order?.OrderNumber ?? "Order")</h1>
+    </div>
+    <button class="secondary-button" type="button" @onclick="LoadAsync">Refresh</button>
+</section>
+
+<div class="connectivity @ConnectivityClass">@ConnectivityLabel</div>
+
+<ApiErrorAlert Error="error" Title="Order unavailable" />
+<LoadingPanel IsLoading="isLoading" Message="Loading order" />
+
+@if (order is not null)
+{
+    <section class="metric-grid">
+        <MetricTile Label="Status" Value="@order.OrderStatus" Detail="Current state" />
+        <MetricTile Label="Total" Value="@order.TotalAmount.ToString("C0")" Detail="Including taxes" />
+        <MetricTile Label="ETA" Value="@(order.EstimatedMinutes?.ToString() ?? "-")" Detail="Minutes" />
+        <MetricTile Label="Items" Value="@order.Items.Count.ToString()" Detail="Line items" />
+    </section>
+
+    @if (CanConfirm(order))
+    {
+        <section class="data-section">
+            <div class="action-row">
+                <button class="primary-button" type="button" disabled="@IsOffline" @onclick="ConfirmAsync">Confirm order</button>
+                <button class="secondary-button danger" type="button" disabled="@IsOffline" @onclick="RejectAsync">Reject order</button>
+            </div>
+        </section>
+    }
+
+    <section class="data-section">
+        <div class="section-heading">
+            <h2>Items</h2>
+            <OrderStatusBadge Status="@order.OrderStatus" />
+        </div>
+        <div class="mobile-list">
+            @foreach (var item in order.Items)
+            {
+                <article>
+                    <div>
+                        <strong>@item.ItemName</strong>
+                        <span>Qty @item.Quantity</span>
+                    </div>
+                    <div>
+                        <span>@item.UnitPrice.ToString("C0") each</span>
+                        <strong>@item.LineTotal.ToString("C0")</strong>
+                    </div>
+                </article>
+            }
+        </div>
+    </section>
+
+    <section class="data-section">
+        <div class="section-heading">
+            <h2>Customer</h2>
+        </div>
+        <div class="detail-list">
+            <div><span>Name</span><strong>@order.CustomerName</strong></div>
+            <div><span>Phone</span><strong>@order.CustomerPhone</strong></div>
+            <div><span>Address</span><strong>@order.Address</strong></div>
+            <div><span>Source</span><strong>@order.Source</strong></div>
+        </div>
+    </section>
+
+    <section class="data-section">
+        <div class="section-heading">
+            <h2>Status history</h2>
+            <span>@order.StatusHistory.Count entries</span>
+        </div>
+        <div class="compact-list">
+            @foreach (var history in order.StatusHistory.OrderByDescending(x => x.UpdatedAtUtc))
+            {
+                <div>
+                    <strong>@history.NewStatus</strong>
+                    <span>@history.UpdatedAtUtc.ToLocalTime().ToString("dd MMM, HH:mm")</span>
+                </div>
+            }
+        </div>
+    </section>
+
+    <section class="data-section">
+        <div class="section-heading">
+            <h2>Messages</h2>
+            <span>@order.Messages.Count entries</span>
+        </div>
+        <div class="notification-list">
+            @foreach (var message in order.Messages.OrderByDescending(x => x.CreatedAt))
+            {
+                <article>
+                    <div class="notification-meta">
+                        <strong>@message.Direction</strong>
+                        <span>@message.CreatedAt.ToLocalTime().ToString("dd MMM, HH:mm")</span>
+                        <span>@message.Status</span>
+                    </div>
+                    <p>@message.MessageText</p>
+                </article>
+            }
+        </div>
+    </section>
+}
+
+@code {
+    [Parameter] public Guid OrderId { get; set; }
+
+    private OrderDetailResponse? order;
+    private MobileConnectivityStatus connectivityStatus;
+    private bool isLoading;
+    private ApiClientException? error;
+
+    private bool IsOffline => connectivityStatus is MobileConnectivityStatus.Offline or MobileConnectivityStatus.Unknown;
+
+    private string ConnectivityLabel =>
+        connectivityStatus == MobileConnectivityStatus.Online
+            ? "Online"
+            : connectivityStatus == MobileConnectivityStatus.Constrained
+                ? "Limited connection"
+                : "Offline";
+
+    private string ConnectivityClass =>
+        connectivityStatus == MobileConnectivityStatus.Online ? "is-online" : "is-offline";
+
+    protected override async Task OnParametersSetAsync()
+    {
+        connectivityStatus = ConnectivityService.CurrentStatus;
+        ConnectivityService.StatusChanged += OnConnectivityChanged;
+        await LoadAsync();
+    }
+
+    private async Task LoadAsync()
+    {
+        isLoading = true;
+        error = null;
+
+        try
+        {
+            order = await ApiClient.GetOrderAsync(OrderId);
+        }
+        catch (ApiClientException exception)
+        {
+            error = exception;
+            RedirectIfUnauthorized(exception);
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private async Task ConfirmAsync()
+    {
+        if (IsOffline)
+        {
+            return;
+        }
+
+        error = null;
+
+        try
+        {
+            order = await ApiClient.ConfirmOrderAsync(OrderId, new ConfirmOrderRequest(30, "Order confirmed."));
+        }
+        catch (ApiClientException exception)
+        {
+            error = exception;
+            RedirectIfUnauthorized(exception);
+        }
+    }
+
+    private async Task RejectAsync()
+    {
+        if (IsOffline)
+        {
+            return;
+        }
+
+        error = null;
+
+        try
+        {
+            order = await ApiClient.RejectOrderAsync(OrderId, new RejectOrderRequest("Rejected from mobile portal."));
+        }
+        catch (ApiClientException exception)
+        {
+            error = exception;
+            RedirectIfUnauthorized(exception);
+        }
+    }
+
+    private static bool CanConfirm(OrderDetailResponse order) =>
+        string.Equals(order.OrderStatus, "pending_confirmation", StringComparison.OrdinalIgnoreCase);
+
+    private void OnConnectivityChanged(object? sender, MobileConnectivityStatus status)
+    {
+        connectivityStatus = status;
+        _ = InvokeAsync(StateHasChanged);
+    }
+
+    private void RedirectIfUnauthorized(ApiClientException exception)
+    {
+        if ((int)exception.StatusCode == 401)
+        {
+            Navigation.NavigateTo("/login");
+        }
+    }
+}

@@ -1,0 +1,117 @@
+@page "/restaurants/{RestaurantId:guid}"
+@inject IVelonixsConnectApiClient ApiClient
+@inject NavigationManager Navigation
+
+<PageTitle>Restaurant Detail</PageTitle>
+
+<section class="page-heading">
+    <div>
+        <p class="eyebrow">Admin</p>
+        <h1>@(restaurant?.Name ?? "Restaurant")</h1>
+    </div>
+    <button class="secondary-button" type="button" @onclick="LoadAsync">Refresh</button>
+</section>
+
+<ApiErrorAlert Error="error" Title="Restaurant unavailable" />
+<LoadingPanel IsLoading="isLoading" Message="Loading restaurant" />
+
+@if (restaurant is not null)
+{
+    <section class="metric-grid">
+        <MetricTile Label="Menu items" Value="@((menu?.Items.Count ?? 0).ToString())" Detail="Configured items" />
+        <MetricTile Label="Orders" Value="@orders.Count.ToString()" Detail="Recent queue" />
+        <MetricTile Label="Customers" Value="@customers.Count.ToString()" Detail="Known customers" />
+        <MetricTile Label="Staff" Value="@staff.Count.ToString()" Detail="Portal users" />
+    </section>
+
+    <section class="data-grid">
+        <div class="data-section">
+            <div class="section-heading">
+                <h2>Recent orders</h2>
+                <span>@orders.Count entries</span>
+            </div>
+            <div class="table-wrap">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Order</th>
+                            <th>Customer</th>
+                            <th>Status</th>
+                            <th>Total</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var order in orders.OrderByDescending(x => x.CreatedAt).Take(20))
+                        {
+                            <tr>
+                                <td>@order.OrderNumber</td>
+                                <td>@order.CustomerName</td>
+                                <td><OrderStatusBadge Status="@order.OrderStatus" /></td>
+                                <td>@order.TotalAmount.ToString("C0")</td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <div class="data-section">
+            <div class="section-heading">
+                <h2>Configuration</h2>
+            </div>
+            <div class="detail-list">
+                <div><span>WhatsApp Phone ID</span><strong>@restaurant.WhatsAppPhoneNumberId</strong></div>
+                <div><span>Status</span><strong>@(restaurant.IsActive ? "Active" : "Inactive")</strong></div>
+                <div><span>Business phone</span><strong>@(restaurant.BusinessPhone ?? "-")</strong></div>
+                <div><span>Notification email</span><strong>@(restaurant.NotificationEmail ?? "-")</strong></div>
+                <div><span>Staff alert number</span><strong>@(restaurant.StaffWhatsAppNumber ?? "-")</strong></div>
+            </div>
+        </div>
+    </section>
+}
+
+@code {
+    [Parameter] public Guid RestaurantId { get; set; }
+
+    private RestaurantResponse? restaurant;
+    private MenuResponse? menu;
+    private IReadOnlyCollection<OrderSummaryResponse> orders = Array.Empty<OrderSummaryResponse>();
+    private IReadOnlyCollection<CustomerSummaryResponse> customers = Array.Empty<CustomerSummaryResponse>();
+    private IReadOnlyCollection<StaffUserResponse> staff = Array.Empty<StaffUserResponse>();
+    private bool isLoading;
+    private ApiClientException? error;
+
+    protected override Task OnParametersSetAsync() => LoadAsync();
+
+    private async Task LoadAsync()
+    {
+        isLoading = true;
+        error = null;
+
+        try
+        {
+            restaurant = await ApiClient.GetRestaurantAsync(RestaurantId);
+            menu = await ApiClient.GetMenuAsync(RestaurantId);
+            orders = await ApiClient.GetOrdersAsync(RestaurantId);
+            customers = await ApiClient.GetCustomersAsync(RestaurantId, take: 50);
+            staff = await ApiClient.GetStaffAsync(RestaurantId);
+        }
+        catch (ApiClientException exception)
+        {
+            error = exception;
+            RedirectIfUnauthorized(exception);
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private void RedirectIfUnauthorized(ApiClientException exception)
+    {
+        if ((int)exception.StatusCode == 401)
+        {
+            Navigation.NavigateTo("/login");
+        }
+    }
+}

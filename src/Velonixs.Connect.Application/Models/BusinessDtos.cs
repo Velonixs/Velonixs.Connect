@@ -1,3 +1,5 @@
+using System.ComponentModel.DataAnnotations;
+
 namespace Velonixs.Connect.Application.Models;
 
 public sealed record BusinessResponse(
@@ -13,20 +15,30 @@ public sealed record BusinessResponse(
     DateTimeOffset CreatedAt);
 
 public sealed record CreateBusinessRequest(
+    [Required]
     string Name,
     string? BusinessType,
+
+    [Required]
     string WhatsAppPhoneNumberId,
     string? BusinessPhone,
+
+    [EmailAddress]
     string? NotificationEmail,
     string? StaffWhatsAppNumber,
     string? Address,
     bool IsActive = true);
 
 public sealed record UpdateBusinessRequest(
+    [Required]
     string Name,
     string? BusinessType,
+
+    [Required]
     string WhatsAppPhoneNumberId,
     string? BusinessPhone,
+
+    [EmailAddress]
     string? NotificationEmail,
     string? StaffWhatsAppNumber,
     string? Address,

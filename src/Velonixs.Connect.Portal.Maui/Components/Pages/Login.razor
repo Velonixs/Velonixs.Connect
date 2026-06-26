@@ -1,0 +1,70 @@
+@page "/login"
+@using System.ComponentModel.DataAnnotations
+@inject IVelonixsConnectApiClient ApiClient
+@inject NavigationManager Navigation
+
+<PageTitle>Portal Login</PageTitle>
+
+<section class="auth-panel">
+    <img class="auth-logo" src="images/logo.png" alt="Velonixs" />
+    <p class="eyebrow">Staff access</p>
+    <h1>Restaurant portal</h1>
+    <p class="supporting-text">Sign in with a business owner or staff account.</p>
+
+    <ApiErrorAlert Error="error" Title="Sign in failed" />
+
+    <EditForm Model="form" OnValidSubmit="LoginAsync" class="form-stack">
+        <DataAnnotationsValidator />
+        <ValidationSummary />
+
+        <label>
+            <span>Email</span>
+            <InputText @bind-Value="form.Email" type="email" autocomplete="username" />
+        </label>
+
+        <label>
+            <span>Password</span>
+            <InputText @bind-Value="form.Password" type="password" autocomplete="current-password" />
+        </label>
+
+        <button class="primary-button" type="submit" disabled="@isSubmitting">
+            @(isSubmitting ? "Signing in" : "Sign in")
+        </button>
+    </EditForm>
+</section>
+
+@code {
+    private readonly LoginForm form = new();
+    private bool isSubmitting;
+    private ApiClientException? error;
+
+    private async Task LoginAsync()
+    {
+        isSubmitting = true;
+        error = null;
+
+        try
+        {
+            await ApiClient.LoginAsync(new LoginRequest(form.Email, form.Password));
+            Navigation.NavigateTo("/");
+        }
+        catch (ApiClientException exception)
+        {
+            error = exception;
+        }
+        finally
+        {
+            isSubmitting = false;
+        }
+    }
+
+    private sealed class LoginForm
+    {
+        [Required]
+        [EmailAddress]
+        public string Email { get; set; } = string.Empty;
+
+        [Required]
+        public string Password { get; set; } = string.Empty;
+    }
+}

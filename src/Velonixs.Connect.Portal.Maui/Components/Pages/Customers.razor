@@ -1,0 +1,153 @@
+@page "/customers"
+@using System.ComponentModel.DataAnnotations
+@inject IVelonixsConnectApiClient ApiClient
+@inject NavigationManager Navigation
+
+<PageTitle>Customers</PageTitle>
+
+<section class="page-heading">
+    <div>
+        <p class="eyebrow">Restaurant portal</p>
+        <h1>Customers</h1>
+    </div>
+    <button class="secondary-button" type="button" @onclick="LoadAsync">Refresh</button>
+</section>
+
+<ApiErrorAlert Error="error" Title="Customers unavailable" />
+<LoadingPanel IsLoading="isLoading" Message="Loading customers" />
+
+<section class="data-section">
+    <div class="section-heading">
+        <h2>Customer list</h2>
+        <span>@customers.Count entries</span>
+    </div>
+    <div class="mobile-list">
+        @foreach (var customer in customers.OrderByDescending(x => x.LastInteractionAt))
+        {
+            <article>
+                <div>
+                    <strong>@(string.IsNullOrWhiteSpace(customer.Name) ? "Unnamed" : customer.Name)</strong>
+                    <span>@customer.PhoneNumber</span>
+                    <span>@customer.OrderCount orders</span>
+                </div>
+                <div>
+                    <span>@customer.LastInteractionAt.ToLocalTime().ToString("dd MMM, HH:mm")</span>
+                    <button class="small-action" type="button" @onclick="() => Edit(customer)">Edit</button>
+                </div>
+            </article>
+        }
+    </div>
+</section>
+
+<section class="data-section">
+    <div class="section-heading">
+        <h2>Edit customer</h2>
+    </div>
+
+    @if (selectedCustomer is null)
+    {
+        <div class="empty-state">Select a customer to edit their name or address.</div>
+    }
+    else
+    {
+        <EditForm Model="form" OnValidSubmit="SaveAsync" class="form-stack">
+            <DataAnnotationsValidator />
+            <ValidationSummary />
+            <label>
+                <span>Name</span>
+                <InputText @bind-Value="form.Name" />
+            </label>
+            <label>
+                <span>Last address</span>
+                <InputTextArea @bind-Value="form.LastAddress" />
+            </label>
+            <button class="primary-button" type="submit" disabled="@isSubmitting">
+                @(isSubmitting ? "Saving" : "Save customer")
+            </button>
+        </EditForm>
+    }
+</section>
+
+@code {
+    private IReadOnlyCollection<CustomerSummaryResponse> customers = Array.Empty<CustomerSummaryResponse>();
+    private readonly CustomerEditForm form = new();
+    private CustomerSummaryResponse? selectedCustomer;
+    private bool isLoading;
+    private bool isSubmitting;
+    private ApiClientException? error;
+
+    protected override Task OnInitializedAsync() => LoadAsync();
+
+    private async Task LoadAsync()
+    {
+        isLoading = true;
+        error = null;
+
+        try
+        {
+            customers = await ApiClient.GetCustomersAsync(take: 200);
+        }
+        catch (ApiClientException exception)
+        {
+            error = exception;
+            RedirectIfUnauthorized(exception);
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private void Edit(CustomerSummaryResponse customer)
+    {
+        selectedCustomer = customer;
+        form.Name = customer.Name ?? string.Empty;
+        form.LastAddress = customer.LastAddress ?? string.Empty;
+    }
+
+    private async Task SaveAsync()
+    {
+        if (selectedCustomer is null)
+        {
+            return;
+        }
+
+        isSubmitting = true;
+        error = null;
+
+        try
+        {
+            var updated = await ApiClient.UpdateCustomerAsync(
+                selectedCustomer.Id,
+                new UpdateCustomerRequest(form.Name, form.LastAddress));
+            selectedCustomer = updated;
+            await LoadAsync();
+        }
+        catch (ApiClientException exception)
+        {
+            error = exception;
+            RedirectIfUnauthorized(exception);
+        }
+        finally
+        {
+            isSubmitting = false;
+        }
+    }
+
+    private void RedirectIfUnauthorized(ApiClientException exception)
+    {
+        if ((int)exception.StatusCode == 401)
+        {
+            Navigation.NavigateTo("/login");
+        }
+    }
+
+    private sealed class CustomerEditForm
+    {
+        [StringLength(120)]
+        public string? Name { get; set; }
+
+        [StringLength(500)]
+        public string? LastAddress { get; set; }
+    }
+}

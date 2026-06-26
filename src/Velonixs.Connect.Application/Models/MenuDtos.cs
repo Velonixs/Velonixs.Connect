@@ -1,3 +1,5 @@
+using System.ComponentModel.DataAnnotations;
+
 namespace Velonixs.Connect.Application.Models;
 
 public sealed record MenuResponse(
@@ -39,6 +41,7 @@ public sealed record MenuItemResponse(
 }
 
 public sealed record CreateMenuCategoryRequest(
+    [Required]
     string Name,
     int DisplayOrder = 0,
     bool IsActive = true,
@@ -47,9 +50,15 @@ public sealed record CreateMenuCategoryRequest(
 public sealed record CreateMenuItemRequest(
     Guid CategoryId,
     Guid? MasterMenuItemId,
+
+    [Range(1, int.MaxValue)]
     int ItemCode,
+
+    [Required]
     string Name,
     string? Description,
+
+    [Range(typeof(decimal), "0", "999999999")]
     decimal Price,
     bool IsAvailable = true,
     bool IsActive = true);
@@ -57,9 +66,15 @@ public sealed record CreateMenuItemRequest(
 public sealed record UpdateMenuItemRequest(
     Guid CategoryId,
     Guid? MasterMenuItemId,
+
+    [Range(1, int.MaxValue)]
     int ItemCode,
+
+    [Required]
     string Name,
     string? Description,
+
+    [Range(typeof(decimal), "0", "999999999")]
     decimal Price,
     bool IsAvailable,
     bool IsActive);
@@ -83,12 +98,15 @@ public sealed record MasterMenuItemResponse(
     bool IsActive);
 
 public sealed record CreateMasterMenuCategoryRequest(
+    [Required]
     string Name,
     int DisplayOrder = 0,
     bool IsActive = true);
 
 public sealed record CreateMasterMenuItemRequest(
     Guid MasterCategoryId,
+
+    [Required]
     string Name,
     string? Description,
     bool IsActive = true);

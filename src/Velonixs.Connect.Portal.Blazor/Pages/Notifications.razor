@@ -1,0 +1,84 @@
+@page "/notifications"
+@inject IVelonixsConnectApiClient ApiClient
+@inject NavigationManager Navigation
+
+<PageTitle>Notifications</PageTitle>
+
+<section class="page-heading">
+    <div>
+        <p class="eyebrow">Restaurant portal</p>
+        <h1>Notifications</h1>
+    </div>
+    <button class="secondary-button" type="button" @onclick="LoadAsync">Refresh</button>
+</section>
+
+<ApiErrorAlert Error="error" Title="Notifications unavailable" />
+<LoadingPanel IsLoading="isLoading" Message="Loading notifications" />
+
+<section class="data-section">
+    <div class="section-heading">
+        <h2>Recent messages</h2>
+        <span>@notifications.Count entries</span>
+    </div>
+
+    @if (notifications.Count == 0)
+    {
+        <div class="empty-state">No notification messages have been logged yet.</div>
+    }
+    else
+    {
+        <div class="notification-list">
+            @foreach (var notification in notifications.OrderByDescending(x => x.CreatedAt))
+            {
+                <article>
+                    <div class="notification-meta">
+                        <strong>@notification.Direction</strong>
+                        <span>@notification.CreatedAt.ToLocalTime().ToString("dd MMM yyyy, HH:mm")</span>
+                        <span>@notification.Status</span>
+                    </div>
+                    <p>@notification.MessageText</p>
+                    @if (!string.IsNullOrWhiteSpace(notification.WhatsAppMessageId))
+                    {
+                        <small>@notification.WhatsAppMessageId</small>
+                    }
+                </article>
+            }
+        </div>
+    }
+</section>
+
+@code {
+    private IReadOnlyCollection<NotificationLogResponse> notifications = Array.Empty<NotificationLogResponse>();
+    private bool isLoading;
+    private ApiClientException? error;
+
+    protected override Task OnInitializedAsync() => LoadAsync();
+
+    private async Task LoadAsync()
+    {
+        isLoading = true;
+        error = null;
+
+        try
+        {
+            notifications = await ApiClient.GetNotificationsAsync(take: 100);
+        }
+        catch (ApiClientException exception)
+        {
+            error = exception;
+            RedirectIfUnauthorized(exception);
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private void RedirectIfUnauthorized(ApiClientException exception)
+    {
+        if ((int)exception.StatusCode == 401)
+        {
+            Navigation.NavigateTo("/login");
+        }
+    }
+}

@@ -1,3 +1,5 @@
+using System.ComponentModel.DataAnnotations;
+
 namespace Velonixs.Connect.Application.Models;
 
 public sealed record CatalogResponse(
@@ -26,24 +28,37 @@ public sealed record CatalogProductResponse(
     bool IsActive);
 
 public sealed record CreateCatalogCategoryRequest(
+    [Required]
     string Name,
     int DisplayOrder = 0,
     bool IsActive = true);
 
 public sealed record CreateCatalogProductRequest(
     Guid CategoryId,
+
+    [Range(1, int.MaxValue)]
     int ProductCode,
+
+    [Required]
     string Name,
     string? Description,
+
+    [Range(typeof(decimal), "0", "999999999")]
     decimal Price,
     bool IsAvailable = true,
     bool IsActive = true);
 
 public sealed record UpdateCatalogProductRequest(
     Guid CategoryId,
+
+    [Range(1, int.MaxValue)]
     int ProductCode,
+
+    [Required]
     string Name,
     string? Description,
+
+    [Range(typeof(decimal), "0", "999999999")]
     decimal Price,
     bool IsAvailable,
     bool IsActive);

@@ -1,6 +1,7 @@
 using System.Text;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Identity;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.IdentityModel.Tokens;
@@ -81,20 +82,42 @@ public static class DependencyInjection
                     IssuerSigningKey = signingKey,
                     ClockSkew = TimeSpan.FromMinutes(1)
                 };
+                options.Events = new JwtBearerEvents
+                {
+                    OnMessageReceived = context =>
+                    {
+                        var accessToken = context.Request.Query["access_token"].ToString();
+                        if (!string.IsNullOrWhiteSpace(accessToken) &&
+                            context.HttpContext.Request.Path.StartsWithSegments("/hubs/orders"))
+                        {
+                            context.Token = accessToken;
+                        }
+
+                        return Task.CompletedTask;
+                    }
+                };
             });
 
         services.AddAuthorization();
 
         services.AddScoped<IRestaurantService, RestaurantService>();
+        services.AddScoped<IAdminService, AdminService>();
         services.AddScoped<IBusinessService, BusinessService>();
         services.AddScoped<IMenuService, MenuService>();
+        services.AddScoped<IMenuImportService, MenuImportService>();
         services.AddScoped<ICatalogService, CatalogService>();
         services.AddScoped<IOrderService, OrderService>();
+        services.AddScoped<ICustomerService, CustomerService>();
+        services.AddScoped<IDashboardService, DashboardService>();
+        services.AddScoped<IStaffService, StaffService>();
+        services.AddScoped<INotificationQueryService, NotificationQueryService>();
+        services.AddScoped<IAccountSessionService, AccountSessionService>();
         services.AddScoped<MenuSearchService>();
         services.AddScoped<FreeTextOrderParser>();
         services.AddScoped<OrderingCartService>();
         services.AddScoped<IConversationService, ConversationService>();
         services.AddScoped<INotificationService, NotificationService>();
+        services.TryAddScoped<IOrderRealtimeNotifier, NoOpOrderRealtimeNotifier>();
         services.AddScoped<IAuthTokenService, AuthTokenService>();
         services.AddHttpClient<IWhatsAppMessageSender, WhatsAppCloudMessageSender>(client =>
         {

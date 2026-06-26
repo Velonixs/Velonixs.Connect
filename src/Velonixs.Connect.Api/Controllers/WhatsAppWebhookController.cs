@@ -14,6 +14,7 @@ namespace Velonixs.Connect.Api.Controllers;
 [ApiController]
 [AllowAnonymous]
 [Route("api/webhooks/whatsapp")]
+[Route("api/v1/webhooks/whatsapp")]
 public sealed class WhatsAppWebhookController(
     IConversationService conversationService,
     IOptions<WhatsAppOptions> whatsAppOptions,

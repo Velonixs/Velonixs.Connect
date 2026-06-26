@@ -1,0 +1,220 @@
+@page "/restaurants"
+@using System.ComponentModel.DataAnnotations
+@inject IVelonixsConnectApiClient ApiClient
+@inject NavigationManager Navigation
+
+<PageTitle>Restaurants</PageTitle>
+
+<section class="page-heading">
+    <div>
+        <p class="eyebrow">Admin</p>
+        <h1>Restaurants</h1>
+    </div>
+    <button class="secondary-button" type="button" @onclick="LoadAsync">Refresh</button>
+</section>
+
+<ApiErrorAlert Error="error" Title="Restaurants unavailable" />
+<LoadingPanel IsLoading="isLoading" Message="Loading restaurants" />
+
+<section class="split-grid">
+    <div class="data-section">
+        <div class="section-heading">
+            <h2>Restaurant list</h2>
+            <span>@restaurants.Count entries</span>
+        </div>
+
+        <div class="table-wrap">
+            <table>
+                <thead>
+                    <tr>
+                        <th>Name</th>
+                        <th>WhatsApp Phone ID</th>
+                        <th>Status</th>
+                        <th>Tax</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var restaurant in restaurants.OrderBy(x => x.Name))
+                    {
+                        <tr>
+                            <td>@restaurant.Name</td>
+                            <td>@restaurant.WhatsAppPhoneNumberId</td>
+                            <td>@(restaurant.IsActive ? "Active" : "Inactive")</td>
+                            <td>@($"{restaurant.CgstPercent + restaurant.SgstPercent:0.##}%")</td>
+                            <td><a class="inline-link" href="@($"restaurants/{restaurant.Id}")">Open</a></td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <div class="data-section">
+        <div class="section-heading">
+            <h2>Onboard restaurant</h2>
+        </div>
+
+        @if (!string.IsNullOrWhiteSpace(successMessage))
+        {
+            <div class="success-alert">@successMessage</div>
+        }
+
+        <EditForm Model="form" OnValidSubmit="CreateAsync" class="form-stack">
+            <DataAnnotationsValidator />
+            <ValidationSummary />
+
+            <label>
+                <span>Restaurant name</span>
+                <InputText @bind-Value="form.Name" />
+            </label>
+
+            <label>
+                <span>WhatsApp Phone Number ID</span>
+                <InputText @bind-Value="form.WhatsAppPhoneNumberId" />
+            </label>
+
+            <label>
+                <span>Owner name</span>
+                <InputText @bind-Value="form.OwnerName" />
+            </label>
+
+            <label>
+                <span>Owner email</span>
+                <InputText @bind-Value="form.OwnerEmail" type="email" />
+            </label>
+
+            <label>
+                <span>Temporary password</span>
+                <InputText @bind-Value="form.OwnerPassword" type="password" />
+            </label>
+
+            <div class="two-column-form">
+                <label>
+                    <span>CGST %</span>
+                    <InputNumber @bind-Value="form.CgstPercent" />
+                </label>
+                <label>
+                    <span>SGST %</span>
+                    <InputNumber @bind-Value="form.SgstPercent" />
+                </label>
+            </div>
+
+            <button class="primary-button" type="submit" disabled="@isSubmitting">
+                @(isSubmitting ? "Creating" : "Create restaurant")
+            </button>
+        </EditForm>
+    </div>
+</section>
+
+@code {
+    private readonly RestaurantOnboardingForm form = new();
+    private IReadOnlyCollection<RestaurantResponse> restaurants = Array.Empty<RestaurantResponse>();
+    private bool isLoading;
+    private bool isSubmitting;
+    private string? successMessage;
+    private ApiClientException? error;
+
+    protected override Task OnInitializedAsync() => LoadAsync();
+
+    private async Task LoadAsync()
+    {
+        isLoading = true;
+        error = null;
+
+        try
+        {
+            restaurants = await ApiClient.GetRestaurantsAsync();
+        }
+        catch (ApiClientException exception)
+        {
+            error = exception;
+            RedirectIfUnauthorized(exception);
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private async Task CreateAsync()
+    {
+        isSubmitting = true;
+        error = null;
+        successMessage = null;
+
+        try
+        {
+            var result = await ApiClient.OnboardRestaurantAsync(new CreateRestaurantWithOwnerRequest(
+                new CreateRestaurantRequest(
+                    form.Name,
+                    "restaurant",
+                    form.WhatsAppPhoneNumberId,
+                    BusinessPhone: null,
+                    NotificationEmail: null,
+                    StaffWhatsAppNumber: null,
+                    Address: null,
+                    form.CgstPercent,
+                    form.SgstPercent,
+                    IsActive: true),
+                new CreateOwnerUserRequest(form.OwnerName, form.OwnerEmail, form.OwnerPassword)));
+
+            successMessage = $"Created {result.Restaurant?.Name ?? form.Name}.";
+            form.Reset();
+            await LoadAsync();
+        }
+        catch (ApiClientException exception)
+        {
+            error = exception;
+            RedirectIfUnauthorized(exception);
+        }
+        finally
+        {
+            isSubmitting = false;
+        }
+    }
+
+    private void RedirectIfUnauthorized(ApiClientException exception)
+    {
+        if ((int)exception.StatusCode == 401)
+        {
+            Navigation.NavigateTo("/login");
+        }
+    }
+
+    private sealed class RestaurantOnboardingForm
+    {
+        [Required]
+        public string Name { get; set; } = string.Empty;
+
+        [Required]
+        public string WhatsAppPhoneNumberId { get; set; } = string.Empty;
+
+        [Required]
+        public string OwnerName { get; set; } = string.Empty;
+
+        [Required]
+        [EmailAddress]
+        public string OwnerEmail { get; set; } = string.Empty;
+
+        [Required]
+        [MinLength(8)]
+        public string OwnerPassword { get; set; } = string.Empty;
+
+        [Range(0, 100)]
+        public decimal CgstPercent { get; set; }
+
+        [Range(0, 100)]
+        public decimal SgstPercent { get; set; }
+
+        public void Reset()
+        {
+            Name = string.Empty;
+            WhatsAppPhoneNumberId = string.Empty;
+            OwnerName = string.Empty;
+            OwnerEmail = string.Empty;
+            OwnerPassword = string.Empty;
+            CgstPercent = 0;
+            SgstPercent = 0;
+        }
+    }
+}

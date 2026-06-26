@@ -1,7 +1,11 @@
 using Microsoft.AspNetCore.Diagnostics;
 using Microsoft.AspNetCore.Mvc;
+using Velonixs.Connect.Api.Errors;
+using Velonixs.Connect.Api.Hubs;
 using Velonixs.Connect.Application;
+using Velonixs.Connect.Application.Abstractions;
 using Velonixs.Connect.Api.Security;
+using Velonixs.Connect.Contracts.Common;
 using Velonixs.Connect.Infrastructure;
 using Velonixs.Connect.Infrastructure.Configuration;
 using Velonixs.Connect.Persistence.Persistence;
@@ -10,10 +14,16 @@ var builder = WebApplication.CreateBuilder(args);
 
 builder.Services.AddApplication();
 builder.Services.AddInfrastructure(builder.Configuration);
-builder.Services.AddControllers();
-builder.Services.AddProblemDetails();
+builder.Services.AddControllers()
+    .ConfigureApiBehaviorOptions(options =>
+    {
+        options.InvalidModelStateResponseFactory = context =>
+            new BadRequestObjectResult(ApiErrorResponses.Validation(context.HttpContext, context.ModelState));
+    });
 builder.Services.AddHttpContextAccessor();
 builder.Services.AddScoped<ApiBusinessAccessService>();
+builder.Services.AddScoped<IOrderRealtimeNotifier, SignalROrderRealtimeNotifier>();
+builder.Services.AddSignalR();
 builder.Services.AddHealthChecks();
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
@@ -28,7 +38,8 @@ builder.Services.AddCors(options =>
         policy
             .WithOrigins(allowedOrigins)
             .AllowAnyHeader()
-            .AllowAnyMethod();
+            .AllowAnyMethod()
+            .AllowCredentials();
     });
 });
 
@@ -83,20 +94,22 @@ app.UseExceptionHandler(errorApp =>
             statusCode);
 
         context.Response.StatusCode = statusCode;
-        context.Response.ContentType = "application/problem+json";
+        context.Response.ContentType = "application/json";
 
-        var problem = new ProblemDetails
+        var (code, message) = statusCode switch
         {
-            Status = statusCode,
-            Title = statusCode == StatusCodes.Status500InternalServerError
-                ? "An unexpected error occurred."
-                : "The request could not be processed.",
-            Detail = app.Environment.IsDevelopment() ? exception?.Message : null,
-            Instance = context.Request.Path
+            StatusCodes.Status400BadRequest => ("bad_request", "The request could not be processed."),
+            StatusCodes.Status403Forbidden => ("forbidden", "The request is not permitted."),
+            StatusCodes.Status404NotFound => ("not_found", "The requested resource was not found."),
+            _ => ("unexpected_error", "An unexpected error occurred.")
         };
-        problem.Extensions["traceId"] = context.TraceIdentifier;
 
-        await context.Response.WriteAsJsonAsync(problem);
+        var response = new ApiErrorResponse(
+            code,
+            app.Environment.IsDevelopment() && exception is not null ? exception.Message : message,
+            context.TraceIdentifier);
+
+        await context.Response.WriteAsJsonAsync(response);
     });
 });
 
@@ -115,6 +128,10 @@ else
     app.MapControllers();
 }
 
+app.MapHub<OrdersHub>(OrdersHub.Path).RequireAuthorization();
+
 app.MapHealthChecks("/health");
 
 app.Run();
+
+public partial class Program;

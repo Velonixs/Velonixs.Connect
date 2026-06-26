@@ -1,0 +1,213 @@
+@page "/orders"
+@using System.ComponentModel.DataAnnotations
+@inject IVelonixsConnectApiClient ApiClient
+@inject NavigationManager Navigation
+@inject IMobileConnectivityService ConnectivityService
+@inject IMobileAlertSoundService AlertSoundService
+
+<PageTitle>Orders</PageTitle>
+
+<section class="page-heading">
+    <div>
+        <p class="eyebrow">Restaurant portal</p>
+        <h1>Orders</h1>
+    </div>
+    <button class="secondary-button" type="button" @onclick="LoadAsync">Refresh</button>
+</section>
+
+<div class="connectivity @ConnectivityClass">@ConnectivityLabel</div>
+
+<ApiErrorAlert Error="error" Title="Orders unavailable" />
+<LoadingPanel IsLoading="isLoading" Message="Loading orders" />
+
+<section class="data-section">
+    <div class="section-heading">
+        <h2>Order queue</h2>
+        <span>@orders.Count entries</span>
+    </div>
+
+    <div class="mobile-list">
+        @foreach (var order in orders.OrderByDescending(x => x.CreatedAt))
+        {
+            <article>
+                <div>
+                    <a class="inline-link" href="@($"orders/{order.Id}")">@order.OrderNumber</a>
+                    <span>@order.CustomerName</span>
+                    <span>@order.CustomerPhone</span>
+                </div>
+                <div>
+                    <OrderStatusBadge Status="@order.OrderStatus" />
+                    <span>@order.TotalAmount.ToString("C0")</span>
+                    <span>@(order.EstimatedMinutes is null ? "No ETA" : $"{order.EstimatedMinutes} min")</span>
+                </div>
+
+                @if (CanConfirm(order))
+                {
+                    <div class="action-row">
+                        <button class="small-action" type="button" disabled="@IsOffline" @onclick="() => ConfirmAsync(order.Id)">Confirm</button>
+                        <button class="small-action danger" type="button" disabled="@IsOffline" @onclick="() => BeginReject(order)">Reject</button>
+                    </div>
+                }
+            </article>
+        }
+    </div>
+</section>
+
+@if (rejectingOrder is not null)
+{
+    <section class="data-section action-panel">
+        <div class="section-heading">
+            <h2>Reject @rejectingOrder.OrderNumber</h2>
+            <button class="link-button" type="button" @onclick="CancelReject">Cancel</button>
+        </div>
+        <EditForm Model="rejectForm" OnValidSubmit="RejectAsync" class="form-stack">
+            <DataAnnotationsValidator />
+            <ValidationSummary />
+            <label>
+                <span>Reason</span>
+                <InputTextArea @bind-Value="rejectForm.Reason" />
+            </label>
+            <button class="primary-button danger" type="submit" disabled="@(isSubmitting || IsOffline)">
+                @(isSubmitting ? "Rejecting" : "Reject order")
+            </button>
+        </EditForm>
+    </section>
+}
+
+@code {
+    private IReadOnlyCollection<OrderSummaryResponse> orders = Array.Empty<OrderSummaryResponse>();
+    private readonly RejectForm rejectForm = new();
+    private OrderSummaryResponse? rejectingOrder;
+    private MobileConnectivityStatus connectivityStatus;
+    private bool isLoading;
+    private bool isSubmitting;
+    private ApiClientException? error;
+
+    private bool IsOffline => connectivityStatus is MobileConnectivityStatus.Offline or MobileConnectivityStatus.Unknown;
+
+    private string ConnectivityLabel =>
+        connectivityStatus == MobileConnectivityStatus.Online
+            ? "Online"
+            : connectivityStatus == MobileConnectivityStatus.Constrained
+                ? "Limited connection"
+                : "Offline";
+
+    private string ConnectivityClass =>
+        connectivityStatus == MobileConnectivityStatus.Online ? "is-online" : "is-offline";
+
+    protected override async Task OnInitializedAsync()
+    {
+        connectivityStatus = ConnectivityService.CurrentStatus;
+        ConnectivityService.StatusChanged += OnConnectivityChanged;
+        await LoadAsync();
+    }
+
+    private async Task LoadAsync()
+    {
+        isLoading = true;
+        error = null;
+
+        try
+        {
+            orders = await ApiClient.GetOrdersAsync();
+        }
+        catch (ApiClientException exception)
+        {
+            error = exception;
+            RedirectIfUnauthorized(exception);
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private async Task ConfirmAsync(Guid orderId)
+    {
+        if (IsOffline)
+        {
+            return;
+        }
+
+        isSubmitting = true;
+        error = null;
+
+        try
+        {
+            await ApiClient.ConfirmOrderAsync(orderId, new ConfirmOrderRequest(30, "Order confirmed."));
+            await AlertSoundService.PlayNewOrderAsync();
+            await LoadAsync();
+        }
+        catch (ApiClientException exception)
+        {
+            error = exception;
+            RedirectIfUnauthorized(exception);
+        }
+        finally
+        {
+            isSubmitting = false;
+        }
+    }
+
+    private void BeginReject(OrderSummaryResponse order)
+    {
+        rejectingOrder = order;
+        rejectForm.Reason = string.Empty;
+    }
+
+    private void CancelReject()
+    {
+        rejectingOrder = null;
+        rejectForm.Reason = string.Empty;
+    }
+
+    private async Task RejectAsync()
+    {
+        if (rejectingOrder is null || IsOffline)
+        {
+            return;
+        }
+
+        isSubmitting = true;
+        error = null;
+
+        try
+        {
+            await ApiClient.RejectOrderAsync(rejectingOrder.Id, new RejectOrderRequest(rejectForm.Reason));
+            CancelReject();
+            await LoadAsync();
+        }
+        catch (ApiClientException exception)
+        {
+            error = exception;
+            RedirectIfUnauthorized(exception);
+        }
+        finally
+        {
+            isSubmitting = false;
+        }
+    }
+
+    private static bool CanConfirm(OrderSummaryResponse order) =>
+        string.Equals(order.OrderStatus, "pending_confirmation", StringComparison.OrdinalIgnoreCase);
+
+    private void OnConnectivityChanged(object? sender, MobileConnectivityStatus status)
+    {
+        connectivityStatus = status;
+        _ = InvokeAsync(StateHasChanged);
+    }
+
+    private void RedirectIfUnauthorized(ApiClientException exception)
+    {
+        if ((int)exception.StatusCode == 401)
+        {
+            Navigation.NavigateTo("/login");
+        }
+    }
+
+    private sealed class RejectForm
+    {
+        [Required]
+        public string Reason { get; set; } = string.Empty;
+    }
+}

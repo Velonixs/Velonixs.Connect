@@ -17,7 +17,7 @@ public sealed class OrderStatusManagementTests
         await using var dbContext = CreateDbContext();
         var (_, _, order) = await SeedPendingOrderAsync(dbContext);
         var notificationService = new FakeNotificationService();
-        var service = new OrderService(dbContext, notificationService);
+        var service = new OrderService(dbContext, notificationService, new NoOpOrderRealtimeNotifier());
 
         var result = await service.UpdateStatusAsync(
             order.Id,
@@ -41,7 +41,7 @@ public sealed class OrderStatusManagementTests
     {
         await using var dbContext = CreateDbContext();
         var (_, _, order) = await SeedPendingOrderAsync(dbContext);
-        var service = new OrderService(dbContext, new FakeNotificationService());
+        var service = new OrderService(dbContext, new FakeNotificationService(), new NoOpOrderRealtimeNotifier());
 
         await Assert.ThrowsAsync<InvalidOperationException>(() =>
             service.UpdateStatusAsync(
@@ -54,7 +54,7 @@ public sealed class OrderStatusManagementTests
     {
         await using var dbContext = CreateDbContext();
         var (_, _, order) = await SeedPendingOrderAsync(dbContext);
-        var service = new OrderService(dbContext, new FakeNotificationService());
+        var service = new OrderService(dbContext, new FakeNotificationService(), new NoOpOrderRealtimeNotifier());
 
         await Assert.ThrowsAsync<InvalidOperationException>(() =>
             service.UpdateStatusAsync(
@@ -68,7 +68,7 @@ public sealed class OrderStatusManagementTests
         await using var dbContext = CreateDbContext();
         var (_, _, order) = await SeedPendingOrderAsync(dbContext);
         var notificationService = new FakeNotificationService();
-        var service = new OrderService(dbContext, notificationService);
+        var service = new OrderService(dbContext, notificationService, new NoOpOrderRealtimeNotifier());
 
         await service.UpdateStatusAsync(
             order.Id,

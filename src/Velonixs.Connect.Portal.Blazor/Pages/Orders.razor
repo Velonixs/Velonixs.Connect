@@ -1,0 +1,211 @@
+@page "/orders"
+@using System.ComponentModel.DataAnnotations
+@using Velonixs.Connect.Contracts.Orders
+@inject IVelonixsConnectApiClient ApiClient
+@inject IOrderRealtimeClient RealtimeClient
+@inject NavigationManager Navigation
+@implements IDisposable
+
+<PageTitle>Orders</PageTitle>
+
+<section class="page-heading">
+    <div>
+        <p class="eyebrow">Restaurant portal</p>
+        <h1>Orders</h1>
+    </div>
+    <button class="secondary-button" type="button" @onclick="LoadAsync">Refresh</button>
+</section>
+
+<ApiErrorAlert Error="error" Title="Orders unavailable" />
+<LoadingPanel IsLoading="isLoading" Message="Loading orders" />
+
+<section class="data-section">
+    <div class="section-heading">
+        <h2>Order queue</h2>
+        <span>@orders.Count entries</span>
+    </div>
+
+    <div class="table-wrap">
+        <table>
+            <thead>
+                <tr>
+                    <th>Order</th>
+                    <th>Customer</th>
+                    <th>Status</th>
+                    <th>Total</th>
+                    <th>ETA</th>
+                    <th>Action</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var order in orders.OrderByDescending(x => x.CreatedAt))
+                {
+                    <tr>
+                        <td><a class="inline-link" href="@($"orders/{order.Id}")">@order.OrderNumber</a></td>
+                        <td>
+                            <strong>@order.CustomerName</strong>
+                            <span class="subtle-cell">@order.CustomerPhone</span>
+                        </td>
+                        <td><OrderStatusBadge Status="@order.OrderStatus" /></td>
+                        <td>@order.TotalAmount.ToString("C0")</td>
+                        <td>@(order.EstimatedMinutes is null ? "-" : $"{order.EstimatedMinutes} min")</td>
+                        <td>
+                            @if (CanConfirm(order))
+                            {
+                                <button class="small-action" type="button" @onclick="() => ConfirmAsync(order.Id)">Confirm</button>
+                                <button class="small-action danger" type="button" @onclick="() => BeginReject(order)">Reject</button>
+                            }
+                            else
+                            {
+                                <span class="subtle-cell">No action</span>
+                            }
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+</section>
+
+@if (rejectingOrder is not null)
+{
+    <section class="data-section action-panel">
+        <div class="section-heading">
+            <h2>Reject @rejectingOrder.OrderNumber</h2>
+            <button class="link-button" type="button" @onclick="CancelReject">Cancel</button>
+        </div>
+        <EditForm Model="rejectForm" OnValidSubmit="RejectAsync" class="form-stack">
+            <DataAnnotationsValidator />
+            <ValidationSummary />
+            <label>
+                <span>Reason</span>
+                <InputTextArea @bind-Value="rejectForm.Reason" />
+            </label>
+            <button class="primary-button danger" type="submit" disabled="@isSubmitting">
+                @(isSubmitting ? "Rejecting" : "Reject order")
+            </button>
+        </EditForm>
+    </section>
+}
+
+@code {
+    private IReadOnlyCollection<OrderSummaryResponse> orders = Array.Empty<OrderSummaryResponse>();
+    private readonly RejectForm rejectForm = new();
+    private OrderSummaryResponse? rejectingOrder;
+    private bool isLoading;
+    private bool isSubmitting;
+    private ApiClientException? error;
+
+    protected override Task OnInitializedAsync()
+    {
+        RealtimeClient.OrderChanged += OnOrderChanged;
+        return LoadAsync();
+    }
+
+    private async Task LoadAsync()
+    {
+        isLoading = true;
+        error = null;
+
+        try
+        {
+            orders = await ApiClient.GetOrdersAsync();
+        }
+        catch (ApiClientException exception)
+        {
+            error = exception;
+            RedirectIfUnauthorized(exception);
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private async Task ConfirmAsync(Guid orderId)
+    {
+        isSubmitting = true;
+        error = null;
+
+        try
+        {
+            await ApiClient.ConfirmOrderAsync(orderId, new ConfirmOrderRequest(30, "Order confirmed."));
+            await LoadAsync();
+        }
+        catch (ApiClientException exception)
+        {
+            error = exception;
+            RedirectIfUnauthorized(exception);
+        }
+        finally
+        {
+            isSubmitting = false;
+        }
+    }
+
+    private void BeginReject(OrderSummaryResponse order)
+    {
+        rejectingOrder = order;
+        rejectForm.Reason = string.Empty;
+    }
+
+    private void CancelReject()
+    {
+        rejectingOrder = null;
+        rejectForm.Reason = string.Empty;
+    }
+
+    private async Task RejectAsync()
+    {
+        if (rejectingOrder is null)
+        {
+            return;
+        }
+
+        isSubmitting = true;
+        error = null;
+
+        try
+        {
+            await ApiClient.RejectOrderAsync(rejectingOrder.Id, new RejectOrderRequest(rejectForm.Reason));
+            CancelReject();
+            await LoadAsync();
+        }
+        catch (ApiClientException exception)
+        {
+            error = exception;
+            RedirectIfUnauthorized(exception);
+        }
+        finally
+        {
+            isSubmitting = false;
+        }
+    }
+
+    private static bool CanConfirm(OrderSummaryResponse order) =>
+        string.Equals(order.OrderStatus, "pending_confirmation", StringComparison.OrdinalIgnoreCase);
+
+    private void RedirectIfUnauthorized(ApiClientException exception)
+    {
+        if ((int)exception.StatusCode == 401)
+        {
+            Navigation.NavigateTo("/login");
+        }
+    }
+
+    private async void OnOrderChanged(object? sender, OrderRealtimeEvent orderEvent)
+    {
+        await InvokeAsync(LoadAsync);
+    }
+
+    public void Dispose()
+    {
+        RealtimeClient.OrderChanged -= OnOrderChanged;
+    }
+
+    private sealed class RejectForm
+    {
+        [Required]
+        public string Reason { get; set; } = string.Empty;
+    }
+}

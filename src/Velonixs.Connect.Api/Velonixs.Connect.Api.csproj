@@ -19,6 +19,7 @@
     <ProjectReference Include="..\Velonixs.Connect.Application\Velonixs.Connect.Application.csproj" />
     <ProjectReference Include="..\Velonixs.Connect.Infrastructure\Velonixs.Connect.Infrastructure.csproj" />
     <ProjectReference Include="..\Velonixs.Connect.Persistence\Velonixs.Connect.Persistence.csproj" />
+    <ProjectReference Include="..\Velonixs.Connect.Contracts\Velonixs.Connect.Contracts.csproj" />
   </ItemGroup>
 
 </Project>

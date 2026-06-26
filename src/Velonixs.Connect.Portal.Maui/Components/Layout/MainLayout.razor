@@ -1,0 +1,134 @@
+@inherits LayoutComponentBase
+@inject IVelonixsConnectApiClient ApiClient
+@inject IApiTokenStore TokenStore
+@inject IOrderRealtimeClient RealtimeClient
+@inject IMobileAlertSoundService AlertSoundService
+@inject IMobileLocalNotificationService LocalNotificationService
+@inject NavigationManager Navigation
+@implements IAsyncDisposable
+
+<div class="app-shell">
+    @if (!IsLoginRoute())
+    {
+        <header class="mobile-header">
+            <div class="brand-lockup">
+                <img src="images/logo.png" alt="Velonixs" />
+                <div>
+                    <span>Velonixs</span>
+                    <strong>Restaurant Portal</strong>
+                </div>
+            </div>
+            <button type="button" class="link-button" @onclick="LogoutAsync">Sign out</button>
+        </header>
+
+        <nav class="mobile-nav">
+            <NavLink href="" Match="NavLinkMatch.All">Dashboard</NavLink>
+            <NavLink href="orders">Orders</NavLink>
+            <NavLink href="menu">Menu</NavLink>
+            <NavLink href="customers">Customers</NavLink>
+            <NavLink href="staff">Staff</NavLink>
+            <NavLink href="notifications">Messages</NavLink>
+            <NavLink href="settings">Settings</NavLink>
+        </nav>
+    }
+
+    <main class="content">
+        @Body
+    </main>
+</div>
+
+@code {
+    private bool realtimeStarted;
+
+    protected override async Task OnInitializedAsync()
+    {
+        Navigation.LocationChanged += OnLocationChanged;
+        await SyncRealtimeStateAsync();
+    }
+
+    private async Task SyncRealtimeStateAsync()
+    {
+        var tokenState = await GetTokenStateAsync();
+        if (!IsLoginRoute() && tokenState is null)
+        {
+            Navigation.NavigateTo("/login");
+            return;
+        }
+
+        if (IsLoginRoute())
+        {
+            if (realtimeStarted)
+            {
+                await RealtimeClient.StopAsync();
+                RealtimeClient.OrderChanged -= OnOrderChanged;
+                realtimeStarted = false;
+            }
+
+            return;
+        }
+
+        if (!realtimeStarted)
+        {
+            RealtimeClient.OrderChanged += OnOrderChanged;
+
+            try
+            {
+                await RealtimeClient.StartAsync();
+                realtimeStarted = true;
+            }
+            catch
+            {
+                RealtimeClient.OrderChanged -= OnOrderChanged;
+            }
+        }
+    }
+
+    private async Task<ApiClientTokenState?> GetTokenStateAsync()
+    {
+        try
+        {
+            return await TokenStore.GetAsync();
+        }
+        catch
+        {
+            await TokenStore.ClearAsync();
+            return null;
+        }
+    }
+
+    private async Task LogoutAsync()
+    {
+        await RealtimeClient.StopAsync();
+        RealtimeClient.OrderChanged -= OnOrderChanged;
+        realtimeStarted = false;
+        await ApiClient.LogoutAsync();
+        Navigation.NavigateTo("/login", forceLoad: false);
+    }
+
+    private bool IsLoginRoute()
+    {
+        var relative = Navigation.ToBaseRelativePath(Navigation.Uri);
+        return relative.StartsWith("login", StringComparison.OrdinalIgnoreCase);
+    }
+
+    private async void OnOrderChanged(object? sender, OrderRealtimeEvent orderEvent)
+    {
+        await AlertSoundService.PlayNewOrderAsync();
+        await LocalNotificationService.ShowAsync(new MobileNotificationRequest(
+            orderEvent.EventType == "created" ? "New order received" : "Order updated",
+            $"{orderEvent.OrderNumber} is {orderEvent.OrderStatus}.",
+            $"orders/{orderEvent.OrderId}"));
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        Navigation.LocationChanged -= OnLocationChanged;
+        RealtimeClient.OrderChanged -= OnOrderChanged;
+        await RealtimeClient.DisposeAsync();
+    }
+
+    private async void OnLocationChanged(object? sender, Microsoft.AspNetCore.Components.Routing.LocationChangedEventArgs args)
+    {
+        await SyncRealtimeStateAsync();
+    }
+}

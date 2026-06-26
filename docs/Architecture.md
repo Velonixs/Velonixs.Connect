@@ -14,6 +14,7 @@ Customer WhatsApp
 
 ```text
 src/Velonixs.Connect.Api             REST API, WhatsApp webhook, health endpoint
+src/Velonixs.Connect.Contracts       Shared API contracts and cross-client response shapes
 src/Velonixs.Connect.Admin           Platform admin UI
 src/Velonixs.Connect.Portal          Staff operations UI
 src/Velonixs.Connect.Application     Service contracts and DTOs
@@ -33,8 +34,12 @@ src/Velonixs.Connect.Shared          Shared security roles and claim names
 
 ## Pending Architecture Work
 
-- Add shared UI/contracts project if needed
+- Move Admin and Portal workflows to API-backed Blazor applications
+- Extract shared Portal Razor components for web and MAUI reuse
+- Add typed API clients, refresh-token persistence, SignalR order notifications, and MAUI Android packaging
 - Continue generalizing restaurant-specific domain names into business/catalog terminology
+
+See `docs/api-first-migration-plan.md` for the API-first migration assessment, dependency diagram, risks, and phased implementation plan.
 
 ## Business Type Support
 
@@ -42,7 +47,9 @@ The platform now records a business type on the current restaurant/business reco
 
 ## API Compatibility
 
-The API exposes first-class business/catalog endpoints such as `/api/businesses` and `/api/businesses/{id}/catalog` through dedicated application contracts. The original restaurant/menu endpoints remain available for existing local tests and clients while the domain model continues its staged migration.
+The API exposes first-class business/catalog endpoints such as `/api/businesses` and `/api/businesses/{id}/catalog` through dedicated application contracts. Phase 1 adds versioned `/api/v1/...` routes while keeping the original `/api/...` endpoints available for existing local tests, Azure configuration, and WhatsApp webhook compatibility.
+
+Order operations now include `PATCH /api/v1/orders/{id}/status`, `POST /api/v1/orders/{id}/confirm`, and `POST /api/v1/orders/{id}/reject`. Order status-transition validation lives in `Velonixs.Connect.Domain.Services.OrderStatusTransitionPolicy`.
 
 ## Authentication
 

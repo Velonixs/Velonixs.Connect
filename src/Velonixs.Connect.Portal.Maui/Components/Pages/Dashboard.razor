@@ -1,0 +1,109 @@
+@page "/"
+@inject IVelonixsConnectApiClient ApiClient
+@inject NavigationManager Navigation
+@inject IMobileConnectivityService ConnectivityService
+
+<PageTitle>Restaurant Dashboard</PageTitle>
+
+<section class="page-heading">
+    <div>
+        <p class="eyebrow">Mobile portal</p>
+        <h1>@(dashboard?.Restaurant.Name ?? "Live operations")</h1>
+    </div>
+    <button class="secondary-button" type="button" @onclick="LoadAsync">Refresh</button>
+</section>
+
+<div class="connectivity @ConnectivityClass">@ConnectivityLabel</div>
+
+<ApiErrorAlert Error="error" Title="Dashboard unavailable" />
+<LoadingPanel IsLoading="isLoading" Message="Loading restaurant dashboard" />
+
+@if (dashboard is not null)
+{
+    <section class="metric-grid">
+        <MetricTile Label="Pending" Value="@dashboard.PendingOrderCount.ToString()" Detail="Needs attention" />
+        <MetricTile Label="Today" Value="@dashboard.TodayOrderCount.ToString()" Detail="Orders received" />
+        <MetricTile Label="Revenue" Value="@dashboard.TodayRevenue.ToString("C0")" Detail="Today" />
+        <MetricTile Label="Menu" Value="@dashboard.AvailableItemCount.ToString()" Detail="Available items" />
+    </section>
+
+    <section class="data-section">
+        <div class="section-heading">
+            <h2>Recent orders</h2>
+            <span>@dashboard.RecentOrders.Count entries</span>
+        </div>
+        <div class="mobile-list">
+            @foreach (var order in dashboard.RecentOrders)
+            {
+                <article>
+                    <div>
+                        <strong>@order.OrderNumber</strong>
+                        <span>@order.CustomerName</span>
+                    </div>
+                    <div>
+                        <OrderStatusBadge Status="@order.OrderStatus" />
+                        <span>@order.TotalAmount.ToString("C0")</span>
+                    </div>
+                </article>
+            }
+        </div>
+    </section>
+}
+
+@code {
+    private RestaurantDashboardResponse? dashboard;
+    private MobileConnectivityStatus connectivityStatus;
+    private bool isLoading;
+    private ApiClientException? error;
+
+    private string ConnectivityLabel =>
+        connectivityStatus == MobileConnectivityStatus.Online
+            ? "Online"
+            : connectivityStatus == MobileConnectivityStatus.Constrained
+                ? "Limited connection"
+                : "Offline";
+
+    private string ConnectivityClass =>
+        connectivityStatus == MobileConnectivityStatus.Online ? "is-online" : "is-offline";
+
+    protected override async Task OnInitializedAsync()
+    {
+        connectivityStatus = ConnectivityService.CurrentStatus;
+        ConnectivityService.StatusChanged += OnConnectivityChanged;
+        await LoadAsync();
+    }
+
+    private async Task LoadAsync()
+    {
+        isLoading = true;
+        error = null;
+
+        try
+        {
+            dashboard = await ApiClient.GetRestaurantDashboardAsync();
+        }
+        catch (ApiClientException exception)
+        {
+            error = exception;
+            RedirectIfUnauthorized(exception);
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private void OnConnectivityChanged(object? sender, MobileConnectivityStatus status)
+    {
+        connectivityStatus = status;
+        _ = InvokeAsync(StateHasChanged);
+    }
+
+    private void RedirectIfUnauthorized(ApiClientException exception)
+    {
+        if ((int)exception.StatusCode == 401)
+        {
+            Navigation.NavigateTo("/login");
+        }
+    }
+}

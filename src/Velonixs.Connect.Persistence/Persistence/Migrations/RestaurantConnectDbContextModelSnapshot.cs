@@ -153,6 +153,43 @@ namespace Velonixs.Connect.Persistence.Persistence.Migrations
                     b.ToTable("AuthUserToken", (string)null);
                 });
 
+            modelBuilder.Entity("Velonixs.Connect.Persistence.Identity.AuthRefreshToken", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTimeOffset>("CreatedAtUtc")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<DateTimeOffset>("ExpiresAtUtc")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<string>("ReplacedByTokenHash")
+                        .HasMaxLength(128)
+                        .HasColumnType("nvarchar(128)");
+
+                    b.Property<DateTimeOffset?>("RevokedAtUtc")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<string>("TokenHash")
+                        .IsRequired()
+                        .HasMaxLength(128)
+                        .HasColumnType("nvarchar(128)");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("TokenHash")
+                        .IsUnique();
+
+                    b.HasIndex("UserId", "ExpiresAtUtc", "RevokedAtUtc");
+
+                    b.ToTable("AuthRefreshToken", (string)null);
+                });
+
             modelBuilder.Entity("Velonixs.Connect.Domain.Entities.Conversation", b =>
                 {
                     b.Property<Guid>("Id")
@@ -800,6 +837,17 @@ namespace Velonixs.Connect.Persistence.Persistence.Migrations
                         .HasForeignKey("UserId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
+                });
+
+            modelBuilder.Entity("Velonixs.Connect.Persistence.Identity.AuthRefreshToken", b =>
+                {
+                    b.HasOne("Velonixs.Connect.Persistence.Identity.ApplicationUser", "User")
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("User");
                 });
 
             modelBuilder.Entity("Velonixs.Connect.Domain.Entities.Conversation", b =>

@@ -5,11 +5,10 @@
 
 <PageTitle>Portal Login</PageTitle>
 
-<div class="auth-surface">
-    <section class="auth-panel">
+<section class="auth-shell">
+    <div class="card shadow-sm auth-panel p-4">
         <p class="eyebrow">Staff access</p>
-        <h1>Restaurant portal</h1>
-        <p class="supporting-text">Sign in with a business owner or staff account.</p>
+        <h1>Sign in to the business portal</h1>
 
         <ApiErrorAlert Error="error" Title="Sign in failed" />
 
@@ -17,22 +16,22 @@
             <DataAnnotationsValidator />
             <ValidationSummary />
 
-            <label>
-                <span>Email</span>
-                <InputText @bind-Value="form.Email" type="email" autocomplete="username" />
-            </label>
+            <div>
+                <label class="form-label">Email</label>
+                <InputText class="form-control" @bind-Value="form.Email" type="email" autocomplete="username" />
+            </div>
 
-            <label>
-                <span>Password</span>
-                <InputText @bind-Value="form.Password" type="password" autocomplete="current-password" />
-            </label>
+            <div>
+                <label class="form-label">Password</label>
+                <InputText class="form-control" @bind-Value="form.Password" type="password" autocomplete="current-password" />
+            </div>
 
-            <button class="primary-button" type="submit" disabled="@isSubmitting">
+            <button class="btn btn-primary w-100" type="submit" disabled="@isSubmitting">
                 @(isSubmitting ? "Signing in" : "Sign in")
             </button>
         </EditForm>
-    </section>
-</div>
+    </div>
+</section>
 
 @code {
     private readonly LoginForm form = new();

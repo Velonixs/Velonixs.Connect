@@ -5,32 +5,32 @@
 
 <PageTitle>Portal Login</PageTitle>
 
-<section class="auth-panel">
-    <img class="auth-logo" src="images/logo.png" alt="Velonixs" />
-    <p class="eyebrow">Staff access</p>
-    <h1>Restaurant portal</h1>
-    <p class="supporting-text">Sign in with a business owner or staff account.</p>
+<section class="auth-shell">
+    <div class="card shadow-sm auth-panel p-4">
+        <p class="eyebrow">Staff access</p>
+        <h1>Sign in to the business portal</h1>
 
-    <ApiErrorAlert Error="error" Title="Sign in failed" />
+        <ApiErrorAlert Error="error" Title="Sign in failed" />
 
-    <EditForm Model="form" OnValidSubmit="LoginAsync" class="form-stack">
-        <DataAnnotationsValidator />
-        <ValidationSummary />
+        <EditForm Model="form" OnValidSubmit="LoginAsync" class="form-stack">
+            <DataAnnotationsValidator />
+            <ValidationSummary />
 
-        <label>
-            <span>Email</span>
-            <InputText @bind-Value="form.Email" type="email" autocomplete="username" />
-        </label>
+            <div>
+                <label class="form-label">Email</label>
+                <InputText class="form-control" @bind-Value="form.Email" type="email" autocomplete="username" />
+            </div>
 
-        <label>
-            <span>Password</span>
-            <InputText @bind-Value="form.Password" type="password" autocomplete="current-password" />
-        </label>
+            <div>
+                <label class="form-label">Password</label>
+                <InputText class="form-control" @bind-Value="form.Password" type="password" autocomplete="current-password" />
+            </div>
 
-        <button class="primary-button" type="submit" disabled="@isSubmitting">
-            @(isSubmitting ? "Signing in" : "Sign in")
-        </button>
-    </EditForm>
+            <button class="btn btn-primary w-100" type="submit" disabled="@isSubmitting">
+                @(isSubmitting ? "Signing in" : "Sign in")
+            </button>
+        </EditForm>
+    </div>
 </section>
 
 @code {

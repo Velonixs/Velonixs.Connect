@@ -2,14 +2,14 @@
 
 @if (Error is not null)
 {
-    <div class="vc-alert" role="alert">
+    <div class="alert alert-danger" role="alert">
         <div>
             <strong>@Title</strong>
-            <p>@Error.Message</p>
+            <p class="mb-0">@Error.Message</p>
         </div>
         @if (!string.IsNullOrWhiteSpace(Error.Error?.TraceId))
         {
-            <span>Trace @Error.Error.TraceId</span>
+            <small>Trace @Error.Error.TraceId</small>
         }
     </div>
 }

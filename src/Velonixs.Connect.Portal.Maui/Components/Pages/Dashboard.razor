@@ -1,19 +1,24 @@
 @page "/"
 @inject IVelonixsConnectApiClient ApiClient
-@inject NavigationManager Navigation
-@inject IMobileConnectivityService ConnectivityService
+@inject IOrderRealtimeClient RealtimeClient
+@implements IDisposable
 
 <PageTitle>Restaurant Dashboard</PageTitle>
 
 <section class="page-heading">
     <div>
-        <p class="eyebrow">Mobile portal</p>
+        <p class="eyebrow">Live Business</p>
         <h1>@(dashboard?.Restaurant.Name ?? "Live operations")</h1>
     </div>
-    <button class="secondary-button" type="button" @onclick="LoadAsync">Refresh</button>
+    @if (dashboard is not null)
+    {
+        <div class="d-flex flex-wrap align-items-center gap-2 justify-content-lg-end ms-lg-auto">
+            <span class="badge text-bg-light border">Restaurant</span>
+            <span class="badge @(dashboard.Restaurant.IsActive ? "text-bg-success" : "text-bg-secondary")">@(dashboard.Restaurant.IsActive ? "Active" : "Inactive")</span>
+            <button class="btn btn-outline-secondary" type="button" @onclick="LoadAsync">Refresh</button>
+        </div>
+    }
 </section>
-
-<div class="connectivity @ConnectivityClass">@ConnectivityLabel</div>
 
 <ApiErrorAlert Error="error" Title="Dashboard unavailable" />
 <LoadingPanel IsLoading="isLoading" Message="Loading restaurant dashboard" />
@@ -21,56 +26,95 @@
 @if (dashboard is not null)
 {
     <section class="metric-grid">
-        <MetricTile Label="Pending" Value="@dashboard.PendingOrderCount.ToString()" Detail="Needs attention" />
-        <MetricTile Label="Today" Value="@dashboard.TodayOrderCount.ToString()" Detail="Orders received" />
-        <MetricTile Label="Revenue" Value="@dashboard.TodayRevenue.ToString("C0")" Detail="Today" />
-        <MetricTile Label="Menu" Value="@dashboard.AvailableItemCount.ToString()" Detail="Available items" />
+        <MetricTile Label="Pending Orders" Value="@dashboard.PendingOrderCount.ToString()" Detail="Awaiting restaurant confirmation" />
+        <MetricTile Label="Today Orders" Value="@dashboard.TodayOrderCount.ToString()" Detail="Current business day" />
+        <MetricTile Label="Today Revenue" Value="@($"Rs {dashboard.TodayRevenue:0.##}")" Detail="WhatsApp orders" />
+        <MetricTile Label="Available Products" Value="@dashboard.AvailableItemCount.ToString()" Detail="Visible to customers" />
     </section>
 
-    <section class="data-section">
-        <div class="section-heading">
-            <h2>Recent orders</h2>
-            <span>@dashboard.RecentOrders.Count entries</span>
+    <section class="row g-3 mb-4">
+        <div class="col-12 col-md-4">
+            <a class="card module-tile h-100 text-decoration-none" href="menu">
+                <div class="card-body">
+                    <span class="eyebrow">Menu</span>
+                    <h2 class="h4">Price & Stock</h2>
+                    <p class="text-secondary mb-0">Map menu items, update prices, stock, and active status.</p>
+                </div>
+            </a>
         </div>
-        <div class="mobile-list">
-            @foreach (var order in dashboard.RecentOrders)
-            {
-                <article>
-                    <div>
-                        <strong>@order.OrderNumber</strong>
-                        <span>@order.CustomerName</span>
-                    </div>
-                    <div>
-                        <OrderStatusBadge Status="@order.OrderStatus" />
-                        <span>@order.TotalAmount.ToString("C0")</span>
-                    </div>
-                </article>
-            }
+        <div class="col-12 col-md-4">
+            <a class="card module-tile h-100 text-decoration-none" href="customers">
+                <div class="card-body">
+                    <span class="eyebrow">Customers</span>
+                    <h2 class="h4">Customer Records</h2>
+                    <p class="text-secondary mb-0">Review and edit customer names and saved addresses.</p>
+                </div>
+            </a>
+        </div>
+        <div class="col-12 col-md-4">
+            <a class="card module-tile h-100 text-decoration-none" href="staff">
+                <div class="card-body">
+                    <span class="eyebrow">Team</span>
+                    <h2 class="h4">Staff Users</h2>
+                    <p class="text-secondary mb-0">Manage portal users and access for this business.</p>
+                </div>
+            </a>
+        </div>
+    </section>
+
+    @if (dashboard.PendingOrderCount > 0)
+    {
+        <section class="alert alert-warning border-warning shadow-sm new-order-alert" role="alert">
+            <strong>New order alert:</strong> @dashboard.PendingOrderCount order@(dashboard.PendingOrderCount == 1 ? "" : "s") waiting for confirmation.
+            Open the order to confirm or reject it.
+        </section>
+    }
+
+    <section class="card shadow-sm">
+        <div class="card-body">
+            <div class="section-heading">
+                <h2>Orders</h2>
+            </div>
+            <div class="table-responsive stack-mobile">
+                <table class="table table-hover align-middle mb-0 responsive-stack">
+                    <thead>
+                        <tr>
+                            <th>Order</th>
+                            <th>Customer</th>
+                            <th>Status</th>
+                            <th>Total</th>
+                            <th>Time</th>
+                            <th></th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var order in dashboard.RecentOrders)
+                        {
+                            <tr class="@(IsPending(order.OrderStatus) ? "table-warning pending-order-row" : "")">
+                                <td data-label="Order"><strong>@order.OrderNumber</strong><small>@order.Address</small></td>
+                                <td data-label="Customer">@order.CustomerName<small>@order.CustomerPhone</small></td>
+                                <td data-label="Status"><OrderStatusBadge Status="@order.OrderStatus" /></td>
+                                <td data-label="Total">Rs @order.TotalAmount.ToString("0.##")</td>
+                                <td data-label="Time">@order.CreatedAt.ToLocalTime().ToString("dd MMM, hh:mm tt")</td>
+                                <td data-label="" class="text-end"><a class="btn btn-sm btn-primary" href="@($"orders/{order.Id}")">Open</a></td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
         </div>
     </section>
 }
 
 @code {
     private RestaurantDashboardResponse? dashboard;
-    private MobileConnectivityStatus connectivityStatus;
     private bool isLoading;
     private ApiClientException? error;
 
-    private string ConnectivityLabel =>
-        connectivityStatus == MobileConnectivityStatus.Online
-            ? "Online"
-            : connectivityStatus == MobileConnectivityStatus.Constrained
-                ? "Limited connection"
-                : "Offline";
-
-    private string ConnectivityClass =>
-        connectivityStatus == MobileConnectivityStatus.Online ? "is-online" : "is-offline";
-
-    protected override async Task OnInitializedAsync()
+    protected override Task OnInitializedAsync()
     {
-        connectivityStatus = ConnectivityService.CurrentStatus;
-        ConnectivityService.StatusChanged += OnConnectivityChanged;
-        await LoadAsync();
+        RealtimeClient.OrderChanged += OnOrderChanged;
+        return LoadAsync();
     }
 
     private async Task LoadAsync()
@@ -85,7 +129,6 @@
         catch (ApiClientException exception)
         {
             error = exception;
-            RedirectIfUnauthorized(exception);
         }
         finally
         {
@@ -93,17 +136,16 @@
         }
     }
 
-    private void OnConnectivityChanged(object? sender, MobileConnectivityStatus status)
+    private async void OnOrderChanged(object? sender, OrderRealtimeEvent orderEvent)
     {
-        connectivityStatus = status;
-        _ = InvokeAsync(StateHasChanged);
+        await InvokeAsync(LoadAsync);
     }
 
-    private void RedirectIfUnauthorized(ApiClientException exception)
+    private static bool IsPending(string status) =>
+        string.Equals(status, "pending_confirmation", StringComparison.OrdinalIgnoreCase);
+
+    public void Dispose()
     {
-        if ((int)exception.StatusCode == 401)
-        {
-            Navigation.NavigateTo("/login");
-        }
+        RealtimeClient.OrderChanged -= OnOrderChanged;
     }
 }

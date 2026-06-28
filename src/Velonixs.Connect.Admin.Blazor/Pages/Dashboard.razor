@@ -1,16 +1,22 @@
 @page "/"
+@using System.ComponentModel.DataAnnotations
+@using Velonixs.Connect.Contracts.Restaurants
 @inject IVelonixsConnectApiClient ApiClient
 @inject IOrderRealtimeClient RealtimeClient
 @implements IDisposable
 
 <PageTitle>Admin Dashboard</PageTitle>
 
-<section class="page-heading">
+<section class="d-flex flex-column flex-lg-row align-items-lg-end justify-content-between gap-3 mb-4">
     <div>
-        <p class="eyebrow">Admin dashboard</p>
-        <h1>Platform overview</h1>
+        <p class="eyebrow">Admin</p>
+        <h1>Business Operations</h1>
     </div>
-    <button class="secondary-button" type="button" @onclick="LoadAsync">Refresh</button>
+    <div class="d-flex flex-wrap gap-2 justify-content-lg-end ms-lg-auto">
+        <a class="btn btn-outline-success" href="master-catalog">Master catalog</a>
+        <a class="btn btn-success" href="restaurants#create-restaurant">Add business</a>
+        <button class="btn btn-outline-secondary" type="button" @onclick="LoadAsync">Refresh</button>
+    </div>
 </section>
 
 <ApiErrorAlert Error="error" Title="Dashboard unavailable" />
@@ -19,43 +25,83 @@
 @if (dashboard is not null)
 {
     <section class="metric-grid">
-        <MetricTile Label="Restaurants" Value="@dashboard.TotalRestaurants.ToString()" Detail="@($"{dashboard.ActiveRestaurants} active")" />
+        <MetricTile Label="Businesses" Value="@dashboard.TotalRestaurants.ToString()" Detail="@($"{dashboard.ActiveRestaurants} active")" />
         <MetricTile Label="Orders" Value="@dashboard.TotalOrders.ToString()" Detail="All tracked orders" />
-        <MetricTile Label="Revenue" Value="@dashboard.TotalRevenue.ToString("C0")" Detail="Delivered revenue" />
-        <MetricTile Label="Tax" Value="@($"{dashboard.TaxSetting.CgstPercent + dashboard.TaxSetting.SgstPercent:0.##}%")" Detail="CGST + SGST" />
+        <MetricTile Label="Revenue" Value="@($"Rs {dashboard.TotalRevenue:0.##}")" Detail="Recorded orders" />
+        <MetricTile Label="Master Catalog" Value="Open" Detail="Manage shared categories and items" />
     </section>
 
-    <section class="data-section">
-        <div class="section-heading">
-            <h2>Restaurants</h2>
-            <span>@dashboard.Restaurants.Count entries</span>
+    <section class="card shadow-sm mb-4">
+        <div class="card-body">
+            <div class="section-heading">
+                <div>
+                    <h2>Master GST Defaults</h2>
+                    <p class="text-secondary mb-0">These defaults are applied when creating a new restaurant. Each restaurant can override them in the portal.</p>
+                </div>
+            </div>
+            @if (!string.IsNullOrWhiteSpace(successMessage))
+            {
+                <div class="success-alert">@successMessage</div>
+            }
+            <EditForm Model="taxForm" OnValidSubmit="SaveTaxAsync" class="row g-3 align-items-end">
+                <DataAnnotationsValidator />
+                <ValidationSummary />
+                <div class="col-12 col-md-3">
+                    <label class="form-label">CGST %</label>
+                    <InputNumber class="form-control" @bind-Value="taxForm.CgstPercent" />
+                </div>
+                <div class="col-12 col-md-3">
+                    <label class="form-label">SGST %</label>
+                    <InputNumber class="form-control" @bind-Value="taxForm.SgstPercent" />
+                </div>
+                <div class="col-12 col-md-auto">
+                    <button class="btn btn-success" type="submit" disabled="@isSubmitting">Save GST defaults</button>
+                </div>
+            </EditForm>
         </div>
-        <div class="table-wrap">
-            <table>
+    </section>
+
+    <section class="card shadow-sm mb-4">
+        <div class="card-body">
+        <div class="section-heading">
+            <h2>Businesses</h2>
+        </div>
+        <div class="table-responsive stack-mobile">
+            <table class="table table-hover align-middle mb-0 responsive-stack">
                 <thead>
                     <tr>
                         <th>Name</th>
+                        <th>Type</th>
+                        <th>WhatsApp phone id</th>
                         <th>Status</th>
                         <th>Menu</th>
                         <th>Customers</th>
                         <th>Orders</th>
                         <th>Revenue</th>
+                        <th></th>
                     </tr>
                 </thead>
                 <tbody>
                     @foreach (var item in dashboard.Restaurants.OrderByDescending(x => x.LastOrderAt ?? DateTimeOffset.MinValue))
                     {
                         <tr>
-                            <td>@item.Restaurant.Name</td>
-                            <td>@(item.Restaurant.IsActive ? "Active" : "Inactive")</td>
-                            <td>@item.MenuItemCount</td>
-                            <td>@item.CustomerCount</td>
-                            <td>@item.OrderCount</td>
-                            <td>@item.Revenue.ToString("C0")</td>
+                            <td data-label="Name">
+                                <strong>@item.Restaurant.Name</strong>
+                                <small>@item.Restaurant.BusinessPhone</small>
+                            </td>
+                            <td data-label="Type">@item.Restaurant.BusinessType</td>
+                            <td data-label="WhatsApp ID"><code>@item.Restaurant.WhatsAppPhoneNumberId</code></td>
+                            <td data-label="Status"><span class="pill @(item.Restaurant.IsActive ? "good" : "muted")">@(item.Restaurant.IsActive ? "Active" : "Inactive")</span></td>
+                            <td data-label="Catalog">@item.MenuItemCount</td>
+                            <td data-label="Customers">@item.CustomerCount</td>
+                            <td data-label="Orders">@item.OrderCount</td>
+                            <td data-label="Revenue">Rs @item.Revenue.ToString("0.##")</td>
+                            <td data-label="" class="text-end"><a class="btn btn-sm btn-success" href="@($"restaurants/{item.Restaurant.Id}")">Manage</a></td>
                         </tr>
                     }
                 </tbody>
             </table>
+        </div>
         </div>
     </section>
 }
@@ -63,7 +109,10 @@
 @code {
     private PlatformDashboardResponse? dashboard;
     private readonly HashSet<Guid> subscribedRestaurants = [];
+    private readonly TaxForm taxForm = new();
     private bool isLoading;
+    private bool isSubmitting;
+    private string? successMessage;
     private ApiClientException? error;
 
     protected override Task OnInitializedAsync()
@@ -80,6 +129,8 @@
         try
         {
             dashboard = await ApiClient.GetPlatformDashboardAsync();
+            taxForm.CgstPercent = dashboard.TaxSetting.CgstPercent;
+            taxForm.SgstPercent = dashboard.TaxSetting.SgstPercent;
             await SubscribeVisibleRestaurantsAsync();
         }
         catch (ApiClientException exception)
@@ -108,6 +159,30 @@
         }
     }
 
+    private async Task SaveTaxAsync()
+    {
+        isSubmitting = true;
+        error = null;
+        successMessage = null;
+
+        try
+        {
+            await ApiClient.UpdatePlatformTaxSettingsAsync(new UpdateRestaurantTaxSettingRequest(
+                taxForm.CgstPercent,
+                taxForm.SgstPercent));
+            successMessage = "GST defaults saved.";
+            await LoadAsync();
+        }
+        catch (ApiClientException exception)
+        {
+            error = exception;
+        }
+        finally
+        {
+            isSubmitting = false;
+        }
+    }
+
     private async void OnOrderChanged(object? sender, OrderRealtimeEvent orderEvent)
     {
         await InvokeAsync(LoadAsync);
@@ -116,5 +191,14 @@
     public void Dispose()
     {
         RealtimeClient.OrderChanged -= OnOrderChanged;
+    }
+
+    private sealed class TaxForm
+    {
+        [Range(typeof(decimal), "0", "100")]
+        public decimal CgstPercent { get; set; }
+
+        [Range(typeof(decimal), "0", "100")]
+        public decimal SgstPercent { get; set; }
     }
 }

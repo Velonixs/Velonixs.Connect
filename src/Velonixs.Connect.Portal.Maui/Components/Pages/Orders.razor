@@ -1,76 +1,99 @@
 @page "/orders"
 @using System.ComponentModel.DataAnnotations
+@using Velonixs.Connect.Contracts.Orders
 @inject IVelonixsConnectApiClient ApiClient
+@inject IOrderRealtimeClient RealtimeClient
 @inject NavigationManager Navigation
-@inject IMobileConnectivityService ConnectivityService
-@inject IMobileAlertSoundService AlertSoundService
+@implements IDisposable
 
 <PageTitle>Orders</PageTitle>
 
-<section class="page-heading">
+<section class="d-flex flex-column flex-lg-row align-items-lg-center justify-content-between gap-3 mb-4">
     <div>
-        <p class="eyebrow">Restaurant portal</p>
+        <p class="eyebrow">Restaurant Portal</p>
         <h1>Orders</h1>
+        <p class="text-secondary mb-0">Review live WhatsApp orders and confirm or reject pending requests.</p>
     </div>
-    <button class="secondary-button" type="button" @onclick="LoadAsync">Refresh</button>
+    <div class="d-flex flex-wrap gap-2 justify-content-lg-end ms-lg-auto">
+        <a class="btn btn-outline-primary" href="/">Back to dashboard</a>
+        <button class="btn btn-outline-secondary" type="button" @onclick="LoadAsync">Refresh</button>
+    </div>
 </section>
-
-<div class="connectivity @ConnectivityClass">@ConnectivityLabel</div>
 
 <ApiErrorAlert Error="error" Title="Orders unavailable" />
 <LoadingPanel IsLoading="isLoading" Message="Loading orders" />
 
-<section class="data-section">
+<section class="card shadow-sm">
+    <div class="card-body">
     <div class="section-heading">
         <h2>Order queue</h2>
-        <span>@orders.Count entries</span>
     </div>
 
-    <div class="mobile-list">
-        @foreach (var order in orders.OrderByDescending(x => x.CreatedAt))
-        {
-            <article>
-                <div>
-                    <a class="inline-link" href="@($"orders/{order.Id}")">@order.OrderNumber</a>
-                    <span>@order.CustomerName</span>
-                    <span>@order.CustomerPhone</span>
-                </div>
-                <div>
-                    <OrderStatusBadge Status="@order.OrderStatus" />
-                    <span>@order.TotalAmount.ToString("C0")</span>
-                    <span>@(order.EstimatedMinutes is null ? "No ETA" : $"{order.EstimatedMinutes} min")</span>
-                </div>
-
-                @if (CanConfirm(order))
+    <div class="table-responsive stack-mobile">
+        <table class="table table-hover align-middle mb-0 responsive-stack">
+            <thead>
+                <tr>
+                    <th>Order</th>
+                    <th>Customer</th>
+                    <th>Status</th>
+                    <th>Total</th>
+                    <th>ETA</th>
+                    <th>Action</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var order in orders.OrderByDescending(x => x.CreatedAt))
                 {
-                    <div class="action-row">
-                        <button class="small-action" type="button" disabled="@IsOffline" @onclick="() => ConfirmAsync(order.Id)">Confirm</button>
-                        <button class="small-action danger" type="button" disabled="@IsOffline" @onclick="() => BeginReject(order)">Reject</button>
-                    </div>
+                    <tr>
+                        <td data-label="Order"><a class="inline-link" href="@($"orders/{order.Id}")">@order.OrderNumber</a><small>@order.Address</small></td>
+                        <td data-label="Customer">
+                            <strong>@order.CustomerName</strong>
+                            <span class="subtle-cell">@order.CustomerPhone</span>
+                        </td>
+                        <td data-label="Status"><OrderStatusBadge Status="@order.OrderStatus" /></td>
+                        <td data-label="Total">Rs @order.TotalAmount.ToString("0.##")</td>
+                        <td data-label="ETA">@(order.EstimatedMinutes is null ? "-" : $"{order.EstimatedMinutes} min")</td>
+                        <td data-label="">
+                            @if (CanConfirm(order))
+                            {
+                                <button class="btn btn-sm btn-primary" type="button" @onclick="() => ConfirmAsync(order.Id)">Confirm</button>
+                                <button class="btn btn-sm btn-outline-danger" type="button" @onclick="() => BeginReject(order)">Reject</button>
+                            }
+                            else
+                            {
+                                <span class="subtle-cell">No action</span>
+                            }
+                        </td>
+                    </tr>
                 }
-            </article>
-        }
+            </tbody>
+        </table>
+    </div>
     </div>
 </section>
 
 @if (rejectingOrder is not null)
 {
-    <section class="data-section action-panel">
+    <section class="card shadow-sm mt-4 action-panel">
+        <div class="card-body">
         <div class="section-heading">
             <h2>Reject @rejectingOrder.OrderNumber</h2>
-            <button class="link-button" type="button" @onclick="CancelReject">Cancel</button>
+            <button class="btn btn-outline-secondary" type="button" @onclick="CancelReject">Cancel</button>
         </div>
-        <EditForm Model="rejectForm" OnValidSubmit="RejectAsync" class="form-stack">
+        <EditForm Model="rejectForm" OnValidSubmit="RejectAsync" class="row g-3">
             <DataAnnotationsValidator />
             <ValidationSummary />
-            <label>
-                <span>Reason</span>
-                <InputTextArea @bind-Value="rejectForm.Reason" />
-            </label>
-            <button class="primary-button danger" type="submit" disabled="@(isSubmitting || IsOffline)">
-                @(isSubmitting ? "Rejecting" : "Reject order")
-            </button>
+            <div class="col-12">
+                <label class="form-label">Reason</label>
+                <InputTextArea class="form-control" @bind-Value="rejectForm.Reason" />
+            </div>
+            <div class="col-12">
+                <button class="btn btn-outline-danger" type="submit" disabled="@isSubmitting">
+                    @(isSubmitting ? "Rejecting" : "Reject order")
+                </button>
+            </div>
         </EditForm>
+        </div>
     </section>
 }
 
@@ -78,28 +101,14 @@
     private IReadOnlyCollection<OrderSummaryResponse> orders = Array.Empty<OrderSummaryResponse>();
     private readonly RejectForm rejectForm = new();
     private OrderSummaryResponse? rejectingOrder;
-    private MobileConnectivityStatus connectivityStatus;
     private bool isLoading;
     private bool isSubmitting;
     private ApiClientException? error;
 
-    private bool IsOffline => connectivityStatus is MobileConnectivityStatus.Offline or MobileConnectivityStatus.Unknown;
-
-    private string ConnectivityLabel =>
-        connectivityStatus == MobileConnectivityStatus.Online
-            ? "Online"
-            : connectivityStatus == MobileConnectivityStatus.Constrained
-                ? "Limited connection"
-                : "Offline";
-
-    private string ConnectivityClass =>
-        connectivityStatus == MobileConnectivityStatus.Online ? "is-online" : "is-offline";
-
-    protected override async Task OnInitializedAsync()
+    protected override Task OnInitializedAsync()
     {
-        connectivityStatus = ConnectivityService.CurrentStatus;
-        ConnectivityService.StatusChanged += OnConnectivityChanged;
-        await LoadAsync();
+        RealtimeClient.OrderChanged += OnOrderChanged;
+        return LoadAsync();
     }
 
     private async Task LoadAsync()
@@ -124,18 +133,12 @@
 
     private async Task ConfirmAsync(Guid orderId)
     {
-        if (IsOffline)
-        {
-            return;
-        }
-
         isSubmitting = true;
         error = null;
 
         try
         {
             await ApiClient.ConfirmOrderAsync(orderId, new ConfirmOrderRequest(30, "Order confirmed."));
-            await AlertSoundService.PlayNewOrderAsync();
             await LoadAsync();
         }
         catch (ApiClientException exception)
@@ -163,7 +166,7 @@
 
     private async Task RejectAsync()
     {
-        if (rejectingOrder is null || IsOffline)
+        if (rejectingOrder is null)
         {
             return;
         }
@@ -191,18 +194,22 @@
     private static bool CanConfirm(OrderSummaryResponse order) =>
         string.Equals(order.OrderStatus, "pending_confirmation", StringComparison.OrdinalIgnoreCase);
 
-    private void OnConnectivityChanged(object? sender, MobileConnectivityStatus status)
-    {
-        connectivityStatus = status;
-        _ = InvokeAsync(StateHasChanged);
-    }
-
     private void RedirectIfUnauthorized(ApiClientException exception)
     {
         if ((int)exception.StatusCode == 401)
         {
             Navigation.NavigateTo("/login");
         }
+    }
+
+    private async void OnOrderChanged(object? sender, OrderRealtimeEvent orderEvent)
+    {
+        await InvokeAsync(LoadAsync);
+    }
+
+    public void Dispose()
+    {
+        RealtimeClient.OrderChanged -= OnOrderChanged;
     }
 
     private sealed class RejectForm

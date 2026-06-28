@@ -7,10 +7,17 @@
 
 <section class="page-heading">
     <div>
-        <p class="eyebrow">Restaurant dashboard</p>
+        <p class="eyebrow">Live Business</p>
         <h1>@(dashboard?.Restaurant.Name ?? "Live operations")</h1>
     </div>
-    <button class="secondary-button" type="button" @onclick="LoadAsync">Refresh</button>
+    @if (dashboard is not null)
+    {
+        <div class="d-flex flex-wrap align-items-center gap-2 justify-content-lg-end ms-lg-auto">
+            <span class="badge text-bg-light border">Restaurant</span>
+            <span class="badge @(dashboard.Restaurant.IsActive ? "text-bg-success" : "text-bg-secondary")">@(dashboard.Restaurant.IsActive ? "Active" : "Inactive")</span>
+            <button class="btn btn-outline-secondary" type="button" @onclick="LoadAsync">Refresh</button>
+        </div>
+    }
 </section>
 
 <ApiErrorAlert Error="error" Title="Dashboard unavailable" />
@@ -19,56 +26,81 @@
 @if (dashboard is not null)
 {
     <section class="metric-grid">
-        <MetricTile Label="Pending" Value="@dashboard.PendingOrderCount.ToString()" Detail="Orders needing attention" />
-        <MetricTile Label="Today" Value="@dashboard.TodayOrderCount.ToString()" Detail="Orders received" />
-        <MetricTile Label="Revenue" Value="@dashboard.TodayRevenue.ToString("C0")" Detail="Today" />
-        <MetricTile Label="Available" Value="@dashboard.AvailableItemCount.ToString()" Detail="Menu items" />
+        <MetricTile Label="Pending Orders" Value="@dashboard.PendingOrderCount.ToString()" Detail="Awaiting restaurant confirmation" />
+        <MetricTile Label="Today Orders" Value="@dashboard.TodayOrderCount.ToString()" Detail="Current business day" />
+        <MetricTile Label="Today Revenue" Value="@($"Rs {dashboard.TodayRevenue:0.##}")" Detail="WhatsApp orders" />
+        <MetricTile Label="Available Products" Value="@dashboard.AvailableItemCount.ToString()" Detail="Visible to customers" />
     </section>
 
-    <section class="data-grid">
-        <div class="data-section">
+    <section class="row g-3 mb-4">
+        <div class="col-12 col-md-4">
+            <a class="card module-tile h-100 text-decoration-none" href="menu">
+                <div class="card-body">
+                    <span class="eyebrow">Menu</span>
+                    <h2 class="h4">Price & Stock</h2>
+                    <p class="text-secondary mb-0">Map menu items, update prices, stock, and active status.</p>
+                </div>
+            </a>
+        </div>
+        <div class="col-12 col-md-4">
+            <a class="card module-tile h-100 text-decoration-none" href="customers">
+                <div class="card-body">
+                    <span class="eyebrow">Customers</span>
+                    <h2 class="h4">Customer Records</h2>
+                    <p class="text-secondary mb-0">Review and edit customer names and saved addresses.</p>
+                </div>
+            </a>
+        </div>
+        <div class="col-12 col-md-4">
+            <a class="card module-tile h-100 text-decoration-none" href="staff">
+                <div class="card-body">
+                    <span class="eyebrow">Team</span>
+                    <h2 class="h4">Staff Users</h2>
+                    <p class="text-secondary mb-0">Manage portal users and access for this business.</p>
+                </div>
+            </a>
+        </div>
+    </section>
+
+    @if (dashboard.PendingOrderCount > 0)
+    {
+        <section class="alert alert-warning border-warning shadow-sm new-order-alert" role="alert">
+            <strong>New order alert:</strong> @dashboard.PendingOrderCount order@(dashboard.PendingOrderCount == 1 ? "" : "s") waiting for confirmation.
+            Open the order to confirm or reject it.
+        </section>
+    }
+
+    <section class="card shadow-sm">
+        <div class="card-body">
             <div class="section-heading">
-                <h2>Recent orders</h2>
-                <span>@dashboard.RecentOrders.Count entries</span>
+                <h2>Orders</h2>
             </div>
-            <div class="table-wrap">
-                <table>
+            <div class="table-responsive stack-mobile">
+                <table class="table table-hover align-middle mb-0 responsive-stack">
                     <thead>
                         <tr>
                             <th>Order</th>
                             <th>Customer</th>
                             <th>Status</th>
                             <th>Total</th>
+                            <th>Time</th>
+                            <th></th>
                         </tr>
                     </thead>
                     <tbody>
                         @foreach (var order in dashboard.RecentOrders)
                         {
-                            <tr>
-                                <td>@order.OrderNumber</td>
-                                <td>@order.CustomerName</td>
-                                <td><OrderStatusBadge Status="@order.OrderStatus" /></td>
-                                <td>@order.TotalAmount.ToString("C0")</td>
+                            <tr class="@(IsPending(order.OrderStatus) ? "table-warning pending-order-row" : "")">
+                                <td data-label="Order"><strong>@order.OrderNumber</strong><small>@order.Address</small></td>
+                                <td data-label="Customer">@order.CustomerName<small>@order.CustomerPhone</small></td>
+                                <td data-label="Status"><OrderStatusBadge Status="@order.OrderStatus" /></td>
+                                <td data-label="Total">Rs @order.TotalAmount.ToString("0.##")</td>
+                                <td data-label="Time">@order.CreatedAt.ToLocalTime().ToString("dd MMM, hh:mm tt")</td>
+                                <td data-label="" class="text-end"><a class="btn btn-sm btn-primary" href="@($"orders/{order.Id}")">Open</a></td>
                             </tr>
                         }
                     </tbody>
                 </table>
-            </div>
-        </div>
-
-        <div class="data-section">
-            <div class="section-heading">
-                <h2>Recent customers</h2>
-                <span>@dashboard.RecentCustomers.Count entries</span>
-            </div>
-            <div class="compact-list">
-                @foreach (var customer in dashboard.RecentCustomers)
-                {
-                    <div>
-                        <strong>@(string.IsNullOrWhiteSpace(customer.Name) ? customer.PhoneNumber : customer.Name)</strong>
-                        <span>@customer.OrderCount orders</span>
-                    </div>
-                }
             </div>
         </div>
     </section>
@@ -108,6 +140,9 @@
     {
         await InvokeAsync(LoadAsync);
     }
+
+    private static bool IsPending(string status) =>
+        string.Equals(status, "pending_confirmation", StringComparison.OrdinalIgnoreCase);
 
     public void Dispose()
     {

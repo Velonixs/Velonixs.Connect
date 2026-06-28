@@ -5,53 +5,62 @@
 
 <PageTitle>Restaurants</PageTitle>
 
-<section class="page-heading">
+<section class="d-flex flex-column flex-lg-row align-items-lg-end justify-content-between gap-3 mb-4">
     <div>
         <p class="eyebrow">Admin</p>
-        <h1>Restaurants</h1>
+        <h1>Businesses</h1>
     </div>
-    <button class="secondary-button" type="button" @onclick="LoadAsync">Refresh</button>
+    <div class="d-flex flex-wrap gap-2 justify-content-lg-end ms-lg-auto">
+        <a class="btn btn-outline-success" href="/">Back to businesses</a>
+        <button class="btn btn-outline-secondary" type="button" @onclick="LoadAsync">Refresh</button>
+    </div>
 </section>
 
 <ApiErrorAlert Error="error" Title="Restaurants unavailable" />
 <LoadingPanel IsLoading="isLoading" Message="Loading restaurants" />
 
-<section class="split-grid">
-    <div class="data-section">
+<section class="card shadow-sm mb-4">
+    <div class="card-body">
         <div class="section-heading">
-            <h2>Restaurant list</h2>
-            <span>@restaurants.Count entries</span>
+            <h2>Business List</h2>
         </div>
 
-        <div class="table-wrap">
-            <table>
+        <div class="table-responsive stack-mobile">
+            <table class="table table-hover align-middle mb-0 responsive-stack">
                 <thead>
                     <tr>
                         <th>Name</th>
+                        <th>Type</th>
                         <th>WhatsApp Phone ID</th>
+                        <th>Phone</th>
                         <th>Status</th>
                         <th>Tax</th>
+                        <th></th>
                     </tr>
                 </thead>
                 <tbody>
                     @foreach (var restaurant in restaurants.OrderBy(x => x.Name))
                     {
                         <tr>
-                            <td>@restaurant.Name</td>
-                            <td>@restaurant.WhatsAppPhoneNumberId</td>
-                            <td>@(restaurant.IsActive ? "Active" : "Inactive")</td>
-                            <td>@($"{restaurant.CgstPercent + restaurant.SgstPercent:0.##}%")</td>
-                            <td><a class="inline-link" href="@($"restaurants/{restaurant.Id}")">Open</a></td>
+                            <td data-label="Name"><strong>@restaurant.Name</strong><small>@restaurant.Address</small></td>
+                            <td data-label="Type">@restaurant.BusinessType</td>
+                            <td data-label="WhatsApp ID"><code>@restaurant.WhatsAppPhoneNumberId</code></td>
+                            <td data-label="Phone">@restaurant.BusinessPhone</td>
+                            <td data-label="Status"><span class="pill @(restaurant.IsActive ? "good" : "muted")">@(restaurant.IsActive ? "Active" : "Inactive")</span></td>
+                            <td data-label="Tax">@($"{restaurant.CgstPercent + restaurant.SgstPercent:0.##}%")</td>
+                            <td data-label="" class="text-end"><a class="btn btn-sm btn-success" href="@($"restaurants/{restaurant.Id}")">Manage</a></td>
                         </tr>
                     }
                 </tbody>
             </table>
         </div>
     </div>
+</section>
 
-    <div class="data-section">
+<section id="create-restaurant" class="card shadow-sm">
+    <div class="card-body">
         <div class="section-heading">
-            <h2>Onboard restaurant</h2>
+            <h2>Add Business</h2>
         </div>
 
         @if (!string.IsNullOrWhiteSpace(successMessage))
@@ -59,55 +68,83 @@
             <div class="success-alert">@successMessage</div>
         }
 
-        <EditForm Model="form" OnValidSubmit="CreateAsync" class="form-stack">
+        <EditForm Model="form" OnValidSubmit="CreateAsync" class="row g-3 align-items-end">
             <DataAnnotationsValidator />
             <ValidationSummary />
 
-            <label>
-                <span>Restaurant name</span>
-                <InputText @bind-Value="form.Name" />
-            </label>
-
-            <label>
-                <span>WhatsApp Phone Number ID</span>
-                <InputText @bind-Value="form.WhatsAppPhoneNumberId" />
-            </label>
-
-            <label>
-                <span>Owner name</span>
-                <InputText @bind-Value="form.OwnerName" />
-            </label>
-
-            <label>
-                <span>Owner email</span>
-                <InputText @bind-Value="form.OwnerEmail" type="email" />
-            </label>
-
-            <label>
-                <span>Temporary password</span>
-                <InputText @bind-Value="form.OwnerPassword" type="password" />
-            </label>
-
-            <div class="two-column-form">
-                <label>
-                    <span>CGST %</span>
-                    <InputNumber @bind-Value="form.CgstPercent" />
-                </label>
-                <label>
-                    <span>SGST %</span>
-                    <InputNumber @bind-Value="form.SgstPercent" />
-                </label>
+            <div class="col-12 col-lg-3">
+                <label class="form-label">Name</label>
+                <InputText class="form-control" @bind-Value="form.Name" />
+            </div>
+            <div class="col-12 col-lg-3">
+                <label class="form-label">Business Type</label>
+                <InputSelect class="form-select" @bind-Value="form.BusinessType">
+                    @foreach (var businessType in BusinessTypeOptions)
+                    {
+                        <option value="@businessType">@businessType</option>
+                    }
+                </InputSelect>
+            </div>
+            <div class="col-12 col-lg-3">
+                <label class="form-label">WhatsApp Phone Number ID</label>
+                <InputText class="form-control" @bind-Value="form.WhatsAppPhoneNumberId" />
+            </div>
+            <div class="col-12 col-lg-3">
+                <label class="form-label">Business Phone</label>
+                <InputText class="form-control" @bind-Value="form.BusinessPhone" />
+            </div>
+            <div class="col-12 col-lg-3">
+                <label class="form-label">Notification Email</label>
+                <InputText class="form-control" @bind-Value="form.NotificationEmail" type="email" />
+            </div>
+            <div class="col-12 col-lg-3">
+                <label class="form-label">Staff WhatsApp Number</label>
+                <InputText class="form-control" @bind-Value="form.StaffWhatsAppNumber" />
+            </div>
+            <div class="col-12 col-lg-6">
+                <label class="form-label">Address</label>
+                <InputText class="form-control" @bind-Value="form.Address" />
+            </div>
+            <div class="col-12 col-lg-3">
+                <label class="form-label">CGST %</label>
+                <InputNumber class="form-control" @bind-Value="form.CgstPercent" />
+            </div>
+            <div class="col-12 col-lg-3">
+                <label class="form-label">SGST %</label>
+                <InputNumber class="form-control" @bind-Value="form.SgstPercent" />
+            </div>
+            <div class="col-12 col-lg-3">
+                <div class="form-check mb-lg-2">
+                    <InputCheckbox class="form-check-input" @bind-Value="form.IsActive" />
+                    <label class="form-check-label">Active business</label>
+                </div>
             </div>
 
-            <button class="primary-button" type="submit" disabled="@isSubmitting">
-                @(isSubmitting ? "Creating" : "Create restaurant")
-            </button>
+            <div class="col-12"><hr class="my-2" /><h3 class="h5 mb-0">Business owner login</h3></div>
+            <div class="col-12 col-lg-3">
+                <label class="form-label">Owner Name</label>
+                <InputText class="form-control" @bind-Value="form.OwnerName" />
+            </div>
+            <div class="col-12 col-lg-3">
+                <label class="form-label">Owner Email</label>
+                <InputText class="form-control" @bind-Value="form.OwnerEmail" type="email" />
+            </div>
+            <div class="col-12 col-lg-3">
+                <label class="form-label">Temporary Password</label>
+                <InputText class="form-control" @bind-Value="form.OwnerPassword" type="password" />
+            </div>
+            <div class="col-12">
+                <button class="btn btn-success" type="submit" disabled="@isSubmitting">
+                    @(isSubmitting ? "Creating" : "Create business and owner")
+                </button>
+            </div>
         </EditForm>
     </div>
 </section>
 
 @code {
     private readonly RestaurantOnboardingForm form = new();
+    private static readonly string[] BusinessTypeOptions = ["restaurant", "cafe", "bakery", "cloud_kitchen", "grocery", "pharmacy", "retail", "other"];
     private IReadOnlyCollection<RestaurantResponse> restaurants = Array.Empty<RestaurantResponse>();
     private bool isLoading;
     private bool isSubmitting;
@@ -147,15 +184,15 @@
             var result = await ApiClient.OnboardRestaurantAsync(new CreateRestaurantWithOwnerRequest(
                 new CreateRestaurantRequest(
                     form.Name,
-                    "restaurant",
+                    form.BusinessType,
                     form.WhatsAppPhoneNumberId,
-                    BusinessPhone: null,
-                    NotificationEmail: null,
-                    StaffWhatsAppNumber: null,
-                    Address: null,
+                    string.IsNullOrWhiteSpace(form.BusinessPhone) ? null : form.BusinessPhone,
+                    string.IsNullOrWhiteSpace(form.NotificationEmail) ? null : form.NotificationEmail,
+                    string.IsNullOrWhiteSpace(form.StaffWhatsAppNumber) ? null : form.StaffWhatsAppNumber,
+                    string.IsNullOrWhiteSpace(form.Address) ? null : form.Address,
                     form.CgstPercent,
                     form.SgstPercent,
-                    IsActive: true),
+                    form.IsActive),
                 new CreateOwnerUserRequest(form.OwnerName, form.OwnerEmail, form.OwnerPassword)));
 
             successMessage = $"Created {result.Restaurant?.Name ?? form.Name}.";
@@ -187,7 +224,19 @@
         public string Name { get; set; } = string.Empty;
 
         [Required]
+        public string BusinessType { get; set; } = "restaurant";
+
+        [Required]
         public string WhatsAppPhoneNumberId { get; set; } = string.Empty;
+
+        public string? BusinessPhone { get; set; }
+
+        [EmailAddress]
+        public string? NotificationEmail { get; set; }
+
+        public string? StaffWhatsAppNumber { get; set; }
+
+        public string? Address { get; set; }
 
         [Required]
         public string OwnerName { get; set; } = string.Empty;
@@ -206,15 +255,23 @@
         [Range(0, 100)]
         public decimal SgstPercent { get; set; }
 
+        public bool IsActive { get; set; } = true;
+
         public void Reset()
         {
             Name = string.Empty;
+            BusinessType = "restaurant";
             WhatsAppPhoneNumberId = string.Empty;
+            BusinessPhone = null;
+            NotificationEmail = null;
+            StaffWhatsAppNumber = null;
+            Address = null;
             OwnerName = string.Empty;
             OwnerEmail = string.Empty;
             OwnerPassword = string.Empty;
             CgstPercent = 0;
             SgstPercent = 0;
+            IsActive = true;
         }
     }
 }

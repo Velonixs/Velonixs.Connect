@@ -1,139 +1,230 @@
 @page "/orders/{OrderId:guid}"
+@using System.ComponentModel.DataAnnotations
+@using Velonixs.Connect.Contracts.Orders
 @inject IVelonixsConnectApiClient ApiClient
+@inject IOrderRealtimeClient RealtimeClient
 @inject NavigationManager Navigation
-@inject IMobileConnectivityService ConnectivityService
+@implements IDisposable
 
 <PageTitle>Order Detail</PageTitle>
 
-<section class="page-heading">
+<section class="d-flex flex-column flex-sm-row align-items-sm-center justify-content-between gap-3 mb-4">
     <div>
-        <p class="eyebrow">Order detail</p>
+        <p class="eyebrow">Restaurant portal</p>
         <h1>@(order?.OrderNumber ?? "Order")</h1>
     </div>
-    <button class="secondary-button" type="button" @onclick="LoadAsync">Refresh</button>
+    <div class="d-flex flex-wrap gap-2 justify-content-sm-end ms-sm-auto">
+        <a class="btn btn-outline-primary" href="/">Back to dashboard</a>
+        <button class="btn btn-outline-secondary" type="button" @onclick="LoadAsync">Refresh</button>
+    </div>
 </section>
-
-<div class="connectivity @ConnectivityClass">@ConnectivityLabel</div>
 
 <ApiErrorAlert Error="error" Title="Order unavailable" />
 <LoadingPanel IsLoading="isLoading" Message="Loading order" />
 
 @if (order is not null)
 {
-    <section class="metric-grid">
-        <MetricTile Label="Status" Value="@order.OrderStatus" Detail="Current state" />
-        <MetricTile Label="Total" Value="@order.TotalAmount.ToString("C0")" Detail="Including taxes" />
-        <MetricTile Label="ETA" Value="@(order.EstimatedMinutes?.ToString() ?? "-")" Detail="Minutes" />
-        <MetricTile Label="Items" Value="@order.Items.Count.ToString()" Detail="Line items" />
-    </section>
-
-    @if (CanConfirm(order))
-    {
-        <section class="data-section">
-            <div class="action-row">
-                <button class="primary-button" type="button" disabled="@IsOffline" @onclick="ConfirmAsync">Confirm order</button>
-                <button class="secondary-button danger" type="button" disabled="@IsOffline" @onclick="RejectAsync">Reject order</button>
+    <section class="row g-3 mb-4">
+        <div class="col-12 col-md-4">
+            <div class="metric h-100">
+                <span>Status</span>
+                <strong>@order.OrderStatus</strong>
+                <small>
+                    @order.CreatedAt.ToLocalTime().ToString("dd MMM yyyy, hh:mm tt")
+                    @if (order.EstimatedMinutes is int estimatedMinutes)
+                    {
+                        <span> - ETA @estimatedMinutes min</span>
+                    }
+                </small>
             </div>
-        </section>
-    }
-
-    <section class="data-section">
-        <div class="section-heading">
-            <h2>Items</h2>
-            <OrderStatusBadge Status="@order.OrderStatus" />
         </div>
-        <div class="mobile-list">
-            @foreach (var item in order.Items)
+        <div class="col-12 col-md-4">
+            <div class="metric h-100">
+                <span>Total</span>
+                <strong>Rs @order.TotalAmount.ToString("0.##")</strong>
+                <small>@order.Source</small>
+            </div>
+        </div>
+        <div class="col-12 col-md-4">
+            <div class="metric h-100">
+                <span>Customer</span>
+                <strong>@order.CustomerName</strong>
+                <small>@order.CustomerPhone</small>
+            </div>
+        </div>
+    </section>
+
+    <section class="card shadow-sm mb-4">
+        <div class="card-body row g-4">
+            <div class="col-12 col-lg-8">
+                <h2>Products</h2>
+                @foreach (var item in order.Items)
+                {
+                    <div class="line-item">
+                        <span>@item.Quantity x @item.ItemName</span>
+                        <strong>Rs @item.LineTotal.ToString("0.##")</strong>
+                    </div>
+                }
+                <div class="line-item total">
+                    <span>Subtotal</span>
+                    <strong>Rs @order.SubTotalAmount.ToString("0.##")</strong>
+                </div>
+                <div class="line-item">
+                    <span>CGST (@order.CgstPercent.ToString("0.##")%)</span>
+                    <strong>Rs @order.CgstAmount.ToString("0.##")</strong>
+                </div>
+                <div class="line-item">
+                    <span>SGST (@order.SgstPercent.ToString("0.##")%)</span>
+                    <strong>Rs @order.SgstAmount.ToString("0.##")</strong>
+                </div>
+                <div class="line-item total">
+                    <span>Total</span>
+                    <strong>Rs @order.TotalAmount.ToString("0.##")</strong>
+                </div>
+                <h2>Address</h2>
+                <p>@order.Address</p>
+            </div>
+
+            <div class="col-12 col-lg-4">
+                @if (IsPending(order))
+                {
+                    <div class="card bg-light border-0 p-3 mb-3">
+                        <h2 class="h5">Confirm Order</h2>
+                        <EditForm Model="confirmForm" OnValidSubmit="ConfirmAsync">
+                            <DataAnnotationsValidator />
+                            <label class="form-label" for="EstimatedMinutes">Estimated time</label>
+                            <InputSelect class="form-select mb-2" id="EstimatedMinutes" @bind-Value="confirmForm.EstimatedMinutes">
+                                <option value="20">20 minutes</option>
+                                <option value="30">30 minutes</option>
+                                <option value="45">45 minutes</option>
+                            </InputSelect>
+                            <label class="form-label" for="CustomEstimatedMinutes">Custom estimated time</label>
+                            <InputNumber class="form-control mb-2" id="CustomEstimatedMinutes" @bind-Value="confirmForm.CustomEstimatedMinutes" />
+                            <label class="form-label" for="ConfirmComment">Customer-visible comment</label>
+                            <InputTextArea class="form-control mb-3" id="ConfirmComment" @bind-Value="confirmForm.Comment" rows="3" placeholder="Optional message for customer" />
+                            <button class="btn btn-success w-100" type="submit" disabled="@isSubmitting">Confirm Order</button>
+                        </EditForm>
+                    </div>
+
+                    <div class="card border-danger p-3">
+                        <h2 class="h5">Reject Order</h2>
+                        <EditForm Model="rejectForm" OnValidSubmit="RejectAsync">
+                            <DataAnnotationsValidator />
+                            <ValidationSummary />
+                            <label class="form-label" for="RejectComment">Rejection reason</label>
+                            <InputTextArea class="form-control mb-3" id="RejectComment" @bind-Value="rejectForm.Reason" rows="3" required placeholder="Tell the customer why this order cannot be accepted" />
+                            <button class="btn btn-outline-danger w-100" type="submit" disabled="@isSubmitting">Reject Order</button>
+                        </EditForm>
+                    </div>
+                }
+                else if (!IsTerminal(order))
+                {
+                    <EditForm Model="statusForm" OnValidSubmit="UpdateStatusAsync">
+                        <DataAnnotationsValidator />
+                        <div class="card bg-light border-0 p-3">
+                            <h2 class="h5">Update Status</h2>
+                            <InputSelect class="form-select mb-3" @bind-Value="statusForm.Status">
+                                @foreach (var status in StatusOptions)
+                                {
+                                    <option value="@status">@status</option>
+                                }
+                            </InputSelect>
+                            <label class="form-label" for="StatusComment">Customer-visible comment</label>
+                            <InputTextArea class="form-control mb-3" id="StatusComment" @bind-Value="statusForm.Comment" rows="3" placeholder="Optional status note" />
+                            <button class="btn btn-primary" type="submit" disabled="@isSubmitting">Save status</button>
+                        </div>
+                    </EditForm>
+                }
+                else
+                {
+                    <div class="card bg-light border-0 p-3">
+                        <h2 class="h5">Order Closed</h2>
+                        <p class="mb-0">This order is @order.OrderStatus and cannot be updated further.</p>
+                    </div>
+                }
+            </div>
+        </div>
+    </section>
+
+    <section class="card shadow-sm mb-4">
+        <div class="card-body">
+            <div class="section-heading">
+                <h2>Status History</h2>
+            </div>
+            @if (order.StatusHistory.Count == 0)
             {
-                <article>
-                    <div>
-                        <strong>@item.ItemName</strong>
-                        <span>Qty @item.Quantity</span>
-                    </div>
-                    <div>
-                        <span>@item.UnitPrice.ToString("C0") each</span>
-                        <strong>@item.LineTotal.ToString("C0")</strong>
-                    </div>
-                </article>
+                <p class="text-muted mb-0">No status updates yet.</p>
             }
-        </div>
-    </section>
-
-    <section class="data-section">
-        <div class="section-heading">
-            <h2>Customer</h2>
-        </div>
-        <div class="detail-list">
-            <div><span>Name</span><strong>@order.CustomerName</strong></div>
-            <div><span>Phone</span><strong>@order.CustomerPhone</strong></div>
-            <div><span>Address</span><strong>@order.Address</strong></div>
-            <div><span>Source</span><strong>@order.Source</strong></div>
-        </div>
-    </section>
-
-    <section class="data-section">
-        <div class="section-heading">
-            <h2>Status history</h2>
-            <span>@order.StatusHistory.Count entries</span>
-        </div>
-        <div class="compact-list">
-            @foreach (var history in order.StatusHistory.OrderByDescending(x => x.UpdatedAtUtc))
+            else
             {
-                <div>
-                    <strong>@history.NewStatus</strong>
-                    <span>@history.UpdatedAtUtc.ToLocalTime().ToString("dd MMM, HH:mm")</span>
+                <div class="table-responsive stack-mobile">
+                    <table class="table table-hover align-middle mb-0 responsive-stack">
+                        <thead>
+                            <tr>
+                                <th>Time</th>
+                                <th>Change</th>
+                                <th>Updated By</th>
+                                <th>Comment</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var history in order.StatusHistory)
+                            {
+                                <tr>
+                                    <td data-label="Time">@history.UpdatedAtUtc.ToLocalTime().ToString("dd MMM yyyy, hh:mm tt")</td>
+                                    <td data-label="Change">@history.PreviousStatus -> @history.NewStatus</td>
+                                    <td data-label="Updated By">@history.UpdatedBy</td>
+                                    <td data-label="Comment">@history.Comment</td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
                 </div>
             }
         </div>
     </section>
 
-    <section class="data-section">
-        <div class="section-heading">
-            <h2>Messages</h2>
-            <span>@order.Messages.Count entries</span>
-        </div>
-        <div class="notification-list">
-            @foreach (var message in order.Messages.OrderByDescending(x => x.CreatedAt))
-            {
-                <article>
-                    <div class="notification-meta">
-                        <strong>@message.Direction</strong>
-                        <span>@message.CreatedAt.ToLocalTime().ToString("dd MMM, HH:mm")</span>
-                        <span>@message.Status</span>
-                    </div>
-                    <p>@message.MessageText</p>
-                </article>
-            }
+    <section class="card shadow-sm">
+        <div class="card-body">
+            <div class="section-heading">
+                <h2>Conversation</h2>
+            </div>
+            <div class="message-list">
+                @foreach (var message in order.Messages.OrderByDescending(x => x.CreatedAt).Take(30))
+                {
+                    <article class="message @(message.Direction == "Incoming" ? "incoming" : "outgoing")">
+                        <div>
+                            <strong>@message.Direction</strong>
+                            <small>@message.CreatedAt.ToLocalTime().ToString("dd MMM yyyy, hh:mm tt") - @message.Status</small>
+                        </div>
+                        <p>@message.MessageText</p>
+                    </article>
+                }
+            </div>
         </div>
     </section>
 }
 
 @code {
+    private static readonly string[] StatusOptions = ["confirmed", "preparing", "out_for_delivery", "delivered", "cancelled"];
+
     [Parameter] public Guid OrderId { get; set; }
 
+    private readonly ConfirmForm confirmForm = new();
+    private readonly RejectForm rejectForm = new();
+    private readonly StatusForm statusForm = new();
     private OrderDetailResponse? order;
-    private MobileConnectivityStatus connectivityStatus;
     private bool isLoading;
+    private bool isSubmitting;
     private ApiClientException? error;
 
-    private bool IsOffline => connectivityStatus is MobileConnectivityStatus.Offline or MobileConnectivityStatus.Unknown;
-
-    private string ConnectivityLabel =>
-        connectivityStatus == MobileConnectivityStatus.Online
-            ? "Online"
-            : connectivityStatus == MobileConnectivityStatus.Constrained
-                ? "Limited connection"
-                : "Offline";
-
-    private string ConnectivityClass =>
-        connectivityStatus == MobileConnectivityStatus.Online ? "is-online" : "is-offline";
-
-    protected override async Task OnParametersSetAsync()
+    protected override Task OnInitializedAsync()
     {
-        connectivityStatus = ConnectivityService.CurrentStatus;
-        ConnectivityService.StatusChanged += OnConnectivityChanged;
-        await LoadAsync();
+        RealtimeClient.OrderChanged += OnOrderChanged;
+        return Task.CompletedTask;
     }
+
+    protected override Task OnParametersSetAsync() => LoadAsync();
 
     private async Task LoadAsync()
     {
@@ -143,6 +234,7 @@
         try
         {
             order = await ApiClient.GetOrderAsync(OrderId);
+            statusForm.Status = StatusOptions.Contains(order.OrderStatus) ? order.OrderStatus : StatusOptions[0];
         }
         catch (ApiClientException exception)
         {
@@ -157,52 +249,61 @@
 
     private async Task ConfirmAsync()
     {
-        if (IsOffline)
+        var estimate = confirmForm.CustomEstimatedMinutes ?? confirmForm.EstimatedMinutes;
+        await RunMutationAsync(async () =>
         {
-            return;
-        }
-
-        error = null;
-
-        try
-        {
-            order = await ApiClient.ConfirmOrderAsync(OrderId, new ConfirmOrderRequest(30, "Order confirmed."));
-        }
-        catch (ApiClientException exception)
-        {
-            error = exception;
-            RedirectIfUnauthorized(exception);
-        }
+            order = await ApiClient.ConfirmOrderAsync(
+                OrderId,
+                new ConfirmOrderRequest(estimate, confirmForm.Comment));
+        });
     }
 
     private async Task RejectAsync()
     {
-        if (IsOffline)
+        await RunMutationAsync(async () =>
         {
-            return;
-        }
+            order = await ApiClient.RejectOrderAsync(OrderId, new RejectOrderRequest(rejectForm.Reason));
+        });
+    }
 
+    private async Task UpdateStatusAsync()
+    {
+        await RunMutationAsync(async () =>
+        {
+            order = await ApiClient.UpdateOrderStatusAsync(
+                OrderId,
+                new UpdateOrderStatusRequest(statusForm.Status, statusForm.Comment));
+            statusForm.Comment = null;
+        });
+    }
+
+    private async Task RunMutationAsync(Func<Task> action)
+    {
+        isSubmitting = true;
         error = null;
 
         try
         {
-            order = await ApiClient.RejectOrderAsync(OrderId, new RejectOrderRequest("Rejected from mobile portal."));
+            await action();
         }
         catch (ApiClientException exception)
         {
             error = exception;
             RedirectIfUnauthorized(exception);
         }
+        finally
+        {
+            isSubmitting = false;
+        }
     }
 
-    private static bool CanConfirm(OrderDetailResponse order) =>
+    private static bool IsPending(OrderDetailResponse order) =>
         string.Equals(order.OrderStatus, "pending_confirmation", StringComparison.OrdinalIgnoreCase);
 
-    private void OnConnectivityChanged(object? sender, MobileConnectivityStatus status)
-    {
-        connectivityStatus = status;
-        _ = InvokeAsync(StateHasChanged);
-    }
+    private static bool IsTerminal(OrderDetailResponse order) =>
+        string.Equals(order.OrderStatus, "delivered", StringComparison.OrdinalIgnoreCase) ||
+        string.Equals(order.OrderStatus, "rejected", StringComparison.OrdinalIgnoreCase) ||
+        string.Equals(order.OrderStatus, "cancelled", StringComparison.OrdinalIgnoreCase);
 
     private void RedirectIfUnauthorized(ApiClientException exception)
     {
@@ -210,5 +311,38 @@
         {
             Navigation.NavigateTo("/login");
         }
+    }
+
+    private async void OnOrderChanged(object? sender, OrderRealtimeEvent orderEvent)
+    {
+        if (orderEvent.OrderId == OrderId)
+        {
+            await InvokeAsync(LoadAsync);
+        }
+    }
+
+    public void Dispose()
+    {
+        RealtimeClient.OrderChanged -= OnOrderChanged;
+    }
+
+    private sealed class ConfirmForm
+    {
+        public int EstimatedMinutes { get; set; } = 30;
+        public int? CustomEstimatedMinutes { get; set; }
+        public string? Comment { get; set; }
+    }
+
+    private sealed class RejectForm
+    {
+        [Required]
+        public string Reason { get; set; } = string.Empty;
+    }
+
+    private sealed class StatusForm
+    {
+        [Required]
+        public string Status { get; set; } = StatusOptions[0];
+        public string? Comment { get; set; }
     }
 }

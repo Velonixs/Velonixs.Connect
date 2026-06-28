@@ -5,106 +5,196 @@
 
 <PageTitle>Master Catalog</PageTitle>
 
-<section class="page-heading">
+<section class="d-flex flex-column flex-lg-row align-items-lg-end justify-content-between gap-3 mb-4">
     <div>
         <p class="eyebrow">Admin</p>
-        <h1>Master catalog</h1>
+        <h1>Master Catalog</h1>
+        <p class="text-secondary mb-0">Create common categories and menu items once. Restaurants map these items and set their own price and stock.</p>
     </div>
-    <button class="secondary-button" type="button" @onclick="LoadAsync">Refresh</button>
+    <div class="d-flex flex-wrap gap-2 justify-content-lg-end ms-lg-auto">
+        <a class="btn btn-outline-success" href="/">Back to businesses</a>
+        <button class="btn btn-outline-secondary" type="button" @onclick="LoadAsync">Refresh</button>
+    </div>
 </section>
 
 <ApiErrorAlert Error="error" Title="Master catalog unavailable" />
 <LoadingPanel IsLoading="isLoading" Message="Loading master catalog" />
 
-<section class="split-grid">
-    <div class="data-section">
-        <div class="section-heading">
-            <h2>Categories</h2>
-            <span>@catalog.Categories.Count entries</span>
-        </div>
-        <div class="catalog-list">
-            @foreach (var category in catalog.Categories.OrderBy(x => x.DisplayOrder).ThenBy(x => x.Name))
-            {
-                <article>
-                    <div>
-                        <strong>@category.Name</strong>
-                        <span>Order @category.DisplayOrder - @(category.IsActive ? "Active" : "Inactive")</span>
+<section class="row g-3 mb-4">
+    <div class="col-12 col-xl-5">
+        <div class="card shadow-sm h-100">
+            <div class="card-body">
+                <h2 class="h4">Add master category</h2>
+                <EditForm Model="categoryForm" OnValidSubmit="CreateCategoryAsync" class="row g-3 align-items-end">
+                    <DataAnnotationsValidator />
+                    <ValidationSummary />
+                    <div class="col-12 col-lg-7">
+                        <label class="form-label">Category name</label>
+                        <InputText class="form-control" @bind-Value="categoryForm.Name" placeholder="Pizza, Burger, Main Course" />
                     </div>
-                    <button class="small-action danger" type="button" @onclick="() => DeleteCategoryAsync(category.Id)">Delete</button>
-                </article>
-            }
-        </div>
-
-        <div class="section-heading sub-section-heading">
-            <h2>Items</h2>
-            <span>@catalog.Items.Count entries</span>
-        </div>
-        <div class="catalog-list">
-            @foreach (var item in catalog.Items.OrderBy(x => x.MasterCategoryName).ThenBy(x => x.Name))
-            {
-                <article>
-                    <div>
-                        <strong>@item.Name</strong>
-                        <span>@item.MasterCategoryName - @(item.IsActive ? "Active" : "Inactive")</span>
+                    <div class="col-6 col-lg-2">
+                        <label class="form-label">Order</label>
+                        <InputNumber class="form-control" @bind-Value="categoryForm.DisplayOrder" />
                     </div>
-                    <button class="small-action danger" type="button" @onclick="() => DeleteItemAsync(item.Id)">Delete</button>
-                </article>
-            }
+                    <div class="col-6 col-lg-3">
+                        <div class="form-check mb-lg-2">
+                            <InputCheckbox class="form-check-input" @bind-Value="categoryForm.IsActive" />
+                            <label class="form-check-label">Active</label>
+                        </div>
+                    </div>
+                    <div class="col-12">
+                        <button class="btn btn-success" type="submit" disabled="@isSubmitting">Add category</button>
+                    </div>
+                </EditForm>
+            </div>
         </div>
     </div>
 
-    <div class="data-section">
-        <div class="section-heading">
-            <h2>Create category</h2>
+    <div class="col-12 col-xl-7">
+        <div class="card shadow-sm h-100">
+            <div class="card-body">
+                <h2 class="h4">Add master menu item</h2>
+                @if (catalog.Categories.Any(x => x.IsActive))
+                {
+                    <EditForm Model="itemForm" OnValidSubmit="CreateItemAsync" class="row g-3 align-items-end">
+                        <DataAnnotationsValidator />
+                        <ValidationSummary />
+                        <div class="col-12 col-lg-4">
+                            <label class="form-label">Master category</label>
+                            <InputSelect class="form-select" @bind-Value="itemForm.MasterCategoryId">
+                                <option value="">Select category</option>
+                                @foreach (var category in catalog.Categories.Where(x => x.IsActive).OrderBy(x => x.DisplayOrder).ThenBy(x => x.Name))
+                                {
+                                    <option value="@category.Id">@category.Name</option>
+                                }
+                            </InputSelect>
+                        </div>
+                        <div class="col-12 col-lg-3">
+                            <label class="form-label">Item name</label>
+                            <InputText class="form-control" @bind-Value="itemForm.Name" placeholder="Paneer Pizza" />
+                        </div>
+                        <div class="col-12 col-lg-3">
+                            <label class="form-label">Description</label>
+                            <InputText class="form-control" @bind-Value="itemForm.Description" />
+                        </div>
+                        <div class="col-6 col-lg-2">
+                            <div class="form-check mb-lg-2">
+                                <InputCheckbox class="form-check-input" @bind-Value="itemForm.IsActive" />
+                                <label class="form-check-label">Active</label>
+                            </div>
+                        </div>
+                        <div class="col-12">
+                            <button class="btn btn-success" type="submit" disabled="@isSubmitting">Add master item</button>
+                        </div>
+                    </EditForm>
+                }
+                else
+                {
+                    <p class="text-secondary mb-0">Add an active master category first.</p>
+                }
+            </div>
         </div>
-        <EditForm Model="categoryForm" OnValidSubmit="CreateCategoryAsync" class="form-stack">
-            <DataAnnotationsValidator />
-            <ValidationSummary />
-            <label>
-                <span>Name</span>
-                <InputText @bind-Value="categoryForm.Name" />
-            </label>
-            <label>
-                <span>Display order</span>
-                <InputNumber @bind-Value="categoryForm.DisplayOrder" />
-            </label>
-            <label class="checkbox-line">
-                <InputCheckbox @bind-Value="categoryForm.IsActive" />
-                <span>Active</span>
-            </label>
-            <button class="primary-button" type="submit" disabled="@isSubmitting">Create category</button>
-        </EditForm>
+    </div>
+</section>
 
-        <div class="section-heading sub-section-heading">
-            <h2>Create item</h2>
+<section class="card shadow-sm mb-4">
+    <div class="card-body">
+        <div class="section-heading">
+            <h2>Master Categories</h2>
         </div>
-        <EditForm Model="itemForm" OnValidSubmit="CreateItemAsync" class="form-stack">
-            <DataAnnotationsValidator />
-            <ValidationSummary />
-            <label>
-                <span>Category</span>
-                <InputSelect @bind-Value="itemForm.MasterCategoryId">
-                    <option value="">Select category</option>
+        <div class="table-responsive stack-mobile">
+            <table class="table table-hover align-middle mb-0 responsive-stack">
+                <thead>
+                    <tr>
+                        <th>Category</th>
+                        <th>Order</th>
+                        <th>Status</th>
+                        <th class="text-end">Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
                     @foreach (var category in catalog.Categories.OrderBy(x => x.DisplayOrder).ThenBy(x => x.Name))
                     {
-                        <option value="@category.Id">@category.Name</option>
+                        var edit = GetCategoryEdit(category);
+                        <tr>
+                            <td colspan="4" class="p-0">
+                                <EditForm Model="edit" OnValidSubmit="() => UpdateCategoryAsync(category.Id)" class="catalog-row">
+                                    <DataAnnotationsValidator />
+                                    <InputText class="form-control" @bind-Value="edit.Name" aria-label="Category name" />
+                                    <InputNumber class="form-control" @bind-Value="edit.DisplayOrder" aria-label="Display order" />
+                                    <label class="form-check mb-0">
+                                        <InputCheckbox class="form-check-input" @bind-Value="edit.IsActive" />
+                                        <span class="form-check-label">Active</span>
+                                    </label>
+                                    <div class="d-flex gap-2 justify-content-end">
+                                        <button class="btn btn-sm btn-success" type="submit" disabled="@isSubmitting">Save</button>
+                                        <button class="btn btn-sm btn-outline-danger" type="button" @onclick="() => DeleteCategoryAsync(category.Id)">Delete</button>
+                                    </div>
+                                </EditForm>
+                            </td>
+                        </tr>
                     }
-                </InputSelect>
-            </label>
-            <label>
-                <span>Name</span>
-                <InputText @bind-Value="itemForm.Name" />
-            </label>
-            <label>
-                <span>Description</span>
-                <InputTextArea @bind-Value="itemForm.Description" />
-            </label>
-            <label class="checkbox-line">
-                <InputCheckbox @bind-Value="itemForm.IsActive" />
-                <span>Active</span>
-            </label>
-            <button class="primary-button" type="submit" disabled="@isSubmitting">Create item</button>
-        </EditForm>
+                    @if (!catalog.Categories.Any())
+                    {
+                        <tr><td colspan="4" class="text-secondary">No master categories yet.</td></tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    </div>
+</section>
+
+<section class="card shadow-sm">
+    <div class="card-body">
+        <div class="section-heading">
+            <h2>Master Menu Items</h2>
+        </div>
+        <div class="table-responsive stack-mobile">
+            <table class="table table-hover align-middle mb-0 responsive-stack">
+                <thead>
+                    <tr>
+                        <th>Category</th>
+                        <th>Menu item</th>
+                        <th>Description</th>
+                        <th>Status</th>
+                        <th class="text-end">Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var item in catalog.Items.OrderBy(x => x.MasterCategoryName).ThenBy(x => x.Name))
+                    {
+                        var edit = GetItemEdit(item);
+                        <tr>
+                            <td colspan="5" class="p-0">
+                                <EditForm Model="edit" OnValidSubmit="() => UpdateItemAsync(item.Id)" class="catalog-item-row">
+                                    <DataAnnotationsValidator />
+                                    <InputSelect class="form-select" @bind-Value="edit.MasterCategoryId" aria-label="Master category">
+                                        @foreach (var category in catalog.Categories.OrderBy(x => x.DisplayOrder).ThenBy(x => x.Name))
+                                        {
+                                            <option value="@category.Id">@category.Name</option>
+                                        }
+                                    </InputSelect>
+                                    <InputText class="form-control" @bind-Value="edit.Name" aria-label="Menu item" />
+                                    <InputText class="form-control" @bind-Value="edit.Description" aria-label="Description" />
+                                    <label class="form-check mb-0">
+                                        <InputCheckbox class="form-check-input" @bind-Value="edit.IsActive" />
+                                        <span class="form-check-label">Active</span>
+                                    </label>
+                                    <div class="d-flex gap-2 justify-content-end">
+                                        <button class="btn btn-sm btn-success" type="submit" disabled="@isSubmitting">Save</button>
+                                        <button class="btn btn-sm btn-outline-danger" type="button" @onclick="() => DeleteItemAsync(item.Id)">Delete</button>
+                                    </div>
+                                </EditForm>
+                            </td>
+                        </tr>
+                    }
+                    @if (!catalog.Items.Any())
+                    {
+                        <tr><td colspan="5" class="text-secondary">No master menu items yet.</td></tr>
+                    }
+                </tbody>
+            </table>
+        </div>
     </div>
 </section>
 
@@ -112,6 +202,8 @@
     private MasterCatalogResponse catalog = new(Array.Empty<MasterMenuCategoryResponse>(), Array.Empty<MasterMenuItemResponse>());
     private readonly MasterCategoryForm categoryForm = new();
     private readonly MasterItemForm itemForm = new();
+    private readonly Dictionary<Guid, MasterCategoryEditForm> categoryEdits = [];
+    private readonly Dictionary<Guid, MasterItemEditForm> itemEdits = [];
     private bool isLoading;
     private bool isSubmitting;
     private ApiClientException? error;
@@ -126,6 +218,7 @@
         try
         {
             catalog = await ApiClient.GetMasterCatalogAsync();
+            SyncEditForms();
         }
         catch (ApiClientException exception)
         {
@@ -140,10 +233,7 @@
 
     private async Task CreateCategoryAsync()
     {
-        isSubmitting = true;
-        error = null;
-
-        try
+        await RunMutationAsync(async () =>
         {
             await ApiClient.CreateMasterCategoryAsync(new CreateMasterMenuCategoryRequest(
                 categoryForm.Name,
@@ -151,16 +241,7 @@
                 categoryForm.IsActive));
             categoryForm.Reset();
             await LoadAsync();
-        }
-        catch (ApiClientException exception)
-        {
-            error = exception;
-            RedirectIfUnauthorized(exception);
-        }
-        finally
-        {
-            isSubmitting = false;
-        }
+        });
     }
 
     private async Task CreateItemAsync()
@@ -170,10 +251,7 @@
             return;
         }
 
-        isSubmitting = true;
-        error = null;
-
-        try
+        await RunMutationAsync(async () =>
         {
             await ApiClient.CreateMasterItemAsync(new CreateMasterMenuItemRequest(
                 itemForm.MasterCategoryId.Value,
@@ -182,6 +260,70 @@
                 itemForm.IsActive));
             itemForm.Reset();
             await LoadAsync();
+        });
+    }
+
+    private async Task UpdateCategoryAsync(Guid id)
+    {
+        if (!categoryEdits.TryGetValue(id, out var edit))
+        {
+            return;
+        }
+
+        await RunMutationAsync(async () =>
+        {
+            await ApiClient.UpdateMasterCategoryAsync(id, new CreateMasterMenuCategoryRequest(
+                edit.Name,
+                edit.DisplayOrder,
+                edit.IsActive));
+            await LoadAsync();
+        });
+    }
+
+    private async Task UpdateItemAsync(Guid id)
+    {
+        if (!itemEdits.TryGetValue(id, out var edit))
+        {
+            return;
+        }
+
+        await RunMutationAsync(async () =>
+        {
+            await ApiClient.UpdateMasterItemAsync(id, new CreateMasterMenuItemRequest(
+                edit.MasterCategoryId,
+                edit.Name,
+                edit.Description,
+                edit.IsActive));
+            await LoadAsync();
+        });
+    }
+
+    private async Task DeleteCategoryAsync(Guid id)
+    {
+        await RunMutationAsync(async () =>
+        {
+            await ApiClient.DeleteMasterCategoryAsync(id);
+            await LoadAsync();
+        });
+    }
+
+    private async Task DeleteItemAsync(Guid id)
+    {
+        await RunMutationAsync(async () =>
+        {
+            await ApiClient.DeleteMasterItemAsync(id);
+            await LoadAsync();
+        });
+    }
+
+    private async Task RunMutationAsync(Func<Task> action)
+    {
+        isSubmitting = true;
+        error = null;
+
+        try
+        {
+            await action();
         }
         catch (ApiClientException exception)
         {
@@ -194,35 +336,41 @@
         }
     }
 
-    private async Task DeleteCategoryAsync(Guid id)
+    private MasterCategoryEditForm GetCategoryEdit(MasterMenuCategoryResponse category)
     {
-        error = null;
+        if (!categoryEdits.TryGetValue(category.Id, out var edit))
+        {
+            edit = MasterCategoryEditForm.From(category);
+            categoryEdits[category.Id] = edit;
+        }
 
-        try
-        {
-            await ApiClient.DeleteMasterCategoryAsync(id);
-            await LoadAsync();
-        }
-        catch (ApiClientException exception)
-        {
-            error = exception;
-            RedirectIfUnauthorized(exception);
-        }
+        return edit;
     }
 
-    private async Task DeleteItemAsync(Guid id)
+    private MasterItemEditForm GetItemEdit(MasterMenuItemResponse item)
     {
-        error = null;
-
-        try
+        if (!itemEdits.TryGetValue(item.Id, out var edit))
         {
-            await ApiClient.DeleteMasterItemAsync(id);
-            await LoadAsync();
+            edit = MasterItemEditForm.From(item);
+            itemEdits[item.Id] = edit;
         }
-        catch (ApiClientException exception)
+
+        return edit;
+    }
+
+    private void SyncEditForms()
+    {
+        categoryEdits.Clear();
+        itemEdits.Clear();
+
+        foreach (var category in catalog.Categories)
         {
-            error = exception;
-            RedirectIfUnauthorized(exception);
+            categoryEdits[category.Id] = MasterCategoryEditForm.From(category);
+        }
+
+        foreach (var item in catalog.Items)
+        {
+            itemEdits[item.Id] = MasterItemEditForm.From(item);
         }
     }
 
@@ -270,5 +418,42 @@
             Description = null;
             IsActive = true;
         }
+    }
+
+    private sealed class MasterCategoryEditForm
+    {
+        [Required]
+        public string Name { get; set; } = string.Empty;
+
+        public int DisplayOrder { get; set; }
+
+        public bool IsActive { get; set; }
+
+        public static MasterCategoryEditForm From(MasterMenuCategoryResponse category) => new()
+        {
+            Name = category.Name,
+            DisplayOrder = category.DisplayOrder,
+            IsActive = category.IsActive
+        };
+    }
+
+    private sealed class MasterItemEditForm
+    {
+        public Guid MasterCategoryId { get; set; }
+
+        [Required]
+        public string Name { get; set; } = string.Empty;
+
+        public string? Description { get; set; }
+
+        public bool IsActive { get; set; }
+
+        public static MasterItemEditForm From(MasterMenuItemResponse item) => new()
+        {
+            MasterCategoryId = item.MasterCategoryId,
+            Name = item.Name,
+            Description = item.Description,
+            IsActive = item.IsActive
+        };
     }
 }

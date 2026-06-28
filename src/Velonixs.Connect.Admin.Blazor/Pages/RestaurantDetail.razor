@@ -1,71 +1,372 @@
 @page "/restaurants/{RestaurantId:guid}"
+@using System.ComponentModel.DataAnnotations
+@using Velonixs.Connect.Contracts.Restaurants
 @inject IVelonixsConnectApiClient ApiClient
 @inject NavigationManager Navigation
 
-<PageTitle>Restaurant Detail</PageTitle>
+<PageTitle>Business Detail</PageTitle>
 
-<section class="page-heading">
+<section class="d-flex flex-column flex-lg-row align-items-lg-end justify-content-between gap-3 mb-4">
     <div>
-        <p class="eyebrow">Admin</p>
-        <h1>@(restaurant?.Name ?? "Restaurant")</h1>
+        <p class="eyebrow">@(restaurant?.BusinessType ?? "Business")</p>
+        <h1>@(restaurant?.Name ?? "Business")</h1>
     </div>
-    <button class="secondary-button" type="button" @onclick="LoadAsync">Refresh</button>
+    <div class="d-flex flex-wrap gap-2 justify-content-lg-end ms-lg-auto">
+        <a class="btn btn-outline-success" href="/">All businesses</a>
+        <button class="btn btn-outline-secondary" type="button" @onclick="LoadAsync">Refresh</button>
+    </div>
 </section>
 
-<ApiErrorAlert Error="error" Title="Restaurant unavailable" />
-<LoadingPanel IsLoading="isLoading" Message="Loading restaurant" />
+<ApiErrorAlert Error="error" Title="Business unavailable" />
+<LoadingPanel IsLoading="isLoading" Message="Loading business" />
 
 @if (restaurant is not null)
 {
-    <section class="metric-grid">
-        <MetricTile Label="Menu items" Value="@((menu?.Items.Count ?? 0).ToString())" Detail="Configured items" />
-        <MetricTile Label="Orders" Value="@orders.Count.ToString()" Detail="Recent queue" />
-        <MetricTile Label="Customers" Value="@customers.Count.ToString()" Detail="Known customers" />
-        <MetricTile Label="Staff" Value="@staff.Count.ToString()" Detail="Portal users" />
+    <section class="row g-3 mb-4">
+        <div class="col-12 col-sm-6 col-xl-3"><div class="metric h-100">
+            <span>Orders</span>
+            <strong>@orders.Count</strong>
+            <small>@orders.Count(IsPending) needs attention</small>
+        </div></div>
+        <div class="col-12 col-sm-6 col-xl-3"><div class="metric h-100">
+            <span>Revenue</span>
+            <strong>Rs @orders.Sum(x => x.TotalAmount).ToString("0.##")</strong>
+            <small>Recent recorded orders</small>
+        </div></div>
+        <div class="col-12 col-sm-6 col-xl-3"><div class="metric h-100">
+            <span>Catalog</span>
+            <strong>@(menu?.Items.Count(x => x.IsActive && x.IsAvailable) ?? 0)</strong>
+            <small>Available products</small>
+        </div></div>
+        <div class="col-12 col-sm-6 col-xl-3"><div class="metric h-100">
+            <span>Customers</span>
+            <strong>@customers.Count</strong>
+            <small>Recent contacts</small>
+        </div></div>
     </section>
 
-    <section class="data-grid">
-        <div class="data-section">
+    <section class="card shadow-sm mb-4">
+        <div class="card-body">
             <div class="section-heading">
-                <h2>Recent orders</h2>
-                <span>@orders.Count entries</span>
+                <h2>WhatsApp Messaging Setup</h2>
             </div>
-            <div class="table-wrap">
-                <table>
-                    <thead>
-                        <tr>
-                            <th>Order</th>
-                            <th>Customer</th>
-                            <th>Status</th>
-                            <th>Total</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        @foreach (var order in orders.OrderByDescending(x => x.CreatedAt).Take(20))
-                        {
-                            <tr>
-                                <td>@order.OrderNumber</td>
-                                <td>@order.CustomerName</td>
-                                <td><OrderStatusBadge Status="@order.OrderStatus" /></td>
-                                <td>@order.TotalAmount.ToString("C0")</td>
-                            </tr>
-                        }
-                    </tbody>
-                </table>
+            <div class="row g-3">
+                <div class="col-12 col-md-6 col-xl-3">
+                    <span class="badge @(restaurant.IsActive ? "text-bg-success" : "text-bg-warning")">@(restaurant.IsActive ? "Ready" : "Needs attention")</span>
+                    <div class="mt-2 fw-semibold">Business is active</div>
+                    <small class="text-secondary">Inactive businesses will not receive WhatsApp orders.</small>
+                </div>
+                <div class="col-12 col-md-6 col-xl-3">
+                    <span class="badge @(!string.IsNullOrWhiteSpace(restaurant.WhatsAppPhoneNumberId) ? "text-bg-success" : "text-bg-warning")">
+                        @(!string.IsNullOrWhiteSpace(restaurant.WhatsAppPhoneNumberId) ? "Ready" : "Missing")
+                    </span>
+                    <div class="mt-2 fw-semibold">WhatsApp Phone Number ID</div>
+                    <small class="text-secondary"><code>@(string.IsNullOrWhiteSpace(restaurant.WhatsAppPhoneNumberId) ? "Not configured" : restaurant.WhatsAppPhoneNumberId)</code></small>
+                </div>
+                <div class="col-12 col-md-6 col-xl-3">
+                    <span class="badge @((menu?.Items.Count(x => x.IsActive && x.IsAvailable) ?? 0) > 0 ? "text-bg-success" : "text-bg-warning")">
+                        @((menu?.Items.Count(x => x.IsActive && x.IsAvailable) ?? 0) > 0 ? "Ready" : "Add menu")
+                    </span>
+                    <div class="mt-2 fw-semibold">Available menu items</div>
+                    <small class="text-secondary">@((menu?.Items.Count(x => x.IsActive && x.IsAvailable) ?? 0)) active and available item(s).</small>
+                </div>
+                <div class="col-12 col-md-6 col-xl-3">
+                    <span class="badge @(!string.IsNullOrWhiteSpace(restaurant.StaffWhatsAppNumber) ? "text-bg-success" : "text-bg-secondary")">
+                        @(!string.IsNullOrWhiteSpace(restaurant.StaffWhatsAppNumber) ? "Configured" : "Optional")
+                    </span>
+                    <div class="mt-2 fw-semibold">Staff WhatsApp alerts</div>
+                    <small class="text-secondary">@(restaurant.StaffWhatsAppNumber ?? "Add a staff number to receive order alerts.")</small>
+                </div>
             </div>
         </div>
+    </section>
 
-        <div class="data-section">
-            <div class="section-heading">
-                <h2>Configuration</h2>
+    <section class="section-band">
+        <div class="section-heading">
+            <h2>Business Settings</h2>
+        </div>
+        @if (!string.IsNullOrWhiteSpace(successMessage))
+        {
+            <div class="success-alert">@successMessage</div>
+        }
+        <EditForm Model="restaurantForm" OnValidSubmit="SaveRestaurantAsync" class="form-grid">
+            <DataAnnotationsValidator />
+            <ValidationSummary />
+            <label>
+                <span>Name</span>
+                <InputText @bind-Value="restaurantForm.Name" />
+            </label>
+            <label>
+                <span>Business Type</span>
+                <InputSelect @bind-Value="restaurantForm.BusinessType">
+                    @foreach (var businessType in BusinessTypeOptions)
+                    {
+                        <option value="@businessType">@businessType</option>
+                    }
+                </InputSelect>
+            </label>
+            <label>
+                <span>WhatsApp Phone Number ID</span>
+                <InputText @bind-Value="restaurantForm.WhatsAppPhoneNumberId" />
+            </label>
+            <label>
+                <span>Business Phone</span>
+                <InputText @bind-Value="restaurantForm.BusinessPhone" />
+            </label>
+            <label>
+                <span>Notification Email</span>
+                <InputText @bind-Value="restaurantForm.NotificationEmail" type="email" />
+            </label>
+            <label>
+                <span>Staff WhatsApp Number</span>
+                <InputText @bind-Value="restaurantForm.StaffWhatsAppNumber" />
+            </label>
+            <label class="wide">
+                <span>Address</span>
+                <InputTextArea @bind-Value="restaurantForm.Address" rows="3" />
+            </label>
+            <label>
+                <span>CGST %</span>
+                <InputNumber @bind-Value="restaurantForm.CgstPercent" />
+            </label>
+            <label>
+                <span>SGST %</span>
+                <InputNumber @bind-Value="restaurantForm.SgstPercent" />
+            </label>
+            <label class="checkline">
+                <InputCheckbox @bind-Value="restaurantForm.IsActive" />
+                <span>Active</span>
+            </label>
+            <div class="form-actions">
+                <button class="button" type="submit" disabled="@isSubmitting">Save settings</button>
             </div>
-            <div class="detail-list">
-                <div><span>WhatsApp Phone ID</span><strong>@restaurant.WhatsAppPhoneNumberId</strong></div>
-                <div><span>Status</span><strong>@(restaurant.IsActive ? "Active" : "Inactive")</strong></div>
-                <div><span>Business phone</span><strong>@(restaurant.BusinessPhone ?? "-")</strong></div>
-                <div><span>Notification email</span><strong>@(restaurant.NotificationEmail ?? "-")</strong></div>
-                <div><span>Staff alert number</span><strong>@(restaurant.StaffWhatsAppNumber ?? "-")</strong></div>
+        </EditForm>
+    </section>
+
+    <section class="section-band">
+        <div class="section-heading">
+            <h2>Orders</h2>
+        </div>
+        <div class="table-responsive stack-mobile">
+            <table class="table table-hover align-middle mb-0 responsive-stack">
+                <thead>
+                    <tr>
+                        <th>Order</th>
+                        <th>Customer</th>
+                        <th>Status</th>
+                        <th>Total</th>
+                        <th>Created</th>
+                        <th></th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var order in orders.OrderByDescending(x => x.CreatedAt))
+                    {
+                        <tr>
+                            <td data-label="Order"><strong>@order.OrderNumber</strong><small>@order.Source</small></td>
+                            <td data-label="Customer">@order.CustomerName<small>@order.CustomerPhone</small></td>
+                            <td data-label="Status"><OrderStatusBadge Status="@order.OrderStatus" /></td>
+                            <td data-label="Total">Rs @order.TotalAmount.ToString("0.##")</td>
+                            <td data-label="Time">@order.CreatedAt.ToLocalTime().ToString("dd MMM yyyy, hh:mm tt")</td>
+                            <td data-label="" class="text-end"><span class="text-secondary">Portal order</span></td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    </section>
+
+    <section class="section-band">
+        <div class="section-heading">
+            <h2>Catalog</h2>
+        </div>
+        @if (menu is not null)
+        {
+            <div class="split-grid">
+                <EditForm Model="categoryForm" OnValidSubmit="CreateCategoryAsync" class="panel-form">
+                    <DataAnnotationsValidator />
+                    <ValidationSummary />
+                    <h3>Add Category</h3>
+                    <label>
+                        <span>Name</span>
+                        <InputText @bind-Value="categoryForm.Name" />
+                    </label>
+                    <label>
+                        <span>Display Order</span>
+                        <InputNumber @bind-Value="categoryForm.DisplayOrder" />
+                    </label>
+                    <label class="checkline">
+                        <InputCheckbox @bind-Value="categoryForm.IsActive" />
+                        <span>Active</span>
+                    </label>
+                    <button class="button" type="submit" disabled="@isSubmitting">Add category</button>
+                </EditForm>
+
+                <EditForm Model="itemForm" OnValidSubmit="CreateItemAsync" class="panel-form">
+                    <DataAnnotationsValidator />
+                    <ValidationSummary />
+                    <h3>Add Product</h3>
+                    <label>
+                        <span>Category</span>
+                        <InputSelect @bind-Value="itemForm.CategoryId">
+                            <option value="">Select category</option>
+                            @foreach (var category in menu.Categories)
+                            {
+                                <option value="@category.Id">@category.Name</option>
+                            }
+                        </InputSelect>
+                    </label>
+                    <label>
+                        <span>Product Code</span>
+                        <InputNumber @bind-Value="itemForm.ItemCode" />
+                    </label>
+                    <label>
+                        <span>Product Name</span>
+                        <InputText @bind-Value="itemForm.Name" />
+                    </label>
+                    <label>
+                        <span>Price</span>
+                        <InputNumber @bind-Value="itemForm.Price" />
+                    </label>
+                    <label class="wide">
+                        <span>Description</span>
+                        <InputTextArea @bind-Value="itemForm.Description" rows="2" />
+                    </label>
+                    <label class="checkline">
+                        <InputCheckbox @bind-Value="itemForm.IsAvailable" />
+                        <span>Available</span>
+                    </label>
+                    <label class="checkline">
+                        <InputCheckbox @bind-Value="itemForm.IsActive" />
+                        <span>Active</span>
+                    </label>
+                    <button class="button" type="submit" disabled="@isSubmitting">Add product</button>
+                </EditForm>
             </div>
+
+            <div class="menu-list">
+                @foreach (var item in menu.Items.OrderBy(x => x.ItemCode))
+                {
+                    var edit = GetItemEdit(item);
+                    <EditForm Model="edit" OnValidSubmit="() => UpdateItemAsync(item.Id)" class="menu-row">
+                        <DataAnnotationsValidator />
+                        <InputNumber @bind-Value="edit.ItemCode" aria-label="Item code" />
+                        <InputSelect @bind-Value="edit.CategoryId" aria-label="Category">
+                            @foreach (var category in menu.Categories)
+                            {
+                                <option value="@category.Id">@category.Name</option>
+                            }
+                        </InputSelect>
+                        <InputText @bind-Value="edit.Name" aria-label="Item name" />
+                        <InputNumber @bind-Value="edit.Price" aria-label="Price" />
+                        <InputText @bind-Value="edit.Description" aria-label="Description" />
+                        <label class="checkline">
+                            <InputCheckbox @bind-Value="edit.IsAvailable" />
+                            <span>Available</span>
+                        </label>
+                        <label class="checkline">
+                            <InputCheckbox @bind-Value="edit.IsActive" />
+                            <span>Active</span>
+                        </label>
+                        <button class="button compact" type="submit" disabled="@isSubmitting">Save</button>
+                        <button class="button compact danger" type="button" @onclick="() => DeactivateItemAsync(item.Id)">Deactivate</button>
+                    </EditForm>
+                }
+            </div>
+        }
+    </section>
+
+    <section class="section-band">
+        <div class="section-heading">
+            <h2>Customers</h2>
+        </div>
+        <div class="table-responsive stack-mobile">
+            <table class="table table-hover align-middle mb-0 responsive-stack">
+                <thead>
+                    <tr>
+                        <th>Customer</th>
+                        <th>Phone</th>
+                        <th>Orders</th>
+                        <th>Last Address</th>
+                        <th>Last Active</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var customer in customers)
+                    {
+                        <tr>
+                            <td data-label="Name">@(customer.Name ?? "WhatsApp Customer")</td>
+                            <td data-label="Phone">@customer.PhoneNumber</td>
+                            <td data-label="Orders">@customer.OrderCount</td>
+                            <td data-label="Last Address">@customer.LastAddress</td>
+                            <td data-label="Last Active">@customer.LastInteractionAt.ToLocalTime().ToString("dd MMM yyyy, hh:mm tt")</td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    </section>
+
+    <section class="section-band">
+        <div class="section-heading">
+            <h2>Portal Users</h2>
+        </div>
+        <div class="row g-3 mb-4">
+            <div class="col-12 col-md-3">
+                <label class="form-label">Name</label>
+                <input class="form-control" @bind="staffForm.DisplayName" />
+            </div>
+            <div class="col-12 col-md-3">
+                <label class="form-label">Email</label>
+                <input class="form-control" @bind="staffForm.Email" type="email" />
+            </div>
+            <div class="col-12 col-md-3">
+                <label class="form-label">Temporary Password</label>
+                <input class="form-control" @bind="staffForm.Password" type="password" />
+            </div>
+            <div class="col-12 col-md-2">
+                <label class="form-label">Role</label>
+                <select class="form-select" @bind="staffForm.Role">
+                    <option value="BusinessManager">BusinessManager</option>
+                    <option value="Cashier">Cashier</option>
+                    <option value="Staff">Staff</option>
+                </select>
+            </div>
+            <div class="col-12 col-md-1 d-flex align-items-end">
+                <button class="btn btn-success w-100" type="button" @onclick="CreateStaffAsync" disabled="@isSubmitting">Add</button>
+            </div>
+        </div>
+        <div class="table-responsive stack-mobile">
+            <table class="table table-hover align-middle mb-0 responsive-stack">
+                <thead>
+                    <tr>
+                        <th>Name</th>
+                        <th>Email</th>
+                        <th>Role</th>
+                        <th>Status</th>
+                        <th></th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var user in staff)
+                    {
+                        <tr>
+                            <td data-label="Name">@user.DisplayName</td>
+                            <td data-label="Email">@user.Email</td>
+                            <td data-label="Role"><span class="badge text-bg-light border">@user.Role</span></td>
+                            <td data-label="Status"><span class="badge @(user.IsActive ? "text-bg-success" : "text-bg-secondary")">@(user.IsActive ? "Active" : "Inactive")</span></td>
+                            <td data-label="" class="text-end">
+                                @if (user.Role != "BusinessOwner")
+                                {
+                                    <button class="btn btn-sm @(user.IsActive ? "btn-outline-danger" : "btn-outline-success")" type="button" @onclick="() => ToggleStaffAsync(user)">
+                                        @(user.IsActive ? "Disable" : "Enable")
+                                    </button>
+                                }
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
         </div>
     </section>
 }
@@ -73,12 +374,20 @@
 @code {
     [Parameter] public Guid RestaurantId { get; set; }
 
+    private static readonly string[] BusinessTypeOptions = ["restaurant", "cafe", "bakery", "cloud_kitchen", "grocery", "pharmacy", "retail", "other"];
+    private readonly RestaurantEditForm restaurantForm = new();
+    private readonly CategoryForm categoryForm = new();
+    private readonly ItemForm itemForm = new();
+    private readonly StaffForm staffForm = new();
+    private readonly Dictionary<Guid, MenuItemEditForm> itemEdits = [];
     private RestaurantResponse? restaurant;
     private MenuResponse? menu;
     private IReadOnlyCollection<OrderSummaryResponse> orders = Array.Empty<OrderSummaryResponse>();
     private IReadOnlyCollection<CustomerSummaryResponse> customers = Array.Empty<CustomerSummaryResponse>();
     private IReadOnlyCollection<StaffUserResponse> staff = Array.Empty<StaffUserResponse>();
     private bool isLoading;
+    private bool isSubmitting;
+    private string? successMessage;
     private ApiClientException? error;
 
     protected override Task OnParametersSetAsync() => LoadAsync();
@@ -95,6 +404,8 @@
             orders = await ApiClient.GetOrdersAsync(RestaurantId);
             customers = await ApiClient.GetCustomersAsync(RestaurantId, take: 50);
             staff = await ApiClient.GetStaffAsync(RestaurantId);
+            restaurantForm.Load(restaurant);
+            SyncItemEdits();
         }
         catch (ApiClientException exception)
         {
@@ -107,11 +418,270 @@
         }
     }
 
+    private async Task SaveRestaurantAsync()
+    {
+        await RunMutationAsync(async () =>
+        {
+            restaurant = await ApiClient.UpdateRestaurantAsync(RestaurantId, new UpdateRestaurantRequest(
+                restaurantForm.Name,
+                restaurantForm.BusinessType,
+                restaurantForm.WhatsAppPhoneNumberId,
+                restaurantForm.BusinessPhone,
+                restaurantForm.NotificationEmail,
+                restaurantForm.StaffWhatsAppNumber,
+                restaurantForm.Address,
+                restaurantForm.CgstPercent,
+                restaurantForm.SgstPercent,
+                restaurantForm.IsActive));
+            successMessage = "Business settings saved.";
+        });
+    }
+
+    private async Task CreateCategoryAsync()
+    {
+        await RunMutationAsync(async () =>
+        {
+            await ApiClient.CreateMenuCategoryAsync(RestaurantId, new CreateMenuCategoryRequest(categoryForm.Name, categoryForm.DisplayOrder, categoryForm.IsActive));
+            categoryForm.Reset();
+            await LoadAsync();
+        });
+    }
+
+    private async Task CreateItemAsync()
+    {
+        if (itemForm.CategoryId is null)
+        {
+            return;
+        }
+
+        await RunMutationAsync(async () =>
+        {
+            await ApiClient.CreateMenuItemAsync(RestaurantId, new CreateMenuItemRequest(
+                itemForm.CategoryId.Value,
+                null,
+                itemForm.ItemCode,
+                itemForm.Name,
+                itemForm.Description,
+                itemForm.Price,
+                itemForm.IsAvailable,
+                itemForm.IsActive));
+            itemForm.Reset();
+            await LoadAsync();
+        });
+    }
+
+    private async Task UpdateItemAsync(Guid id)
+    {
+        if (!itemEdits.TryGetValue(id, out var edit))
+        {
+            return;
+        }
+
+        await RunMutationAsync(async () =>
+        {
+            await ApiClient.UpdateMenuItemAsync(id, new UpdateMenuItemRequest(
+                edit.CategoryId,
+                edit.MasterMenuItemId,
+                edit.ItemCode,
+                edit.Name,
+                edit.Description,
+                edit.Price,
+                edit.IsAvailable,
+                edit.IsActive));
+            await LoadAsync();
+        });
+    }
+
+    private async Task DeactivateItemAsync(Guid id)
+    {
+        if (itemEdits.TryGetValue(id, out var edit))
+        {
+            edit.IsActive = false;
+            await UpdateItemAsync(id);
+        }
+    }
+
+    private async Task CreateStaffAsync()
+    {
+        await RunMutationAsync(async () =>
+        {
+            await ApiClient.CreateStaffAsync(RestaurantId, new CreateStaffUserRequest(
+                staffForm.DisplayName,
+                staffForm.Email,
+                staffForm.Password,
+                staffForm.Role));
+            staffForm.Reset();
+            await LoadAsync();
+        });
+    }
+
+    private async Task ToggleStaffAsync(StaffUserResponse user)
+    {
+        await RunMutationAsync(async () =>
+        {
+            await ApiClient.UpdateStaffStatusAsync(user.Id, RestaurantId, new UpdateStaffStatusRequest(!user.IsActive));
+            await LoadAsync();
+        });
+    }
+
+    private async Task RunMutationAsync(Func<Task> action)
+    {
+        isSubmitting = true;
+        error = null;
+        successMessage = null;
+
+        try
+        {
+            await action();
+        }
+        catch (ApiClientException exception)
+        {
+            error = exception;
+            RedirectIfUnauthorized(exception);
+        }
+        finally
+        {
+            isSubmitting = false;
+        }
+    }
+
+    private MenuItemEditForm GetItemEdit(MenuItemResponse item)
+    {
+        if (!itemEdits.TryGetValue(item.Id, out var edit))
+        {
+            edit = MenuItemEditForm.From(item);
+            itemEdits[item.Id] = edit;
+        }
+
+        return edit;
+    }
+
+    private void SyncItemEdits()
+    {
+        itemEdits.Clear();
+        if (menu is null)
+        {
+            return;
+        }
+
+        foreach (var item in menu.Items)
+        {
+            itemEdits[item.Id] = MenuItemEditForm.From(item);
+        }
+    }
+
+    private static bool IsPending(OrderSummaryResponse order) =>
+        string.Equals(order.OrderStatus, "pending_confirmation", StringComparison.OrdinalIgnoreCase);
+
     private void RedirectIfUnauthorized(ApiClientException exception)
     {
         if ((int)exception.StatusCode == 401)
         {
             Navigation.NavigateTo("/login");
+        }
+    }
+
+    private sealed class RestaurantEditForm
+    {
+        [Required] public string Name { get; set; } = string.Empty;
+        [Required] public string BusinessType { get; set; } = "restaurant";
+        [Required] public string WhatsAppPhoneNumberId { get; set; } = string.Empty;
+        public string? BusinessPhone { get; set; }
+        [EmailAddress] public string? NotificationEmail { get; set; }
+        public string? StaffWhatsAppNumber { get; set; }
+        public string? Address { get; set; }
+        [Range(typeof(decimal), "0", "100")] public decimal CgstPercent { get; set; }
+        [Range(typeof(decimal), "0", "100")] public decimal SgstPercent { get; set; }
+        public bool IsActive { get; set; }
+
+        public void Load(RestaurantResponse restaurant)
+        {
+            Name = restaurant.Name;
+            BusinessType = restaurant.BusinessType;
+            WhatsAppPhoneNumberId = restaurant.WhatsAppPhoneNumberId;
+            BusinessPhone = restaurant.BusinessPhone;
+            NotificationEmail = restaurant.NotificationEmail;
+            StaffWhatsAppNumber = restaurant.StaffWhatsAppNumber;
+            Address = restaurant.Address;
+            CgstPercent = restaurant.CgstPercent;
+            SgstPercent = restaurant.SgstPercent;
+            IsActive = restaurant.IsActive;
+        }
+    }
+
+    private sealed class CategoryForm
+    {
+        [Required] public string Name { get; set; } = string.Empty;
+        public int DisplayOrder { get; set; }
+        public bool IsActive { get; set; } = true;
+
+        public void Reset()
+        {
+            Name = string.Empty;
+            DisplayOrder = 0;
+            IsActive = true;
+        }
+    }
+
+    private sealed class ItemForm
+    {
+        [Required] public Guid? CategoryId { get; set; }
+        [Range(1, int.MaxValue)] public int ItemCode { get; set; } = 1;
+        [Required] public string Name { get; set; } = string.Empty;
+        public string? Description { get; set; }
+        [Range(typeof(decimal), "0", "999999999")] public decimal Price { get; set; }
+        public bool IsAvailable { get; set; } = true;
+        public bool IsActive { get; set; } = true;
+
+        public void Reset()
+        {
+            CategoryId = null;
+            ItemCode = 1;
+            Name = string.Empty;
+            Description = null;
+            Price = 0;
+            IsAvailable = true;
+            IsActive = true;
+        }
+    }
+
+    private sealed class MenuItemEditForm
+    {
+        public Guid CategoryId { get; set; }
+        public Guid? MasterMenuItemId { get; set; }
+        public int ItemCode { get; set; }
+        public string Name { get; set; } = string.Empty;
+        public string? Description { get; set; }
+        public decimal Price { get; set; }
+        public bool IsAvailable { get; set; }
+        public bool IsActive { get; set; }
+
+        public static MenuItemEditForm From(MenuItemResponse item) => new()
+        {
+            CategoryId = item.CategoryId,
+            MasterMenuItemId = item.MasterMenuItemId,
+            ItemCode = item.ItemCode,
+            Name = item.Name,
+            Description = item.Description,
+            Price = item.Price,
+            IsAvailable = item.IsAvailable,
+            IsActive = item.IsActive
+        };
+    }
+
+    private sealed class StaffForm
+    {
+        public string DisplayName { get; set; } = string.Empty;
+        public string Email { get; set; } = string.Empty;
+        public string Password { get; set; } = string.Empty;
+        public string Role { get; set; } = "Staff";
+
+        public void Reset()
+        {
+            DisplayName = string.Empty;
+            Email = string.Empty;
+            Password = string.Empty;
+            Role = "Staff";
         }
     }
 }

@@ -3,97 +3,109 @@
 @inject IVelonixsConnectApiClient ApiClient
 @inject NavigationManager Navigation
 
-<PageTitle>Staff</PageTitle>
+<PageTitle>Staff Users</PageTitle>
 
-<section class="page-heading">
+<section class="d-flex flex-column flex-sm-row align-items-sm-center justify-content-between gap-3 mb-4">
     <div>
-        <p class="eyebrow">Restaurant portal</p>
-        <h1>Staff</h1>
+        <p class="eyebrow">@restaurantName</p>
+        <h1>Staff Users</h1>
     </div>
-    <button class="secondary-button" type="button" @onclick="LoadAsync">Refresh</button>
+    <div class="d-flex flex-wrap gap-2 justify-content-sm-end ms-sm-auto">
+        <a class="btn btn-outline-primary" href="/">Dashboard</a>
+        <button class="btn btn-outline-secondary" type="button" @onclick="LoadAsync">Refresh</button>
+    </div>
 </section>
 
 <ApiErrorAlert Error="error" Title="Staff unavailable" />
 <LoadingPanel IsLoading="isLoading" Message="Loading staff" />
 
-<section class="data-grid">
-    <div class="data-section">
-        <div class="section-heading">
-            <h2>Staff accounts</h2>
-            <span>@staff.Count entries</span>
-        </div>
-        <div class="table-wrap">
-            <table>
-                <thead>
-                    <tr>
-                        <th>Name</th>
-                        <th>Email</th>
-                        <th>Role</th>
-                        <th>Status</th>
-                        <th></th>
-                    </tr>
-                </thead>
-                <tbody>
-                    @foreach (var user in staff.OrderBy(x => x.DisplayName))
-                    {
-                        <tr>
-                            <td>@user.DisplayName</td>
-                            <td>@user.Email</td>
-                            <td>@user.Role</td>
-                            <td>@(user.IsActive ? "Active" : "Inactive")</td>
-                            <td>
-                                <button class="small-action" type="button" @onclick="() => ToggleStatusAsync(user)">
-                                    @(user.IsActive ? "Deactivate" : "Activate")
-                                </button>
-                            </td>
-                        </tr>
-                    }
-                </tbody>
-            </table>
-        </div>
+<div class="row g-4">
+    <div class="col-12 col-xl-7">
+        <section class="card shadow-sm">
+            <div class="card-body">
+                <h2 class="h5 mb-3">Current users</h2>
+                <div class="table-responsive stack-mobile">
+                    <table class="table table-hover align-middle mb-0 responsive-stack">
+                        <thead>
+                            <tr>
+                                <th>Name</th>
+                                <th>Email</th>
+                                <th>Role</th>
+                                <th>Status</th>
+                                <th></th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var user in staff.OrderBy(x => x.DisplayName))
+                            {
+                                <tr>
+                                    <td data-label="Name">@user.DisplayName</td>
+                                    <td data-label="Email">@user.Email</td>
+                                    <td data-label="Role"><span class="badge text-bg-light border">@user.Role</span></td>
+                                    <td data-label="Status"><span class="badge @(user.IsActive ? "text-bg-success" : "text-bg-secondary")">@(user.IsActive ? "Active" : "Inactive")</span></td>
+                                    <td data-label="" class="text-end">
+                                        @if (user.Role != "BusinessOwner")
+                                        {
+                                            <button class="btn btn-sm @(user.IsActive ? "btn-outline-danger" : "btn-outline-success")" type="button" @onclick="() => ToggleStatusAsync(user)" disabled="@isSubmitting">
+                                                @(user.IsActive ? "Disable" : "Enable")
+                                            </button>
+                                        }
+                                    </td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </section>
     </div>
 
-    <div class="data-section">
-        <div class="section-heading">
-            <h2>Create staff</h2>
-        </div>
-        @if (!string.IsNullOrWhiteSpace(successMessage))
-        {
-            <div class="success-alert">@successMessage</div>
-        }
-        <EditForm Model="form" OnValidSubmit="CreateAsync" class="form-stack">
-            <DataAnnotationsValidator />
-            <ValidationSummary />
-            <label>
-                <span>Name</span>
-                <InputText @bind-Value="form.DisplayName" />
-            </label>
-            <label>
-                <span>Email</span>
-                <InputText @bind-Value="form.Email" type="email" />
-            </label>
-            <label>
-                <span>Temporary password</span>
-                <InputText @bind-Value="form.Password" type="password" />
-            </label>
-            <label>
-                <span>Role</span>
-                <InputSelect @bind-Value="form.Role">
-                    <option value="BusinessManager">Business manager</option>
-                    <option value="Cashier">Cashier</option>
-                    <option value="Staff">Staff</option>
-                </InputSelect>
-            </label>
-            <button class="primary-button" type="submit" disabled="@isSubmitting">
-                @(isSubmitting ? "Creating" : "Create staff")
-            </button>
-        </EditForm>
+    <div class="col-12 col-xl-5">
+        <section class="card shadow-sm">
+            <div class="card-body">
+                <h2 class="h5 mb-3">Create staff login</h2>
+                @if (!string.IsNullOrWhiteSpace(successMessage))
+                {
+                    <div class="success-alert">@successMessage</div>
+                }
+                <EditForm Model="form" OnValidSubmit="CreateAsync" class="row g-3">
+                    <DataAnnotationsValidator />
+                    <ValidationSummary />
+                    <div class="col-12">
+                        <label class="form-label">Name</label>
+                        <InputText class="form-control" @bind-Value="form.DisplayName" />
+                    </div>
+                    <div class="col-12">
+                        <label class="form-label">Email</label>
+                        <InputText class="form-control" @bind-Value="form.Email" type="email" />
+                    </div>
+                    <div class="col-12">
+                        <label class="form-label">Temporary Password</label>
+                        <InputText class="form-control" @bind-Value="form.Password" type="password" />
+                    </div>
+                    <div class="col-12">
+                        <label class="form-label">Role</label>
+                        <InputSelect class="form-select" @bind-Value="form.Role">
+                            <option value="BusinessManager">BusinessManager</option>
+                            <option value="Cashier">Cashier</option>
+                            <option value="Staff">Staff</option>
+                        </InputSelect>
+                    </div>
+                    <div class="col-12">
+                        <button class="btn btn-primary w-100" type="submit" disabled="@isSubmitting">
+                            @(isSubmitting ? "Creating" : "Create staff account")
+                        </button>
+                    </div>
+                </EditForm>
+            </div>
+        </section>
     </div>
-</section>
+</div>
 
 @code {
     private IReadOnlyCollection<StaffUserResponse> staff = Array.Empty<StaffUserResponse>();
     private readonly StaffForm form = new();
+    private string restaurantName = "Restaurant";
     private bool isLoading;
     private bool isSubmitting;
     private string? successMessage;
@@ -108,6 +120,8 @@
 
         try
         {
+            var dashboard = await ApiClient.GetRestaurantDashboardAsync();
+            restaurantName = dashboard.Restaurant.Name;
             staff = await ApiClient.GetStaffAsync();
         }
         catch (ApiClientException exception)
@@ -149,6 +163,7 @@
 
     private async Task ToggleStatusAsync(StaffUserResponse user)
     {
+        isSubmitting = true;
         error = null;
 
         try
@@ -163,6 +178,10 @@
         {
             error = exception;
             RedirectIfUnauthorized(exception);
+        }
+        finally
+        {
+            isSubmitting = false;
         }
     }
 

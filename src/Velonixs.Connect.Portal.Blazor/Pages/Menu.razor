@@ -1,68 +1,230 @@
 @page "/menu"
-@using Velonixs.Connect.Contracts.Menu
+@using System.ComponentModel.DataAnnotations
+@using Velonixs.Connect.Contracts.Restaurants
 @inject IVelonixsConnectApiClient ApiClient
 @inject NavigationManager Navigation
 
-<PageTitle>Menu</PageTitle>
+<PageTitle>Menu, Price & Stock</PageTitle>
 
-<section class="page-heading">
+<section class="d-flex flex-column flex-lg-row align-items-lg-center justify-content-between gap-3 mb-4">
     <div>
-        <p class="eyebrow">Restaurant portal</p>
-        <h1>@(menu?.RestaurantName ?? "Menu")</h1>
+        <p class="eyebrow">@(restaurant?.Name ?? "Restaurant")</p>
+        <h1>Menu, Price & Stock</h1>
+        <p class="text-secondary mb-0">Manage this restaurant's menu only. WhatsApp customers see active and available items.</p>
     </div>
-    <button class="secondary-button" type="button" @onclick="LoadAsync">Refresh</button>
+    <div class="d-flex flex-wrap gap-2 justify-content-lg-end ms-lg-auto">
+        <a class="btn btn-outline-primary" href="/">Back to dashboard</a>
+        <button class="btn btn-outline-secondary" type="button" @onclick="LoadAsync">Refresh</button>
+    </div>
 </section>
 
 <ApiErrorAlert Error="error" Title="Menu unavailable" />
 <LoadingPanel IsLoading="isLoading" Message="Loading menu" />
 
-@if (menu is not null)
+@if (menu is not null && restaurant is not null)
 {
-    <section class="data-section">
-        <div class="section-heading">
-            <h2>Menu items</h2>
-            <span>@menu.Items.Count entries</span>
+    <section class="card shadow-sm mb-4">
+        <div class="card-body">
+            <div class="section-heading">
+                <div>
+                    <h2>GST Settings</h2>
+                    <p class="text-secondary mb-0">These rates are added to the order total for this restaurant.</p>
+                </div>
+            </div>
+            @if (!string.IsNullOrWhiteSpace(successMessage))
+            {
+                <div class="success-alert">@successMessage</div>
+            }
+            <EditForm Model="taxForm" OnValidSubmit="SaveTaxAsync" class="row g-3 align-items-end">
+                <DataAnnotationsValidator />
+                <ValidationSummary />
+                <div class="col-12 col-md-3">
+                    <label class="form-label">CGST %</label>
+                    <InputNumber class="form-control" @bind-Value="taxForm.CgstPercent" />
+                </div>
+                <div class="col-12 col-md-3">
+                    <label class="form-label">SGST %</label>
+                    <InputNumber class="form-control" @bind-Value="taxForm.SgstPercent" />
+                </div>
+                <div class="col-12 col-md-auto">
+                    <button class="btn btn-primary" type="submit" disabled="@isSubmitting">Save GST</button>
+                </div>
+            </EditForm>
+        </div>
+    </section>
+
+    <section class="row g-3 mb-4">
+        <div class="col-12 col-xl-5">
+            <div class="card shadow-sm h-100">
+                <div class="card-body">
+                    <h2 class="h4">Map category</h2>
+                    @if (masterCatalog.Categories.Any(x => x.IsActive))
+                    {
+                        <EditForm Model="categoryForm" OnValidSubmit="CreateCategoryAsync" class="row g-3 align-items-end">
+                            <DataAnnotationsValidator />
+                            <ValidationSummary />
+                            <div class="col-12 col-lg-7">
+                                <label class="form-label">Master category</label>
+                                <InputSelect class="form-select" @bind-Value="categoryForm.MasterCategoryId">
+                                    <option value="">Select category</option>
+                                    @foreach (var category in masterCatalog.Categories.Where(x => x.IsActive).OrderBy(x => x.DisplayOrder).ThenBy(x => x.Name))
+                                    {
+                                        <option value="@category.Id">@category.Name</option>
+                                    }
+                                </InputSelect>
+                            </div>
+                            <div class="col-6 col-lg-2">
+                                <label class="form-label">Order</label>
+                                <InputNumber class="form-control" @bind-Value="categoryForm.DisplayOrder" />
+                            </div>
+                            <div class="col-6 col-lg-3">
+                                <div class="form-check mb-lg-2">
+                                    <InputCheckbox class="form-check-input" @bind-Value="categoryForm.IsActive" />
+                                    <label class="form-check-label">Active</label>
+                                </div>
+                            </div>
+                            <div class="col-12">
+                                <button class="btn btn-primary w-100" type="submit" disabled="@isSubmitting">Map category</button>
+                            </div>
+                        </EditForm>
+                    }
+                    else
+                    {
+                        <p class="text-secondary mb-0">Ask platform admin to add master categories first.</p>
+                    }
+                </div>
+            </div>
         </div>
 
-        @if (menu.Items.Count == 0)
-        {
-            <div class="empty-state">No menu items are configured yet.</div>
-        }
-        else
-        {
-            <div class="menu-list">
-                @foreach (var group in menu.Items.GroupBy(item => item.CategoryName).OrderBy(group => group.Key))
+        <div class="col-12 col-xl-7">
+            <div class="card shadow-sm h-100">
+                <div class="card-body">
+                    <h2 class="h4">Map menu item</h2>
+                    @if (menu.Categories.Any(x => x.IsActive) && masterCatalog.Items.Any(x => x.IsActive))
+                    {
+                        <EditForm Model="itemForm" OnValidSubmit="CreateItemAsync" class="row g-3 align-items-end">
+                            <DataAnnotationsValidator />
+                            <ValidationSummary />
+                            <div class="col-12 col-lg-4">
+                                <label class="form-label">Master item</label>
+                                <InputSelect class="form-select" @bind-Value="itemForm.MasterMenuItemId">
+                                    <option value="">Select item</option>
+                                    @foreach (var item in masterCatalog.Items.Where(x => x.IsActive).OrderBy(x => x.MasterCategoryName).ThenBy(x => x.Name))
+                                    {
+                                        <option value="@item.Id">@item.MasterCategoryName - @item.Name</option>
+                                    }
+                                </InputSelect>
+                            </div>
+                            <div class="col-12 col-lg-3">
+                                <label class="form-label">Category</label>
+                                <InputSelect class="form-select" @bind-Value="itemForm.CategoryId">
+                                    <option value="">Select category</option>
+                                    @foreach (var category in menu.Categories.Where(x => x.IsActive).OrderBy(x => x.DisplayOrder).ThenBy(x => x.Name))
+                                    {
+                                        <option value="@category.Id">@category.Name</option>
+                                    }
+                                </InputSelect>
+                            </div>
+                            <div class="col-6 col-lg-2">
+                                <label class="form-label">Code</label>
+                                <InputNumber class="form-control" @bind-Value="itemForm.ItemCode" />
+                            </div>
+                            <div class="col-6 col-lg-3">
+                                <label class="form-label">Price</label>
+                                <InputNumber class="form-control" @bind-Value="itemForm.Price" />
+                            </div>
+                            <div class="col-12 d-flex flex-wrap gap-3">
+                                <div class="form-check">
+                                    <InputCheckbox class="form-check-input" @bind-Value="itemForm.IsAvailable" />
+                                    <label class="form-check-label">In stock</label>
+                                </div>
+                                <div class="form-check">
+                                    <InputCheckbox class="form-check-input" @bind-Value="itemForm.IsActive" />
+                                    <label class="form-check-label">Active</label>
+                                </div>
+                            </div>
+                            <div class="col-12">
+                                <button class="btn btn-primary w-100" type="submit" disabled="@isSubmitting">Map item</button>
+                            </div>
+                        </EditForm>
+                    }
+                    else
+                    {
+                        <p class="text-secondary mb-0">Map an active category and ask platform admin to add master items first.</p>
+                    }
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <section class="card shadow-sm">
+        <div class="card-body">
+            <div class="section-heading">
+                <h2>Restaurant Menu Items</h2>
+            </div>
+
+            <div class="portal-menu-list">
+                @foreach (var item in menu.Items.OrderBy(x => x.ItemCode))
                 {
-                    <section>
-                        <h3>@group.Key</h3>
-                        @foreach (var item in group.OrderBy(x => x.ItemCode))
-                        {
-                            <article class="menu-row">
-                                <div>
-                                    <strong>@item.ItemCode. @item.Name</strong>
-                                    <span>@(string.IsNullOrWhiteSpace(item.Description) ? "No description" : item.Description)</span>
-                                </div>
-                                <div class="menu-row-actions">
-                                    <span>@item.Price.ToString("C0")</span>
-                                    <span class="availability @(item.IsAvailable ? "is-on" : "is-off")">
-                                        @(item.IsAvailable ? "Available" : "Unavailable")
-                                    </span>
-                                    <button class="small-action" type="button" @onclick="() => ToggleAvailabilityAsync(item)">
-                                        @(item.IsAvailable ? "Mark unavailable" : "Mark available")
-                                    </button>
-                                </div>
-                            </article>
-                        }
-                    </section>
+                    var edit = GetEditForm(item);
+                    <EditForm Model="edit" OnValidSubmit="() => UpdateItemAsync(item.Id)" class="portal-menu-row">
+                        <DataAnnotationsValidator />
+                        <InputNumber @bind-Value="edit.ItemCode" aria-label="Item code" />
+                        <InputSelect @bind-Value="edit.MasterMenuItemId" aria-label="Master menu item">
+                            <option value="">Custom item</option>
+                            @foreach (var masterItem in masterCatalog.Items.Where(x => x.IsActive || x.Id == item.MasterMenuItemId).OrderBy(x => x.MasterCategoryName).ThenBy(x => x.Name))
+                            {
+                                <option value="@masterItem.Id">@masterItem.Name</option>
+                            }
+                        </InputSelect>
+                        <InputSelect @bind-Value="edit.CategoryId" aria-label="Category">
+                            @foreach (var category in menu.Categories.OrderBy(x => x.DisplayOrder).ThenBy(x => x.Name))
+                            {
+                                <option value="@category.Id">@category.Name</option>
+                            }
+                        </InputSelect>
+                        <InputNumber @bind-Value="edit.Price" aria-label="Price" />
+                        <InputText @bind-Value="edit.Name" aria-label="Item name" />
+                        <label class="form-check mb-0">
+                            <InputCheckbox class="form-check-input" @bind-Value="edit.IsAvailable" />
+                            <span class="form-check-label">In stock</span>
+                        </label>
+                        <label class="form-check mb-0">
+                            <InputCheckbox class="form-check-input" @bind-Value="edit.IsActive" />
+                            <span class="form-check-label">Active</span>
+                        </label>
+                        <button class="btn btn-sm btn-primary" type="submit" disabled="@isSubmitting">Save</button>
+                        <button class="btn btn-sm btn-outline-secondary" type="button" @onclick="() => DeactivateItemAsync(item.Id)">Deactivate</button>
+                        <button class="btn btn-sm btn-outline-danger" type="button" @onclick="() => DeleteItemAsync(item.Id)">Delete</button>
+                    </EditForm>
+                }
+
+                @if (!menu.Items.Any())
+                {
+                    <div class="alert alert-info mb-0">
+                        No menu items yet. Add a category and item to start accepting WhatsApp orders.
+                    </div>
                 }
             </div>
-        }
+
+            <div class="alert alert-light border mt-3 mb-0">
+                Stock is currently managed as <strong>In stock / Out of stock</strong>. Out-of-stock or inactive items are hidden from the WhatsApp ordering menu.
+            </div>
+        </div>
     </section>
 }
 
 @code {
+    private readonly TaxForm taxForm = new();
+    private readonly CategoryForm categoryForm = new();
+    private readonly ItemForm itemForm = new();
+    private readonly Dictionary<Guid, MenuItemEditForm> itemEdits = [];
+    private RestaurantResponse? restaurant;
     private MenuResponse? menu;
+    private MasterCatalogResponse masterCatalog = new(Array.Empty<MasterMenuCategoryResponse>(), Array.Empty<MasterMenuItemResponse>());
     private bool isLoading;
+    private bool isSubmitting;
+    private string? successMessage;
     private ApiClientException? error;
 
     protected override Task OnInitializedAsync() => LoadAsync();
@@ -75,7 +237,12 @@
         try
         {
             var dashboard = await ApiClient.GetRestaurantDashboardAsync();
+            restaurant = dashboard.Restaurant;
             menu = dashboard.Menu;
+            masterCatalog = await ApiClient.GetMasterCatalogAsync();
+            taxForm.CgstPercent = restaurant.CgstPercent;
+            taxForm.SgstPercent = restaurant.SgstPercent;
+            SyncEditForms();
         }
         catch (ApiClientException exception)
         {
@@ -88,21 +255,159 @@
         }
     }
 
-    private async Task ToggleAvailabilityAsync(MenuItemResponse item)
+    private async Task SaveTaxAsync()
     {
+        if (restaurant is null)
+        {
+            return;
+        }
+
+        await RunMutationAsync(async () =>
+        {
+            restaurant = await ApiClient.UpdateRestaurantTaxSettingsAsync(
+                restaurant.Id,
+                new UpdateRestaurantTaxSettingRequest(taxForm.CgstPercent, taxForm.SgstPercent));
+            successMessage = "GST settings saved.";
+        });
+    }
+
+    private async Task CreateCategoryAsync()
+    {
+        if (menu is null || categoryForm.MasterCategoryId is not Guid masterCategoryId)
+        {
+            return;
+        }
+
+        var masterCategory = masterCatalog.Categories.First(x => x.Id == masterCategoryId);
+        await RunMutationAsync(async () =>
+        {
+            await ApiClient.CreateMenuCategoryAsync(
+                menu.RestaurantId,
+                new CreateMenuCategoryRequest(masterCategory.Name, categoryForm.DisplayOrder, categoryForm.IsActive, masterCategoryId));
+            categoryForm.Reset();
+            await LoadAsync();
+        });
+    }
+
+    private async Task CreateItemAsync()
+    {
+        if (menu is null || itemForm.CategoryId is not Guid categoryId || itemForm.MasterMenuItemId is not Guid masterItemId)
+        {
+            return;
+        }
+
+        var masterItem = masterCatalog.Items.First(x => x.Id == masterItemId);
+        await RunMutationAsync(async () =>
+        {
+            await ApiClient.CreateMenuItemAsync(
+                menu.RestaurantId,
+                new CreateMenuItemRequest(
+                    categoryId,
+                    masterItemId,
+                    itemForm.ItemCode,
+                    masterItem.Name,
+                    masterItem.Description,
+                    itemForm.Price,
+                    itemForm.IsAvailable,
+                    itemForm.IsActive));
+            itemForm.Reset();
+            await LoadAsync();
+        });
+    }
+
+    private async Task UpdateItemAsync(Guid itemId)
+    {
+        if (!itemEdits.TryGetValue(itemId, out var edit))
+        {
+            return;
+        }
+
+        await RunMutationAsync(async () =>
+        {
+            await ApiClient.UpdateMenuItemAsync(
+                itemId,
+                new UpdateMenuItemRequest(
+                    edit.CategoryId,
+                    edit.MasterMenuItemId,
+                    edit.ItemCode,
+                    edit.Name,
+                    edit.Description,
+                    edit.Price,
+                    edit.IsAvailable,
+                    edit.IsActive));
+            await LoadAsync();
+        });
+    }
+
+    private async Task DeactivateItemAsync(Guid itemId)
+    {
+        if (!itemEdits.TryGetValue(itemId, out var edit))
+        {
+            return;
+        }
+
+        edit.IsActive = false;
+        await UpdateItemAsync(itemId);
+    }
+
+    private async Task DeleteItemAsync(Guid itemId)
+    {
+        await RunMutationAsync(async () =>
+        {
+            await ApiClient.DeleteMenuItemAsync(itemId);
+            await LoadAsync();
+        });
+    }
+
+    private MenuItemEditForm GetEditForm(MenuItemResponse item)
+    {
+        if (!itemEdits.TryGetValue(item.Id, out var edit))
+        {
+            edit = MenuItemEditForm.From(item);
+            itemEdits[item.Id] = edit;
+        }
+
+        return edit;
+    }
+
+    private void SyncEditForms()
+    {
+        if (menu is null)
+        {
+            itemEdits.Clear();
+            return;
+        }
+
+        var visibleIds = menu.Items.Select(x => x.Id).ToHashSet();
+        foreach (var missingId in itemEdits.Keys.Where(id => !visibleIds.Contains(id)).ToArray())
+        {
+            itemEdits.Remove(missingId);
+        }
+
+        foreach (var item in menu.Items)
+        {
+            itemEdits[item.Id] = MenuItemEditForm.From(item);
+        }
+    }
+
+    private async Task RunMutationAsync(Func<Task> action)
+    {
+        isSubmitting = true;
         error = null;
+        successMessage = null;
 
         try
         {
-            await ApiClient.UpdateMenuItemAvailabilityAsync(
-                item.Id,
-                new UpdateMenuItemAvailabilityRequest(!item.IsAvailable));
-            await LoadAsync();
+            await action();
         }
         catch (ApiClientException exception)
         {
             error = exception;
             RedirectIfUnauthorized(exception);
+        }
+        finally
+        {
+            isSubmitting = false;
         }
     }
 
@@ -112,5 +417,84 @@
         {
             Navigation.NavigateTo("/login");
         }
+    }
+
+    private sealed class TaxForm
+    {
+        [Range(typeof(decimal), "0", "100")]
+        public decimal CgstPercent { get; set; }
+
+        [Range(typeof(decimal), "0", "100")]
+        public decimal SgstPercent { get; set; }
+    }
+
+    private sealed class CategoryForm
+    {
+        [Required]
+        public Guid? MasterCategoryId { get; set; }
+
+        public int DisplayOrder { get; set; }
+
+        public bool IsActive { get; set; } = true;
+
+        public void Reset()
+        {
+            MasterCategoryId = null;
+            DisplayOrder = 0;
+            IsActive = true;
+        }
+    }
+
+    private sealed class ItemForm
+    {
+        [Required]
+        public Guid? MasterMenuItemId { get; set; }
+
+        [Required]
+        public Guid? CategoryId { get; set; }
+
+        [Range(1, int.MaxValue)]
+        public int ItemCode { get; set; } = 1;
+
+        [Range(typeof(decimal), "0", "999999999")]
+        public decimal Price { get; set; }
+
+        public bool IsAvailable { get; set; } = true;
+
+        public bool IsActive { get; set; } = true;
+
+        public void Reset()
+        {
+            MasterMenuItemId = null;
+            CategoryId = null;
+            ItemCode = 1;
+            Price = 0;
+            IsAvailable = true;
+            IsActive = true;
+        }
+    }
+
+    private sealed class MenuItemEditForm
+    {
+        public Guid CategoryId { get; set; }
+        public Guid? MasterMenuItemId { get; set; }
+        public int ItemCode { get; set; }
+        public string Name { get; set; } = string.Empty;
+        public string? Description { get; set; }
+        public decimal Price { get; set; }
+        public bool IsAvailable { get; set; }
+        public bool IsActive { get; set; }
+
+        public static MenuItemEditForm From(MenuItemResponse item) => new()
+        {
+            CategoryId = item.CategoryId,
+            MasterMenuItemId = item.MasterMenuItemId,
+            ItemCode = item.ItemCode,
+            Name = item.Name,
+            Description = item.Description,
+            Price = item.Price,
+            IsAvailable = item.IsAvailable,
+            IsActive = item.IsActive
+        };
     }
 }

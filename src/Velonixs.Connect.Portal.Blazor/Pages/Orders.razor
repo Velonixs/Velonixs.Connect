@@ -8,25 +8,29 @@
 
 <PageTitle>Orders</PageTitle>
 
-<section class="page-heading">
+<section class="d-flex flex-column flex-lg-row align-items-lg-center justify-content-between gap-3 mb-4">
     <div>
-        <p class="eyebrow">Restaurant portal</p>
+        <p class="eyebrow">Restaurant Portal</p>
         <h1>Orders</h1>
+        <p class="text-secondary mb-0">Review live WhatsApp orders and confirm or reject pending requests.</p>
     </div>
-    <button class="secondary-button" type="button" @onclick="LoadAsync">Refresh</button>
+    <div class="d-flex flex-wrap gap-2 justify-content-lg-end ms-lg-auto">
+        <a class="btn btn-outline-primary" href="/">Back to dashboard</a>
+        <button class="btn btn-outline-secondary" type="button" @onclick="LoadAsync">Refresh</button>
+    </div>
 </section>
 
 <ApiErrorAlert Error="error" Title="Orders unavailable" />
 <LoadingPanel IsLoading="isLoading" Message="Loading orders" />
 
-<section class="data-section">
+<section class="card shadow-sm">
+    <div class="card-body">
     <div class="section-heading">
         <h2>Order queue</h2>
-        <span>@orders.Count entries</span>
     </div>
 
-    <div class="table-wrap">
-        <table>
+    <div class="table-responsive stack-mobile">
+        <table class="table table-hover align-middle mb-0 responsive-stack">
             <thead>
                 <tr>
                     <th>Order</th>
@@ -41,19 +45,19 @@
                 @foreach (var order in orders.OrderByDescending(x => x.CreatedAt))
                 {
                     <tr>
-                        <td><a class="inline-link" href="@($"orders/{order.Id}")">@order.OrderNumber</a></td>
-                        <td>
+                        <td data-label="Order"><a class="inline-link" href="@($"orders/{order.Id}")">@order.OrderNumber</a><small>@order.Address</small></td>
+                        <td data-label="Customer">
                             <strong>@order.CustomerName</strong>
                             <span class="subtle-cell">@order.CustomerPhone</span>
                         </td>
-                        <td><OrderStatusBadge Status="@order.OrderStatus" /></td>
-                        <td>@order.TotalAmount.ToString("C0")</td>
-                        <td>@(order.EstimatedMinutes is null ? "-" : $"{order.EstimatedMinutes} min")</td>
-                        <td>
+                        <td data-label="Status"><OrderStatusBadge Status="@order.OrderStatus" /></td>
+                        <td data-label="Total">Rs @order.TotalAmount.ToString("0.##")</td>
+                        <td data-label="ETA">@(order.EstimatedMinutes is null ? "-" : $"{order.EstimatedMinutes} min")</td>
+                        <td data-label="">
                             @if (CanConfirm(order))
                             {
-                                <button class="small-action" type="button" @onclick="() => ConfirmAsync(order.Id)">Confirm</button>
-                                <button class="small-action danger" type="button" @onclick="() => BeginReject(order)">Reject</button>
+                                <button class="btn btn-sm btn-primary" type="button" @onclick="() => ConfirmAsync(order.Id)">Confirm</button>
+                                <button class="btn btn-sm btn-outline-danger" type="button" @onclick="() => BeginReject(order)">Reject</button>
                             }
                             else
                             {
@@ -65,26 +69,31 @@
             </tbody>
         </table>
     </div>
+    </div>
 </section>
 
 @if (rejectingOrder is not null)
 {
-    <section class="data-section action-panel">
+    <section class="card shadow-sm mt-4 action-panel">
+        <div class="card-body">
         <div class="section-heading">
             <h2>Reject @rejectingOrder.OrderNumber</h2>
-            <button class="link-button" type="button" @onclick="CancelReject">Cancel</button>
+            <button class="btn btn-outline-secondary" type="button" @onclick="CancelReject">Cancel</button>
         </div>
-        <EditForm Model="rejectForm" OnValidSubmit="RejectAsync" class="form-stack">
+        <EditForm Model="rejectForm" OnValidSubmit="RejectAsync" class="row g-3">
             <DataAnnotationsValidator />
             <ValidationSummary />
-            <label>
-                <span>Reason</span>
-                <InputTextArea @bind-Value="rejectForm.Reason" />
-            </label>
-            <button class="primary-button danger" type="submit" disabled="@isSubmitting">
-                @(isSubmitting ? "Rejecting" : "Reject order")
-            </button>
+            <div class="col-12">
+                <label class="form-label">Reason</label>
+                <InputTextArea class="form-control" @bind-Value="rejectForm.Reason" />
+            </div>
+            <div class="col-12">
+                <button class="btn btn-outline-danger" type="submit" disabled="@isSubmitting">
+                    @(isSubmitting ? "Rejecting" : "Reject order")
+                </button>
+            </div>
         </EditForm>
+        </div>
     </section>
 }
 

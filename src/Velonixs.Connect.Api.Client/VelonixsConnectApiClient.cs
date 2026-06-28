@@ -57,6 +57,9 @@ public sealed class VelonixsConnectApiClient(
     public Task<PlatformDashboardResponse> GetPlatformDashboardAsync(CancellationToken cancellationToken = default) =>
         SendAsync<PlatformDashboardResponse>(HttpMethod.Get, "api/v1/dashboard/platform", cancellationToken);
 
+    public Task<PlatformTaxSettingResponse> UpdatePlatformTaxSettingsAsync(UpdateRestaurantTaxSettingRequest request, CancellationToken cancellationToken = default) =>
+        SendAsync<UpdateRestaurantTaxSettingRequest, PlatformTaxSettingResponse>(HttpMethod.Patch, "api/v1/dashboard/platform/tax-settings", request, cancellationToken);
+
     public Task<RestaurantDashboardResponse> GetRestaurantDashboardAsync(Guid? restaurantId = null, CancellationToken cancellationToken = default) =>
         SendAsync<RestaurantDashboardResponse>(
             HttpMethod.Get,

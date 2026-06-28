@@ -1,11 +1,11 @@
-<section class="vc-metric-tile">
+<div class="metric h-100">
     <span>@Label</span>
     <strong>@Value</strong>
     @if (!string.IsNullOrWhiteSpace(Detail))
     {
         <small>@Detail</small>
     }
-</section>
+</div>
 
 @code {
     [Parameter, EditorRequired] public string Label { get; set; } = string.Empty;

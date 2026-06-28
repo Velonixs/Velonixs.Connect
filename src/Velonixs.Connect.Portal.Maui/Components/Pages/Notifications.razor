@@ -1,4 +1,5 @@
 @page "/notifications"
+@using System.Text.RegularExpressions
 @inject IVelonixsConnectApiClient ApiClient
 @inject NavigationManager Navigation
 
@@ -30,16 +31,28 @@
         <div class="notification-list">
             @foreach (var notification in notifications.OrderByDescending(x => x.CreatedAt))
             {
-                <article>
-                    <div class="notification-meta">
-                        <strong>@notification.Direction</strong>
-                        <span>@notification.CreatedAt.ToLocalTime().ToString("dd MMM yyyy, HH:mm")</span>
-                        <span>@notification.Status</span>
+                <article class="notification-tile @DirectionClass(notification.Direction)">
+                    <div class="notification-tile-header">
+                        <div>
+                            <span class="notification-direction">@notification.Direction</span>
+                            <strong>@notification.CreatedAt.ToLocalTime().ToString("dd MMM yyyy, hh:mm tt")</strong>
+                        </div>
+                        <span class="notification-status @StatusClass(notification.Status)">@notification.Status</span>
                     </div>
-                    <p>@notification.MessageText</p>
+
+                    <div class="notification-body">
+                        @foreach (var line in FormatMessageLines(notification.MessageText))
+                        {
+                            <p>@line</p>
+                        }
+                    </div>
+
                     @if (!string.IsNullOrWhiteSpace(notification.WhatsAppMessageId))
                     {
-                        <small>@notification.WhatsAppMessageId</small>
+                        <div class="notification-id">
+                            <span>WhatsApp ID</span>
+                            <code>@notification.WhatsAppMessageId</code>
+                        </div>
                     }
                 </article>
             }
@@ -51,6 +64,39 @@
     private IReadOnlyCollection<NotificationLogResponse> notifications = Array.Empty<NotificationLogResponse>();
     private bool isLoading;
     private ApiClientException? error;
+
+    private static IReadOnlyList<string> FormatMessageLines(string messageText)
+    {
+        if (string.IsNullOrWhiteSpace(messageText))
+        {
+            return ["No message content"];
+        }
+
+        var normalized = messageText
+            .Replace("*", string.Empty)
+            .Replace("\r", " ")
+            .Replace("\n", " ");
+
+        normalized = Regex.Replace(normalized, @"\s+", " ").Trim();
+        normalized = Regex.Replace(normalized, @"\s+(?=\d+\.\s)", "\n");
+        normalized = Regex.Replace(normalized, @"\s+(?=(Reply with|To place order|Please choose|Order:)\b)", "\n", RegexOptions.IgnoreCase);
+
+        return normalized
+            .Split('\n', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+            .DefaultIfEmpty("No message content")
+            .ToArray();
+    }
+
+    private static string DirectionClass(string direction) =>
+        string.Equals(direction, "Incoming", StringComparison.OrdinalIgnoreCase) ? "is-incoming" : "is-outgoing";
+
+    private static string StatusClass(string status) =>
+        status.ToLowerInvariant() switch
+        {
+            "sent" or "delivered" or "received" => "is-ok",
+            "failed" or "error" => "is-error",
+            _ => "is-neutral"
+        };
 
     protected override Task OnInitializedAsync() => LoadAsync();
 

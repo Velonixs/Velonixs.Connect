@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Mvc;
 using Velonixs.Connect.Api.Security;
 using Velonixs.Connect.Application.Abstractions;
 using Velonixs.Connect.Contracts.Common;
+using Velonixs.Connect.Contracts.Restaurants;
 using Velonixs.Connect.Shared.Security;
 
 namespace Velonixs.Connect.Api.Controllers;
@@ -20,6 +21,19 @@ public sealed class DashboardController(
     public async Task<IActionResult> GetPlatformSummary(CancellationToken cancellationToken)
     {
         return Ok(await adminService.GetPlatformDashboardAsync(cancellationToken));
+    }
+
+    [HttpPatch("platform/tax-settings")]
+    [Authorize(Roles = AppRoles.PlatformAdmin)]
+    public async Task<IActionResult> UpdatePlatformTaxSettings(
+        [FromBody] UpdateRestaurantTaxSettingRequest request,
+        [FromServices] IRestaurantService restaurantService,
+        CancellationToken cancellationToken)
+    {
+        return Ok(await restaurantService.UpdatePlatformTaxSettingAsync(
+            request.CgstPercent,
+            request.SgstPercent,
+            cancellationToken));
     }
 
     [HttpGet("summary")]

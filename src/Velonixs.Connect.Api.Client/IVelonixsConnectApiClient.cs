@@ -12,6 +12,7 @@ public interface IVelonixsConnectApiClient
     Task LogoutAsync(CancellationToken cancellationToken = default);
 
     Task<PlatformDashboardResponse> GetPlatformDashboardAsync(CancellationToken cancellationToken = default);
+    Task<PlatformTaxSettingResponse> UpdatePlatformTaxSettingsAsync(UpdateRestaurantTaxSettingRequest request, CancellationToken cancellationToken = default);
     Task<RestaurantDashboardResponse> GetRestaurantDashboardAsync(Guid? restaurantId = null, CancellationToken cancellationToken = default);
 
     Task<IReadOnlyCollection<RestaurantResponse>> GetRestaurantsAsync(CancellationToken cancellationToken = default);

@@ -5,31 +5,37 @@
 @inject NavigationManager Navigation
 @implements IDisposable
 
-<div class="app-shell">
-    <aside class="sidebar">
-        <NavMenu />
-    </aside>
+<nav class="navbar navbar-expand-xl bg-white border-bottom sticky-top app-navbar">
+    <div class="container-fluid px-3 px-xl-4">
+        <NavLink class="navbar-brand brand" href="" Match="NavLinkMatch.All">
+            <span class="brand-mark"><img src="images/logo.png" alt="Velonixs Connect" /></span>
+            <span class="brand-copy"><strong>Velonixs Connect</strong><small>Admin Portal</small></span>
+        </NavLink>
+        <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#adminNavigation" aria-controls="adminNavigation" aria-expanded="false" aria-label="Toggle navigation">
+            <span class="navbar-toggler-icon"></span>
+        </button>
+        <div class="collapse navbar-collapse" id="adminNavigation">
+            @if (!IsLoginRoute())
+            {
+                <div class="portal-nav-bar">
+                    <ul class="navbar-nav portal-main-nav">
+                    <li class="nav-item"><NavLink class="nav-link" href="" Match="NavLinkMatch.All">Businesses</NavLink></li>
+                    <li class="nav-item"><NavLink class="nav-link" href="restaurants">Add Business</NavLink></li>
+                    <li class="nav-item"><NavLink class="nav-link" href="master-catalog">Master Catalog</NavLink></li>
+                    </ul>
+                    <div class="portal-nav-actions">
+                        <span class="nav-status realtime-state @RealtimeStateClass">@RealtimeStateLabel</span>
+                        <button type="button" class="btn btn-outline-secondary sign-out-button" @onclick="LogoutAsync">Sign out</button>
+                    </div>
+                </div>
+            }
+        </div>
+    </div>
+</nav>
 
-    <main class="workspace">
-        <header class="workspace-header">
-            <div>
-                <span>Platform Console</span>
-                <strong>Velonixs Restaurant Connect</strong>
-            </div>
-            <div class="header-actions">
-                @if (!IsLoginRoute())
-                {
-                    <span class="realtime-state @RealtimeStateClass">@RealtimeStateLabel</span>
-                }
-                <button type="button" class="link-button" @onclick="LogoutAsync">Sign out</button>
-            </div>
-        </header>
-
-        <section class="content">
-            @Body
-        </section>
-    </main>
-</div>
+<main class="container-fluid page-shell px-3 px-lg-4 py-4">
+    @Body
+</main>
 
 @code {
     private bool realtimeStarted;

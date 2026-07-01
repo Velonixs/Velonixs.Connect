@@ -33,7 +33,8 @@ public sealed class CatalogService(IMenuService menuService) : ICatalogService
                 request.Description,
                 request.Price,
                 request.IsAvailable,
-                request.IsActive),
+                request.IsActive,
+                request.ProductRetailerId),
             cancellationToken);
 
         return ToProductResponse(item);
@@ -51,7 +52,8 @@ public sealed class CatalogService(IMenuService menuService) : ICatalogService
                 request.Description,
                 request.Price,
                 request.IsAvailable,
-                request.IsActive),
+                request.IsActive,
+                request.ProductRetailerId),
             cancellationToken);
 
         return item is null ? null : ToProductResponse(item);
@@ -93,6 +95,7 @@ public sealed class CatalogService(IMenuService menuService) : ICatalogService
             item.Description,
             item.Price,
             item.IsAvailable,
-            item.IsActive);
+            item.IsActive,
+            item.ProductRetailerId);
     }
 }

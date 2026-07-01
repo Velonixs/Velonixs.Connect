@@ -64,6 +64,15 @@
                 <small class="text-secondary">@Model.ActiveMenuItemCount active and available item(s).</small>
             </div>
             <div class="col-12 col-md-6 col-xl-3">
+                <span class="badge @(!string.IsNullOrWhiteSpace(Model.Restaurant.WhatsAppCatalogId) ? "text-bg-success" : "text-bg-secondary")">
+                    @(!string.IsNullOrWhiteSpace(Model.Restaurant.WhatsAppCatalogId) ? "Configured" : "Optional")
+                </span>
+                <div class="mt-2 fw-semibold">WhatsApp Catalog ID</div>
+                <small class="text-secondary">
+                    <code>@(string.IsNullOrWhiteSpace(Model.Restaurant.WhatsAppCatalogId) ? "Not configured" : Model.Restaurant.WhatsAppCatalogId)</code>
+                </small>
+            </div>
+            <div class="col-12 col-md-6 col-xl-3">
                 <span class="badge @(!string.IsNullOrWhiteSpace(Model.Restaurant.StaffWhatsAppNumber) ? "text-bg-success" : "text-bg-secondary")">
                     @(!string.IsNullOrWhiteSpace(Model.Restaurant.StaffWhatsAppNumber) ? "Configured" : "Optional")
                 </span>
@@ -120,6 +129,10 @@
         <label>
             <span>Staff WhatsApp Number</span>
             <input asp-for="RestaurantForm.StaffWhatsAppNumber" name="StaffWhatsAppNumber" />
+        </label>
+        <label>
+            <span>WhatsApp Catalog ID</span>
+            <input asp-for="RestaurantForm.WhatsAppCatalogId" name="WhatsAppCatalogId" />
         </label>
         <label class="wide">
             <span>Address</span>
@@ -225,6 +238,10 @@
                 <span>Price</span>
                 <input asp-for="NewItem.Price" name="Price" type="number" step="0.01" min="0" required />
             </label>
+            <label>
+                <span>Product Retailer ID</span>
+                <input asp-for="NewItem.ProductRetailerId" name="ProductRetailerId" />
+            </label>
             <label class="wide">
                 <span>Description</span>
                 <textarea asp-for="NewItem.Description" name="Description" rows="2"></textarea>
@@ -262,6 +279,7 @@
                 </select>
                 <input name="Name" value="@item.Name" aria-label="Item name" />
                 <input name="Price" value="@item.Price.ToString("0.##")" type="number" step="0.01" min="0" aria-label="Price" />
+                <input name="ProductRetailerId" value="@item.ProductRetailerId" aria-label="Product retailer ID" placeholder="Catalog SKU" />
                 <input name="Description" value="@item.Description" aria-label="Description" />
                 <label class="checkline">
                     <input name="IsAvailable" type="checkbox" value="true" checked="@item.IsAvailable" />

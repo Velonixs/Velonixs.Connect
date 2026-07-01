@@ -6,4 +6,9 @@ public sealed record IncomingWhatsAppMessage(
     string MessageText,
     string? WhatsAppMessageId = null,
     string? ProfileName = null,
-    DateTimeOffset? ReceivedAt = null);
+    DateTimeOffset? ReceivedAt = null,
+    IReadOnlyCollection<IncomingWhatsAppOrderItem>? OrderItems = null);
+
+public sealed record IncomingWhatsAppOrderItem(
+    string ProductRetailerId,
+    int Quantity);

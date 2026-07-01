@@ -37,6 +37,7 @@ public sealed class RestaurantService(RestaurantConnectDbContext dbContext) : IR
             BusinessPhone = request.BusinessPhone?.Trim(),
             NotificationEmail = request.NotificationEmail?.Trim(),
             StaffWhatsAppNumber = request.StaffWhatsAppNumber?.Trim(),
+            WhatsAppCatalogId = NormalizeOptional(request.WhatsAppCatalogId),
             Address = request.Address?.Trim(),
             CgstPercent = request.CgstPercent,
             SgstPercent = request.SgstPercent,
@@ -64,6 +65,7 @@ public sealed class RestaurantService(RestaurantConnectDbContext dbContext) : IR
         restaurant.BusinessPhone = request.BusinessPhone?.Trim();
         restaurant.NotificationEmail = request.NotificationEmail?.Trim();
         restaurant.StaffWhatsAppNumber = request.StaffWhatsAppNumber?.Trim();
+        restaurant.WhatsAppCatalogId = NormalizeOptional(request.WhatsAppCatalogId);
         restaurant.Address = request.Address?.Trim();
         ValidateTaxPercent(request.CgstPercent, nameof(request.CgstPercent));
         ValidateTaxPercent(request.SgstPercent, nameof(request.SgstPercent));
@@ -133,8 +135,12 @@ public sealed class RestaurantService(RestaurantConnectDbContext dbContext) : IR
             restaurant.CgstPercent,
             restaurant.SgstPercent,
             restaurant.IsActive,
-            restaurant.CreatedAt);
+            restaurant.CreatedAt,
+            restaurant.WhatsAppCatalogId);
     }
+
+    private static string? NormalizeOptional(string? value) =>
+        string.IsNullOrWhiteSpace(value) ? null : value.Trim();
 
     private static void ValidateTaxPercent(decimal value, string fieldName)
     {

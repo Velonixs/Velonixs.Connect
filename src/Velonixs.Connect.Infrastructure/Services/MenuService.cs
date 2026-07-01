@@ -167,6 +167,7 @@ public sealed class MenuService(RestaurantConnectDbContext dbContext) : IMenuSer
             Name = name,
             Description = description,
             Price = request.Price,
+            ProductRetailerId = NormalizeOptional(request.ProductRetailerId),
             IsAvailable = request.IsAvailable,
             IsActive = request.IsActive,
             Category = category
@@ -203,6 +204,7 @@ public sealed class MenuService(RestaurantConnectDbContext dbContext) : IMenuSer
         item.ItemCode = request.ItemCode;
         item.Name = request.Name.Trim();
         item.Description = request.Description?.Trim();
+        item.ProductRetailerId = NormalizeOptional(request.ProductRetailerId);
 
         if (request.MasterMenuItemId is Guid masterMenuItemId)
         {
@@ -268,8 +270,12 @@ public sealed class MenuService(RestaurantConnectDbContext dbContext) : IMenuSer
             item.Description,
             item.Price,
             item.IsAvailable,
-            item.IsActive);
+            item.IsActive,
+            item.ProductRetailerId);
     }
+
+    private static string? NormalizeOptional(string? value) =>
+        string.IsNullOrWhiteSpace(value) ? null : value.Trim();
 
     private static MasterMenuCategoryResponse ToMasterCategoryResponse(MasterMenuCategory category)
     {

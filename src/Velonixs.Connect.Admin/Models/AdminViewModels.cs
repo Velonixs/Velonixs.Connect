@@ -141,6 +141,7 @@ public sealed class RestaurantFormModel
     public string? BusinessPhone { get; set; }
     public string? NotificationEmail { get; set; }
     public string? StaffWhatsAppNumber { get; set; }
+    public string? WhatsAppCatalogId { get; set; }
     public string? Address { get; set; }
     [Range(0, 100)]
     public decimal CgstPercent { get; set; }
@@ -174,6 +175,7 @@ public sealed class MenuItemFormModel
     public int ItemCode { get; set; }
     public string Name { get; set; } = string.Empty;
     public string? Description { get; set; }
+    public string? ProductRetailerId { get; set; }
     public decimal Price { get; set; }
     public bool IsAvailable { get; set; } = true;
     public bool IsActive { get; set; } = true;

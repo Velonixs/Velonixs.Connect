@@ -159,6 +159,41 @@ public sealed class InteractiveOrderingTests
     }
 
     [Fact]
+    public void ProductListGeneration_GroupsCatalogItemsWithinWhatsAppLimit()
+    {
+        var pizza = new MenuCategory { Name = "Pizza" };
+        var burger = new MenuCategory { Name = "Burger" };
+        var pizzaItems = Enumerable.Range(1, 20)
+            .Select(index =>
+            {
+                var item = Item($"Pizza {index}", index * 10, pizza.Id);
+                item.ProductRetailerId = $"pizza-{index}";
+                return item;
+            })
+            .ToArray();
+        var burgerItems = Enumerable.Range(1, 20)
+            .Select(index =>
+            {
+                var item = Item($"Burger {index}", index * 10, burger.Id);
+                item.ProductRetailerId = $"burger-{index}";
+                return item;
+            })
+            .ToArray();
+
+        var sections = WhatsAppOrderingMessageBuilder.BuildProductListSections(
+            new[]
+            {
+                (Category: pizza, Items: (IReadOnlyList<MenuItem>)pizzaItems),
+                (Category: burger, Items: (IReadOnlyList<MenuItem>)burgerItems)
+            });
+
+        Assert.Equal(2, sections.Count);
+        Assert.Equal(30, sections.Sum(section => section.Items.Count));
+        Assert.Equal("Pizza", sections.First().Title);
+        Assert.Equal("pizza-1", sections.First().Items.First().ProductRetailerId);
+    }
+
+    [Fact]
     public void DirectMenu_WithCart_ShowsCheckoutAndCancelWithinWhatsAppLimit()
     {
         var category = new MenuCategory { Name = "Pizza" };

@@ -26,4 +26,14 @@ public interface IWhatsAppMessageSender
         IReadOnlyCollection<WhatsAppReplyButton> buttons,
         string? footerText = null,
         CancellationToken cancellationToken = default);
+
+    Task<WhatsAppSendResult> SendMultiProductMessageAsync(
+        string phoneNumberId,
+        string recipientPhoneNumber,
+        string catalogId,
+        string headerText,
+        string bodyText,
+        IReadOnlyCollection<WhatsAppProductListSection> sections,
+        string? footerText = null,
+        CancellationToken cancellationToken = default);
 }

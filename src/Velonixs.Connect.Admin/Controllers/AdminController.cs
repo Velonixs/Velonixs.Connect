@@ -361,7 +361,8 @@ public sealed class AdminController(
                     form.Address,
                     form.CgstPercent,
                     form.SgstPercent,
-                    form.IsActive),
+                    form.IsActive,
+                    form.WhatsAppCatalogId),
                 cancellationToken);
 
         var owner = new ApplicationUser
@@ -488,7 +489,8 @@ public sealed class AdminController(
                 form.Address,
                 form.CgstPercent,
                 form.SgstPercent,
-                form.IsActive),
+                form.IsActive,
+                form.WhatsAppCatalogId),
             cancellationToken);
 
         if (restaurant is null)
@@ -626,7 +628,7 @@ public sealed class AdminController(
     {
         await menuService.CreateItemAsync(
             restaurantId,
-            new CreateMenuItemRequest(form.CategoryId, null, form.ItemCode, form.Name, form.Description, form.Price, form.IsAvailable, form.IsActive),
+            new CreateMenuItemRequest(form.CategoryId, null, form.ItemCode, form.Name, form.Description, form.Price, form.IsAvailable, form.IsActive, form.ProductRetailerId),
             cancellationToken);
 
         TempData["Success"] = "Menu item added.";
@@ -639,7 +641,7 @@ public sealed class AdminController(
     {
         await menuService.UpdateItemAsync(
             id,
-            new UpdateMenuItemRequest(form.CategoryId, null, form.ItemCode, form.Name, form.Description, form.Price, form.IsAvailable, form.IsActive),
+            new UpdateMenuItemRequest(form.CategoryId, null, form.ItemCode, form.Name, form.Description, form.Price, form.IsAvailable, form.IsActive, form.ProductRetailerId),
             cancellationToken);
 
         TempData["Success"] = "Menu item saved.";
@@ -716,6 +718,7 @@ public sealed class AdminController(
             BusinessPhone = restaurant.BusinessPhone,
             NotificationEmail = restaurant.NotificationEmail,
             StaffWhatsAppNumber = restaurant.StaffWhatsAppNumber,
+            WhatsAppCatalogId = restaurant.WhatsAppCatalogId,
             Address = restaurant.Address,
             CgstPercent = restaurant.CgstPercent,
             SgstPercent = restaurant.SgstPercent,

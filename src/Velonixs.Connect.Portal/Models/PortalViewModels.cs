@@ -109,6 +109,8 @@ public sealed class MenuItemPortalFormModel
 
     public string? Description { get; set; }
 
+    public string? ProductRetailerId { get; set; }
+
     [Range(0, 999999)]
     public decimal Price { get; set; }
 

@@ -57,7 +57,8 @@ public sealed class BusinessService(IRestaurantService restaurantService) : IBus
                 request.Address,
                 existing.CgstPercent,
                 existing.SgstPercent,
-                request.IsActive),
+                request.IsActive,
+                existing.WhatsAppCatalogId),
             cancellationToken);
 
         return restaurant is null ? null : ToBusinessResponse(restaurant);

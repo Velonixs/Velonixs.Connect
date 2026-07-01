@@ -32,7 +32,8 @@ public sealed record MenuItemResponse(
     string? Description,
     decimal Price,
     bool IsAvailable,
-    bool IsActive)
+    bool IsActive,
+    string? ProductRetailerId = null)
 {
     public Guid BusinessId => RestaurantId;
     public int ProductCode => ItemCode;
@@ -52,7 +53,8 @@ public sealed record CreateMenuItemRequest(
     string? Description,
     decimal Price,
     bool IsAvailable = true,
-    bool IsActive = true);
+    bool IsActive = true,
+    string? ProductRetailerId = null);
 
 public sealed record UpdateMenuItemRequest(
     Guid CategoryId,
@@ -62,7 +64,8 @@ public sealed record UpdateMenuItemRequest(
     string? Description,
     decimal Price,
     bool IsAvailable,
-    bool IsActive);
+    bool IsActive,
+    string? ProductRetailerId = null);
 
 public sealed record MasterCatalogResponse(
     IReadOnlyCollection<MasterMenuCategoryResponse> Categories,

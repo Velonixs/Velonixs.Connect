@@ -120,6 +120,10 @@
                                 <label class="form-label">Price</label>
                                 <input class="form-control" asp-for="NewItem.Price" name="Price" type="number" step="0.01" min="0" required />
                             </div>
+                            <div class="col-12 col-lg-4">
+                                <label class="form-label">Product Retailer ID</label>
+                                <input class="form-control" asp-for="NewItem.ProductRetailerId" name="ProductRetailerId" placeholder="Meta catalog SKU" />
+                            </div>
                             <div class="col-12 d-flex flex-wrap gap-3">
                                 <div class="form-check">
                                     <input class="form-check-input" asp-for="NewItem.IsAvailable" name="IsAvailable" />
@@ -186,6 +190,7 @@
                         }
                     </select>
                     <input name="Price" value="@item.Price.ToString("0.##")" type="number" step="0.01" min="0" aria-label="Price" required />
+                    <input name="ProductRetailerId" value="@item.ProductRetailerId" aria-label="Product retailer ID" placeholder="Catalog SKU" />
                     <input name="Name" value="@item.Name" type="hidden" />
                     <label class="form-check mb-0">
                         <input class="form-check-input" name="IsAvailable" type="checkbox" value="true" checked="@item.IsAvailable" />
@@ -208,6 +213,7 @@
                     <strong>@item.ItemCode. @item.Name</strong>
                     <span>@item.CategoryName</span>
                     <span>Rs @item.Price.ToString("0.##")</span>
+                    <span>@(string.IsNullOrWhiteSpace(item.ProductRetailerId) ? "No catalog SKU" : item.ProductRetailerId)</span>
                     <span class="badge @(item.IsAvailable ? "text-bg-success" : "text-bg-secondary")">@(item.IsAvailable ? "In stock" : "Out of stock")</span>
                     <span class="badge @(item.IsActive ? "text-bg-success" : "text-bg-secondary")">@(item.IsActive ? "Active" : "Inactive")</span>
                 </article>

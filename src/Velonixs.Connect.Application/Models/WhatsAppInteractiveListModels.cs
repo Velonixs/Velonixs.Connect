@@ -12,3 +12,10 @@ public sealed record WhatsAppInteractiveListRow(
 public sealed record WhatsAppReplyButton(
     string Id,
     string Title);
+
+public sealed record WhatsAppProductListSection(
+    string Title,
+    IReadOnlyCollection<WhatsAppProductListItem> Items);
+
+public sealed record WhatsAppProductListItem(
+    string ProductRetailerId);

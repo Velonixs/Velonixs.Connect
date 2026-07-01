@@ -124,6 +124,12 @@ public sealed class WhatsAppWebhookController(
                     var id = ReadString(whatsAppMessage, "id");
                     var text = ReadString(whatsAppMessage, "text", "body")
                         ?? ReadInteractiveReplyAsText(whatsAppMessage);
+                    var orderItems = ReadOrderItems(whatsAppMessage);
+
+                    if (orderItems.Count > 0 && string.IsNullOrWhiteSpace(text))
+                    {
+                        text = "catalog.order";
+                    }
 
                     if (string.IsNullOrWhiteSpace(phoneNumberId) ||
                         string.IsNullOrWhiteSpace(from) ||
@@ -132,7 +138,14 @@ public sealed class WhatsAppWebhookController(
                         continue;
                     }
 
-                    return new IncomingWhatsAppMessage(phoneNumberId, from, text, id, profileName, DateTimeOffset.UtcNow);
+                    return new IncomingWhatsAppMessage(
+                        phoneNumberId,
+                        from,
+                        text,
+                        id,
+                        profileName,
+                        DateTimeOffset.UtcNow,
+                        orderItems);
                 }
             }
         }
@@ -198,6 +211,50 @@ public sealed class WhatsAppWebhookController(
             var id when id.StartsWith("menu.qty.", StringComparison.OrdinalIgnoreCase) =>
                 ReadQuantityReplyAsText(id),
             _ => replyId
+        };
+    }
+
+    private static IReadOnlyCollection<IncomingWhatsAppOrderItem> ReadOrderItems(JsonElement whatsAppMessage)
+    {
+        if (!whatsAppMessage.TryGetProperty("order", out var order) ||
+            !order.TryGetProperty("product_items", out var productItems) ||
+            productItems.ValueKind != JsonValueKind.Array)
+        {
+            return Array.Empty<IncomingWhatsAppOrderItem>();
+        }
+
+        var items = new List<IncomingWhatsAppOrderItem>();
+        foreach (var productItem in productItems.EnumerateArray())
+        {
+            var productRetailerId = ReadString(productItem, "product_retailer_id");
+
+            if (string.IsNullOrWhiteSpace(productRetailerId) ||
+                !TryReadInt(productItem, "quantity", out var quantity) ||
+                quantity <= 0)
+            {
+                continue;
+            }
+
+            items.Add(new IncomingWhatsAppOrderItem(productRetailerId, quantity));
+        }
+
+        return items;
+    }
+
+    private static bool TryReadInt(JsonElement element, string propertyName, out int value)
+    {
+        value = 0;
+
+        if (!element.TryGetProperty(propertyName, out var property))
+        {
+            return false;
+        }
+
+        return property.ValueKind switch
+        {
+            JsonValueKind.Number => property.TryGetInt32(out value),
+            JsonValueKind.String => int.TryParse(property.GetString(), out value),
+            _ => false
         };
     }
 

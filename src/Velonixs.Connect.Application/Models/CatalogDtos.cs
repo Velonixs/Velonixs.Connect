@@ -23,7 +23,8 @@ public sealed record CatalogProductResponse(
     string? Description,
     decimal Price,
     bool IsAvailable,
-    bool IsActive);
+    bool IsActive,
+    string? ProductRetailerId = null);
 
 public sealed record CreateCatalogCategoryRequest(
     string Name,
@@ -37,7 +38,8 @@ public sealed record CreateCatalogProductRequest(
     string? Description,
     decimal Price,
     bool IsAvailable = true,
-    bool IsActive = true);
+    bool IsActive = true,
+    string? ProductRetailerId = null);
 
 public sealed record UpdateCatalogProductRequest(
     Guid CategoryId,
@@ -46,4 +48,5 @@ public sealed record UpdateCatalogProductRequest(
     string? Description,
     decimal Price,
     bool IsAvailable,
-    bool IsActive);
+    bool IsActive,
+    string? ProductRetailerId = null);

@@ -296,7 +296,8 @@ public sealed class PortalController(
                     form.Description,
                     form.Price,
                     form.IsAvailable,
-                    form.IsActive),
+                    form.IsActive,
+                    form.ProductRetailerId),
                 cancellationToken);
         }
         catch (InvalidOperationException ex)
@@ -349,7 +350,8 @@ public sealed class PortalController(
                     form.Description,
                     form.Price,
                     form.IsAvailable,
-                    form.IsActive),
+                    form.IsActive,
+                    form.ProductRetailerId),
                 cancellationToken);
         }
         catch (InvalidOperationException ex)

@@ -9,6 +9,7 @@ public sealed class Restaurant
     public string? BusinessPhone { get; set; }
     public string? NotificationEmail { get; set; }
     public string? StaffWhatsAppNumber { get; set; }
+    public string? WhatsAppCatalogId { get; set; }
     public string? Address { get; set; }
     public decimal CgstPercent { get; set; }
     public decimal SgstPercent { get; set; }

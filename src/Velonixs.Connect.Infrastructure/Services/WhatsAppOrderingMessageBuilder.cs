@@ -10,6 +10,7 @@ public static class WhatsAppOrderingMessageBuilder
     public const int ItemPageSize = 6;
     public const int DirectMenuItemCount = 6;
     public const int NumberedMenuPageSize = 6;
+    public const int ProductListItemLimit = 30;
 
     public static IReadOnlyCollection<WhatsAppInteractiveListSection> BuildDirectMenuSections(
         MenuCategory category,
@@ -62,6 +63,37 @@ public static class WhatsAppOrderingMessageBuilder
             "Connect restaurant"));
 
         sections.Add(new WhatsAppInteractiveListSection("More", moreRows));
+
+        return sections;
+    }
+
+    public static IReadOnlyCollection<WhatsAppProductListSection> BuildProductListSections(
+        IReadOnlyList<(MenuCategory Category, IReadOnlyList<MenuItem> Items)> categoryGroups)
+    {
+        var remaining = ProductListItemLimit;
+        var sections = new List<WhatsAppProductListSection>();
+
+        foreach (var group in categoryGroups.Where(group => group.Items.Count > 0))
+        {
+            if (remaining <= 0)
+            {
+                break;
+            }
+
+            var items = group.Items
+                .Where(item => !string.IsNullOrWhiteSpace(item.ProductRetailerId))
+                .Take(remaining)
+                .Select(item => new WhatsAppProductListItem(item.ProductRetailerId!))
+                .ToArray();
+
+            if (items.Length == 0)
+            {
+                continue;
+            }
+
+            sections.Add(new WhatsAppProductListSection(Truncate(group.Category.Name, 24), items));
+            remaining -= items.Length;
+        }
 
         return sections;
     }

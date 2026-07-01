@@ -98,6 +98,84 @@ public sealed class ConversationContinuationFlowTests
     }
 
     [Fact]
+    public async Task Greeting_WithCatalogConfiguration_SendsProductList()
+    {
+        await using var dbContext = CreateDbContext();
+        var restaurant = new Restaurant
+        {
+            Name = "99 Restaurant",
+            WhatsAppPhoneNumberId = "phone-id",
+            WhatsAppCatalogId = "catalog-id"
+        };
+        var category = new MenuCategory
+        {
+            Restaurant = restaurant,
+            Name = "Pizza",
+            DisplayOrder = 1
+        };
+        var item = MenuItem(restaurant, category, "Paneer Pizza", 249, 1);
+        item.ProductRetailerId = "paneer-pizza";
+
+        dbContext.AddRange(restaurant, category, item);
+        await dbContext.SaveChangesAsync();
+
+        var sender = new FakeMessageSender();
+        var service = CreateService(dbContext, sender);
+
+        var greeting = await Send(service, "Hi");
+
+        Assert.Contains("Browse products", greeting.ReplyText);
+        Assert.Equal(1, sender.MultiProductSendCount);
+        Assert.Equal("catalog-id", sender.LastCatalogId);
+        var section = Assert.Single(sender.LastProductSections);
+        Assert.Equal("Pizza", section.Title);
+        Assert.Equal("paneer-pizza", section.Items.Single().ProductRetailerId);
+        Assert.Empty(sender.LastButtons);
+        Assert.Empty(sender.LastSections);
+    }
+
+    [Fact]
+    public async Task CatalogOrderWebhook_AddsSubmittedProductsToCart()
+    {
+        await using var dbContext = CreateDbContext();
+        var restaurant = new Restaurant
+        {
+            Name = "99 Restaurant",
+            WhatsAppPhoneNumberId = "phone-id",
+            WhatsAppCatalogId = "catalog-id"
+        };
+        var category = new MenuCategory
+        {
+            Restaurant = restaurant,
+            Name = "Pizza",
+            DisplayOrder = 1
+        };
+        var item = MenuItem(restaurant, category, "Paneer Pizza", 249, 1);
+        item.ProductRetailerId = "paneer-pizza";
+
+        dbContext.AddRange(restaurant, category, item);
+        await dbContext.SaveChangesAsync();
+
+        var sender = new FakeMessageSender();
+        var service = CreateService(dbContext, sender);
+
+        var result = await service.ProcessIncomingMessageAsync(
+            new IncomingWhatsAppMessage(
+                "phone-id",
+                "919999999999",
+                "catalog.order",
+                Guid.NewGuid().ToString("N"),
+                "Customer",
+                DateTimeOffset.UtcNow,
+                new[] { new IncomingWhatsAppOrderItem("paneer-pizza", 3) }));
+
+        Assert.Contains("Paneer Pizza", result.ReplyText);
+        Assert.Contains("Rs 747", result.ReplyText);
+        Assert.Contains("Total: Rs 747", result.ReplyText);
+        Assert.Equal(new[] { "cart.add_more", "cart.checkout", "cart.cancel" }, sender.LastButtons.Select(x => x.Id));
+    }
+
+    [Fact]
     public async Task DuplicateIncomingMessageId_IsIgnoredWithoutSendingSecondPrompt()
     {
         await using var dbContext = CreateDbContext();
@@ -570,10 +648,14 @@ public sealed class ConversationContinuationFlowTests
         public bool FailInteractiveLists { get; init; }
         public int InteractiveListSendCount { get; private set; }
         public int ReplyButtonSendCount { get; private set; }
+        public int MultiProductSendCount { get; private set; }
         public List<string> TextMessages { get; } = new();
+        public string? LastCatalogId { get; private set; }
         public string? LastButtonBodyText { get; private set; }
         public string? LastButtonText { get; private set; }
         public string? LastFooterText { get; private set; }
+        public IReadOnlyCollection<WhatsAppProductListSection> LastProductSections { get; private set; } =
+            Array.Empty<WhatsAppProductListSection>();
         public IReadOnlyCollection<WhatsAppInteractiveListSection> LastSections { get; private set; } =
             Array.Empty<WhatsAppInteractiveListSection>();
         public IReadOnlyCollection<WhatsAppReplyButton> LastButtons { get; private set; } =
@@ -589,6 +671,8 @@ public sealed class ConversationContinuationFlowTests
             LastButtonBodyText = null;
             LastButtonText = null;
             LastFooterText = null;
+            LastCatalogId = null;
+            LastProductSections = Array.Empty<WhatsAppProductListSection>();
             LastSections = Array.Empty<WhatsAppInteractiveListSection>();
             LastButtons = Array.Empty<WhatsAppReplyButton>();
             return Task.FromResult(new WhatsAppSendResult(true, false));
@@ -612,6 +696,8 @@ public sealed class ConversationContinuationFlowTests
             LastButtonBodyText = null;
             LastButtonText = buttonText;
             LastFooterText = footerText;
+            LastCatalogId = null;
+            LastProductSections = Array.Empty<WhatsAppProductListSection>();
             LastSections = sections;
             LastButtons = Array.Empty<WhatsAppReplyButton>();
             return Task.FromResult(new WhatsAppSendResult(true, false));
@@ -630,7 +716,30 @@ public sealed class ConversationContinuationFlowTests
             LastButtonText = null;
             LastButtons = buttons;
             LastFooterText = footerText;
+            LastCatalogId = null;
+            LastProductSections = Array.Empty<WhatsAppProductListSection>();
             LastSections = Array.Empty<WhatsAppInteractiveListSection>();
+            return Task.FromResult(new WhatsAppSendResult(true, false));
+        }
+
+        public Task<WhatsAppSendResult> SendMultiProductMessageAsync(
+            string phoneNumberId,
+            string recipientPhoneNumber,
+            string catalogId,
+            string headerText,
+            string bodyText,
+            IReadOnlyCollection<WhatsAppProductListSection> sections,
+            string? footerText = null,
+            CancellationToken cancellationToken = default)
+        {
+            MultiProductSendCount++;
+            LastCatalogId = catalogId;
+            LastButtonBodyText = bodyText;
+            LastButtonText = null;
+            LastFooterText = footerText;
+            LastProductSections = sections;
+            LastSections = Array.Empty<WhatsAppInteractiveListSection>();
+            LastButtons = Array.Empty<WhatsAppReplyButton>();
             return Task.FromResult(new WhatsAppSendResult(true, false));
         }
     }

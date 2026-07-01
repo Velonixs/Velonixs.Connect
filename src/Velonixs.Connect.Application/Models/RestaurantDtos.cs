@@ -12,7 +12,8 @@ public sealed record RestaurantResponse(
     decimal CgstPercent,
     decimal SgstPercent,
     bool IsActive,
-    DateTimeOffset CreatedAt);
+    DateTimeOffset CreatedAt,
+    string? WhatsAppCatalogId = null);
 
 public sealed record CreateRestaurantRequest(
     string Name,
@@ -24,7 +25,8 @@ public sealed record CreateRestaurantRequest(
     string? Address,
     decimal CgstPercent = 0,
     decimal SgstPercent = 0,
-    bool IsActive = true);
+    bool IsActive = true,
+    string? WhatsAppCatalogId = null);
 
 public sealed record UpdateRestaurantRequest(
     string Name,
@@ -36,7 +38,8 @@ public sealed record UpdateRestaurantRequest(
     string? Address,
     decimal CgstPercent,
     decimal SgstPercent,
-    bool IsActive);
+    bool IsActive,
+    string? WhatsAppCatalogId = null);
 
 public sealed record PlatformTaxSettingResponse(
     decimal CgstPercent,

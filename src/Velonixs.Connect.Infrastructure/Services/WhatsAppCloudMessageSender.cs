@@ -155,6 +155,92 @@ public sealed class WhatsAppCloudMessageSender(
         return await SendPayloadAsync(phoneNumberId, normalizedRecipientPhoneNumber, payload, bodyText, cancellationToken);
     }
 
+    public async Task<WhatsAppSendResult> SendMultiProductMessageAsync(
+        string phoneNumberId,
+        string recipientPhoneNumber,
+        string catalogId,
+        string headerText,
+        string bodyText,
+        IReadOnlyCollection<WhatsAppProductListSection> sections,
+        string? footerText = null,
+        CancellationToken cancellationToken = default)
+    {
+        var normalizedRecipientPhoneNumber = NormalizeRecipientPhoneNumber(recipientPhoneNumber);
+        if (string.IsNullOrWhiteSpace(normalizedRecipientPhoneNumber))
+        {
+            logger.LogWarning("WhatsApp send failed. Recipient phone number is empty.");
+            return new WhatsAppSendResult(false, false, Error: "Recipient phone number is empty.");
+        }
+
+        if (string.IsNullOrWhiteSpace(catalogId))
+        {
+            logger.LogWarning("WhatsApp product-list send failed. Catalog id is empty.");
+            return new WhatsAppSendResult(false, false, Error: "Catalog id is empty.");
+        }
+
+        var safeSections = sections
+            .Where(section => section.Items.Count > 0)
+            .Take(10)
+            .Select(section => new
+            {
+                title = section.Title,
+                product_items = section.Items
+                    .Where(item => !string.IsNullOrWhiteSpace(item.ProductRetailerId))
+                    .Take(30)
+                    .Select(item => new
+                    {
+                        product_retailer_id = item.ProductRetailerId
+                    })
+                    .ToArray()
+            })
+            .Where(section => section.product_items.Length > 0)
+            .ToArray();
+
+        if (safeSections.Length == 0)
+        {
+            logger.LogWarning("WhatsApp product-list send failed. No product items were provided.");
+            return new WhatsAppSendResult(false, false, Error: "No product items were provided.");
+        }
+
+        var interactive = new Dictionary<string, object?>
+        {
+            ["type"] = "product_list",
+            ["header"] = new
+            {
+                type = "text",
+                text = headerText
+            },
+            ["body"] = new
+            {
+                text = bodyText
+            },
+            ["action"] = new
+            {
+                catalog_id = catalogId,
+                sections = safeSections
+            }
+        };
+
+        if (!string.IsNullOrWhiteSpace(footerText))
+        {
+            interactive["footer"] = new
+            {
+                text = footerText
+            };
+        }
+
+        var payload = new
+        {
+            messaging_product = "whatsapp",
+            recipient_type = "individual",
+            to = normalizedRecipientPhoneNumber,
+            type = "interactive",
+            interactive
+        };
+
+        return await SendPayloadAsync(phoneNumberId, normalizedRecipientPhoneNumber, payload, bodyText, cancellationToken);
+    }
+
     private async Task<WhatsAppSendResult> SendPayloadAsync(
         string phoneNumberId,
         string recipientPhoneNumber,

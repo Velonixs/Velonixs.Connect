@@ -302,9 +302,16 @@ public sealed class OrderService(
             Direction = MessageDirections.Outgoing,
             MessageText = messageText,
             WhatsAppMessageId = result.ProviderMessageId,
-            Status = result.IsSuccess ? MessageStatuses.Sent : MessageStatuses.Failed
+            Status = ResolveMessageStatus(result)
         });
 
         await dbContext.SaveChangesAsync(cancellationToken);
     }
+
+    private static string ResolveMessageStatus(WhatsAppSendResult result) =>
+        result.IsSkipped
+            ? MessageStatuses.Skipped
+            : result.IsSuccess
+                ? MessageStatuses.Sent
+                : MessageStatuses.Failed;
 }

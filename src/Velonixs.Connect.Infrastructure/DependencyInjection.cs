@@ -26,10 +26,20 @@ public static class DependencyInjection
         services.Configure<WhatsAppOptions>(options =>
         {
             configuration.GetSection("WhatsApp").Bind(options);
-            options.AccessToken ??= configuration["WHATSAPP_ACCESS_TOKEN"];
-            options.VerifyToken ??= configuration["WHATSAPP_VERIFY_TOKEN"];
-            options.AppSecret ??= configuration["META_APP_SECRET"];
-            options.ApiVersion = configuration["WHATSAPP_API_VERSION"] ?? options.ApiVersion;
+            options.AccessToken = PreferConfiguredSecret(configuration["WHATSAPP_ACCESS_TOKEN"], options.AccessToken);
+            options.VerifyToken = PreferConfiguredSecret(configuration["WHATSAPP_VERIFY_TOKEN"], options.VerifyToken);
+            options.AppSecret = PreferConfiguredSecret(configuration["META_APP_SECRET"], options.AppSecret);
+            options.ApiVersion = PreferConfiguredSecret(configuration["WHATSAPP_API_VERSION"], options.ApiVersion) ?? options.ApiVersion;
+
+            if (bool.TryParse(configuration["WHATSAPP_DISABLE_SENDING"], out var disableSending))
+            {
+                options.DisableSending = disableSending;
+            }
+
+            if (int.TryParse(configuration["WHATSAPP_SEND_TIMEOUT_SECONDS"], out var sendTimeoutSeconds))
+            {
+                options.SendTimeoutSeconds = sendTimeoutSeconds;
+            }
         });
         services.Configure<SmtpOptions>(options =>
         {
@@ -104,4 +114,11 @@ public static class DependencyInjection
 
         return services;
     }
+
+    private static string? PreferConfiguredSecret(string? preferred, string? fallback) =>
+        !string.IsNullOrWhiteSpace(preferred)
+            ? preferred
+            : string.IsNullOrWhiteSpace(fallback)
+                ? null
+                : fallback;
 }

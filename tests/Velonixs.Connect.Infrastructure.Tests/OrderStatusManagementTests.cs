@@ -81,6 +81,46 @@ public sealed class OrderStatusManagementTests
         Assert.Equal(1, await dbContext.OrderStatusHistory.CountAsync());
     }
 
+    [Fact]
+    public async Task SkippedCustomerNotification_IsLoggedAsSkipped()
+    {
+        await using var dbContext = CreateDbContext();
+        var (_, _, order) = await SeedPendingOrderAsync(dbContext);
+        var notificationService = new FakeNotificationService
+        {
+            SendResult = new WhatsAppSendResult(true, true)
+        };
+        var service = new OrderService(dbContext, notificationService);
+
+        await service.UpdateStatusAsync(
+            order.Id,
+            new UpdateOrderStatusRequest(OrderStatuses.Confirmed, "Accepted.", "Staff", 20));
+
+        var messageLog = await dbContext.MessageLogs.SingleAsync(x => x.Direction == MessageDirections.Outgoing);
+        Assert.Equal(MessageStatuses.Skipped, messageLog.Status);
+        Assert.Null(messageLog.WhatsAppMessageId);
+    }
+
+    [Fact]
+    public async Task FailedCustomerNotification_IsLoggedAsFailed()
+    {
+        await using var dbContext = CreateDbContext();
+        var (_, _, order) = await SeedPendingOrderAsync(dbContext);
+        var notificationService = new FakeNotificationService
+        {
+            SendResult = new WhatsAppSendResult(false, false, Error: "Meta rejected message.")
+        };
+        var service = new OrderService(dbContext, notificationService);
+
+        await service.UpdateStatusAsync(
+            order.Id,
+            new UpdateOrderStatusRequest(OrderStatuses.Confirmed, "Accepted.", "Staff", 20));
+
+        var messageLog = await dbContext.MessageLogs.SingleAsync(x => x.Direction == MessageDirections.Outgoing);
+        Assert.Equal(MessageStatuses.Failed, messageLog.Status);
+        Assert.Null(messageLog.WhatsAppMessageId);
+    }
+
     private static async Task<(Restaurant Restaurant, Customer Customer, Order Order)> SeedPendingOrderAsync(
         RestaurantConnectDbContext dbContext)
     {
@@ -130,6 +170,8 @@ public sealed class OrderStatusManagementTests
     private sealed class FakeNotificationService : INotificationService
     {
         public List<string> CustomerMessages { get; } = new();
+        public WhatsAppSendResult SendResult { get; set; } =
+            new(true, false, Guid.NewGuid().ToString("N"));
 
         public Task NotifyOrderConfirmedAsync(
             Restaurant restaurant,
@@ -154,7 +196,7 @@ public sealed class OrderStatusManagementTests
             CancellationToken cancellationToken = default)
         {
             CustomerMessages.Add(message);
-            return Task.FromResult(new WhatsAppSendResult(true, false, Guid.NewGuid().ToString("N")));
+            return Task.FromResult(SendResult);
         }
     }
 }

@@ -123,7 +123,7 @@ public sealed partial class ConversationService(
             Direction = MessageDirections.Outgoing,
             MessageText = reply.Text,
             WhatsAppMessageId = sendResult.ProviderMessageId,
-            Status = sendResult.IsSuccess ? MessageStatuses.Sent : MessageStatuses.Failed
+            Status = ResolveMessageStatus(sendResult)
         });
         await dbContext.SaveChangesAsync(cancellationToken);
         stopwatch.Stop();
@@ -1319,6 +1319,13 @@ public sealed partial class ConversationService(
                    JsonOptions)
                ?? new PendingOrderDraft();
     }
+
+    private static string ResolveMessageStatus(WhatsAppSendResult result) =>
+        result.IsSkipped
+            ? MessageStatuses.Skipped
+            : result.IsSuccess
+                ? MessageStatuses.Sent
+                : MessageStatuses.Failed;
 
     private static void SaveDraft(Conversation conversation, PendingOrderDraft draft) =>
         conversation.TempOrderJson = JsonSerializer.Serialize(draft, JsonOptions);

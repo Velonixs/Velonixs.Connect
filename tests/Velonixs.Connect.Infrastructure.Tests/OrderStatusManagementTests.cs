@@ -92,13 +92,16 @@ public sealed class OrderStatusManagementTests
         };
         var service = new OrderService(dbContext, notificationService);
 
-        await service.UpdateStatusAsync(
+        var result = await service.UpdateStatusAsync(
             order.Id,
             new UpdateOrderStatusRequest(OrderStatuses.Confirmed, "Accepted.", "Staff", 20));
 
         var messageLog = await dbContext.MessageLogs.SingleAsync(x => x.Direction == MessageDirections.Outgoing);
         Assert.Equal(MessageStatuses.Skipped, messageLog.Status);
         Assert.Null(messageLog.WhatsAppMessageId);
+        Assert.NotNull(result);
+        Assert.Single(result.Messages);
+        Assert.Equal(MessageStatuses.Skipped, result.Messages.Single().Status);
     }
 
     [Fact]
@@ -112,13 +115,16 @@ public sealed class OrderStatusManagementTests
         };
         var service = new OrderService(dbContext, notificationService);
 
-        await service.UpdateStatusAsync(
+        var result = await service.UpdateStatusAsync(
             order.Id,
             new UpdateOrderStatusRequest(OrderStatuses.Confirmed, "Accepted.", "Staff", 20));
 
         var messageLog = await dbContext.MessageLogs.SingleAsync(x => x.Direction == MessageDirections.Outgoing);
         Assert.Equal(MessageStatuses.Failed, messageLog.Status);
         Assert.Null(messageLog.WhatsAppMessageId);
+        Assert.NotNull(result);
+        Assert.Single(result.Messages);
+        Assert.Equal(MessageStatuses.Failed, result.Messages.Single().Status);
     }
 
     private static async Task<(Restaurant Restaurant, Customer Customer, Order Order)> SeedPendingOrderAsync(

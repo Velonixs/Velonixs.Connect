@@ -108,6 +108,10 @@ public sealed class PortalController(
                 CgstPercent = restaurant.CgstPercent,
                 SgstPercent = restaurant.SgstPercent
             },
+            WhatsAppCatalog =
+            {
+                WhatsAppCatalogId = restaurant.WhatsAppCatalogId
+            },
             CanManageMenu = User.IsInRole(AppRoles.BusinessOwner) || User.IsInRole(AppRoles.BusinessManager)
         });
     }
@@ -216,6 +220,12 @@ public sealed class PortalController(
         }
 
         TempData["Success"] = $"Order {order.OrderNumber} marked {order.OrderStatus}.";
+        var notificationWarning = BuildCustomerNotificationWarning(order);
+        if (notificationWarning is not null)
+        {
+            TempData["Warning"] = notificationWarning;
+        }
+
         return RedirectToAction(nameof(Order), new { id });
     }
 
@@ -270,6 +280,29 @@ public sealed class PortalController(
         await dbContext.SaveChangesAsync(cancellationToken);
 
         TempData["Success"] = "GST settings saved. New carts and orders will use these values.";
+        return RedirectToAction(nameof(Menu));
+    }
+
+    [HttpPost("portal/whatsapp-catalog")]
+    [Authorize(Roles = AppRoles.BusinessOwner + "," + AppRoles.BusinessManager)]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> UpdateWhatsAppCatalog(RestaurantWhatsAppCatalogFormModel form, CancellationToken cancellationToken)
+    {
+        var restaurant = await dbContext.Restaurants.FirstOrDefaultAsync(x => x.Id == GetBusinessId(), cancellationToken);
+
+        if (restaurant is null)
+        {
+            return NotFound();
+        }
+
+        restaurant.WhatsAppCatalogId = string.IsNullOrWhiteSpace(form.WhatsAppCatalogId)
+            ? null
+            : form.WhatsAppCatalogId.Trim();
+        await dbContext.SaveChangesAsync(cancellationToken);
+
+        TempData["Success"] = string.IsNullOrWhiteSpace(restaurant.WhatsAppCatalogId)
+            ? "WhatsApp catalog ID cleared. Customers will see the numbered menu."
+            : "WhatsApp catalog ID saved. Customers will see catalog products when active menu items have matching SKUs.";
         return RedirectToAction(nameof(Menu));
     }
 
@@ -636,4 +669,21 @@ public sealed class PortalController(
             ],
             _ => StatusOptions
         };
+
+    private static string? BuildCustomerNotificationWarning(OrderDetailResponse order)
+    {
+        var notification = order.Messages
+            .Where(x => x.Direction == MessageDirections.Outgoing)
+            .OrderByDescending(x => x.CreatedAt)
+            .FirstOrDefault();
+
+        return notification?.Status switch
+        {
+            MessageStatuses.Skipped =>
+                "Order status was saved, but the customer WhatsApp update was not sent because WhatsApp sending is disabled or credentials are missing.",
+            MessageStatuses.Failed =>
+                "Order status was saved, but the customer WhatsApp update failed. Check the conversation log for the provider response.",
+            _ => null
+        };
+    }
 }

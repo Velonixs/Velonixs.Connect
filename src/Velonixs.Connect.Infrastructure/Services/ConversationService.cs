@@ -684,6 +684,9 @@ public sealed partial class ConversationService(
     {
         if (string.IsNullOrWhiteSpace(restaurant.WhatsAppCatalogId))
         {
+            logger.LogInformation(
+                "WhatsApp catalog menu skipped for restaurant {RestaurantId} because no catalog id is configured.",
+                restaurant.Id);
             return null;
         }
 
@@ -702,6 +705,9 @@ public sealed partial class ConversationService(
 
         if (categories.Length == 0)
         {
+            logger.LogInformation(
+                "WhatsApp catalog menu skipped for restaurant {RestaurantId} because no active available menu items have product retailer ids.",
+                restaurant.Id);
             return null;
         }
 
@@ -720,6 +726,9 @@ public sealed partial class ConversationService(
 
         if (items.Length == 0)
         {
+            logger.LogInformation(
+                "WhatsApp catalog menu skipped for restaurant {RestaurantId} because no catalog menu items were found.",
+                restaurant.Id);
             return null;
         }
 
@@ -742,6 +751,9 @@ public sealed partial class ConversationService(
 
         if (sections.Count == 0)
         {
+            logger.LogInformation(
+                "WhatsApp catalog menu skipped for restaurant {RestaurantId} because no product-list sections could be built.",
+                restaurant.Id);
             return null;
         }
 

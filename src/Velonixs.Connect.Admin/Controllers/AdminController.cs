@@ -705,7 +705,30 @@ public sealed class AdminController(
         }
 
         TempData["Success"] = $"Order {order.OrderNumber} marked {order.OrderStatus}.";
+        var notificationWarning = BuildCustomerNotificationWarning(order);
+        if (notificationWarning is not null)
+        {
+            TempData["Warning"] = notificationWarning;
+        }
+
         return RedirectToAction(nameof(Order), new { id });
+    }
+
+    private static string? BuildCustomerNotificationWarning(OrderDetailResponse order)
+    {
+        var notification = order.Messages
+            .Where(x => x.Direction == MessageDirections.Outgoing)
+            .OrderByDescending(x => x.CreatedAt)
+            .FirstOrDefault();
+
+        return notification?.Status switch
+        {
+            MessageStatuses.Skipped =>
+                "Order status was saved, but the customer WhatsApp update was not sent because WhatsApp sending is disabled or credentials are missing.",
+            MessageStatuses.Failed =>
+                "Order status was saved, but the customer WhatsApp update failed. Check the conversation log for the provider response.",
+            _ => null
+        };
     }
 
     private static RestaurantFormModel ToRestaurantForm(RestaurantResponse restaurant)

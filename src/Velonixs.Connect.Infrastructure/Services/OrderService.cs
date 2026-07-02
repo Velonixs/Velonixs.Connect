@@ -156,12 +156,15 @@ public sealed class OrderService(
         var notificationText = BuildCustomerNotification(order, comment);
         await dbContext.SaveChangesAsync(cancellationToken);
 
+        MessageLogResponse? notificationMessage = null;
         if (!alreadyNotified && notificationText is not null)
         {
-            await NotifyCustomerAsync(order, notificationText, cancellationToken);
+            notificationMessage = await NotifyCustomerAsync(order, notificationText, cancellationToken);
         }
 
-        return ToDetailResponse(order, Array.Empty<MessageLogResponse>());
+        return ToDetailResponse(
+            order,
+            notificationMessage is null ? Array.Empty<MessageLogResponse>() : [notificationMessage]);
     }
 
     private static OrderSummaryResponse ToSummaryResponse(Domain.Entities.Order order)
@@ -276,7 +279,7 @@ public sealed class OrderService(
             : null;
     }
 
-    private async Task NotifyCustomerAsync(
+    private async Task<MessageLogResponse> NotifyCustomerAsync(
         Domain.Entities.Order order,
         string notificationText,
         CancellationToken cancellationToken)
@@ -294,7 +297,7 @@ public sealed class OrderService(
             .Select(x => (Guid?)x.Id)
             .FirstOrDefaultAsync(cancellationToken);
 
-        dbContext.MessageLogs.Add(new MessageLog
+        var messageLog = new MessageLog
         {
             RestaurantId = order.RestaurantId,
             CustomerId = order.CustomerId,
@@ -303,9 +306,18 @@ public sealed class OrderService(
             MessageText = messageText,
             WhatsAppMessageId = result.ProviderMessageId,
             Status = ResolveMessageStatus(result)
-        });
+        };
+        dbContext.MessageLogs.Add(messageLog);
 
         await dbContext.SaveChangesAsync(cancellationToken);
+
+        return new MessageLogResponse(
+            messageLog.Id,
+            messageLog.Direction,
+            messageLog.MessageText,
+            messageLog.WhatsAppMessageId,
+            messageLog.Status,
+            messageLog.CreatedAt);
     }
 
     private static string ResolveMessageStatus(WhatsAppSendResult result) =>

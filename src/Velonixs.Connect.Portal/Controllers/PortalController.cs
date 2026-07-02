@@ -108,6 +108,10 @@ public sealed class PortalController(
                 CgstPercent = restaurant.CgstPercent,
                 SgstPercent = restaurant.SgstPercent
             },
+            WhatsAppCatalog =
+            {
+                WhatsAppCatalogId = restaurant.WhatsAppCatalogId
+            },
             CanManageMenu = User.IsInRole(AppRoles.BusinessOwner) || User.IsInRole(AppRoles.BusinessManager)
         });
     }
@@ -276,6 +280,29 @@ public sealed class PortalController(
         await dbContext.SaveChangesAsync(cancellationToken);
 
         TempData["Success"] = "GST settings saved. New carts and orders will use these values.";
+        return RedirectToAction(nameof(Menu));
+    }
+
+    [HttpPost("portal/whatsapp-catalog")]
+    [Authorize(Roles = AppRoles.BusinessOwner + "," + AppRoles.BusinessManager)]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> UpdateWhatsAppCatalog(RestaurantWhatsAppCatalogFormModel form, CancellationToken cancellationToken)
+    {
+        var restaurant = await dbContext.Restaurants.FirstOrDefaultAsync(x => x.Id == GetBusinessId(), cancellationToken);
+
+        if (restaurant is null)
+        {
+            return NotFound();
+        }
+
+        restaurant.WhatsAppCatalogId = string.IsNullOrWhiteSpace(form.WhatsAppCatalogId)
+            ? null
+            : form.WhatsAppCatalogId.Trim();
+        await dbContext.SaveChangesAsync(cancellationToken);
+
+        TempData["Success"] = string.IsNullOrWhiteSpace(restaurant.WhatsAppCatalogId)
+            ? "WhatsApp catalog ID cleared. Customers will see the numbered menu."
+            : "WhatsApp catalog ID saved. Customers will see catalog products when active menu items have matching SKUs.";
         return RedirectToAction(nameof(Menu));
     }
 

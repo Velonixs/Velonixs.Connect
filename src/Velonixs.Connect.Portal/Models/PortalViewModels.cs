@@ -25,7 +25,13 @@ public sealed class PortalMenuViewModel
     public MenuCategoryPortalFormModel NewCategory { get; set; } = new();
     public MenuItemPortalFormModel NewItem { get; set; } = new();
     public RestaurantTaxFormModel TaxSetting { get; set; } = new();
+    public RestaurantWhatsAppCatalogFormModel WhatsAppCatalog { get; set; } = new();
     public bool CanManageMenu { get; set; }
+}
+
+public sealed class RestaurantWhatsAppCatalogFormModel
+{
+    public string? WhatsAppCatalogId { get; set; }
 }
 
 public sealed class RestaurantTaxFormModel

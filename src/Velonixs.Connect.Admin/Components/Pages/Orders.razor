@@ -1,0 +1,115 @@
+@page "/admin/blazor/orders/{BusinessId:guid}"
+@attribute [Authorize(Roles = AppRoles.PlatformAdmin)]
+@inject IRestaurantService RestaurantService
+@inject IOrderService OrderService
+
+<header class="page-head">
+    <div>
+        <p>@_restaurant?.Name</p>
+        <h1>Orders</h1>
+    </div>
+    <div class="toolbar">
+        <a href="/admin/blazor">Dashboard</a>
+        <a href="/admin/blazor/products/@BusinessId">Products</a>
+    </div>
+</header>
+
+<section class="work-surface">
+    <div class="table-responsive">
+        <table class="table align-middle">
+            <thead>
+                <tr>
+                    <th>Order</th>
+                    <th>Customer</th>
+                    <th>Amount</th>
+                    <th>Status</th>
+                    <th>Created</th>
+                    <th></th>
+                </tr>
+            </thead>
+            <tbody>
+            @foreach (var order in _orders)
+            {
+                <tr>
+                    <td><strong>@order.OrderNumber</strong></td>
+                    <td>@order.CustomerName<br /><small>@order.CustomerPhone</small></td>
+                    <td>Rs @order.TotalAmount.ToString("0.##")</td>
+                    <td>
+                        <select class="inline-input" @bind="order.NextStatus">
+                            @foreach (var status in _statusOptions)
+                            {
+                                <option value="@status">@status</option>
+                            }
+                        </select>
+                    </td>
+                    <td>@order.CreatedAt.ToLocalTime().ToString("dd MMM yyyy, hh:mm tt")</td>
+                    <td class="action-row">
+                        <input class="inline-input" placeholder="Comment" @bind="order.Comment" />
+                        <button @onclick="() => UpdateStatusAsync(order)">Save status</button>
+                    </td>
+                </tr>
+            }
+            </tbody>
+        </table>
+    </div>
+</section>
+
+@code {
+    [Parameter] public Guid BusinessId { get; set; }
+
+    private RestaurantResponse? _restaurant;
+    private readonly List<OrderEditor> _orders = new();
+    private readonly string[] _statusOptions =
+    [
+        OrderStatuses.PendingConfirmation,
+        OrderStatuses.Confirmed,
+        OrderStatuses.Preparing,
+        OrderStatuses.ReadyForPickup,
+        OrderStatuses.OutForDelivery,
+        OrderStatuses.Delivered,
+        OrderStatuses.Rejected,
+        OrderStatuses.Cancelled,
+        OrderStatuses.Failed
+    ];
+
+    protected override async Task OnParametersSetAsync()
+    {
+        await LoadAsync();
+    }
+
+    private async Task LoadAsync()
+    {
+        _restaurant = await RestaurantService.GetRestaurantAsync(BusinessId);
+        _orders.Clear();
+        _orders.AddRange((await OrderService.GetRestaurantOrdersAsync(BusinessId)).Select(OrderEditor.From));
+    }
+
+    private async Task UpdateStatusAsync(OrderEditor order)
+    {
+        await OrderService.UpdateStatusAsync(order.Id, new UpdateOrderStatusRequest(order.NextStatus, order.Comment, "Blazor admin", null));
+        await LoadAsync();
+    }
+
+    private sealed class OrderEditor
+    {
+        public Guid Id { get; set; }
+        public string OrderNumber { get; set; } = string.Empty;
+        public string CustomerName { get; set; } = string.Empty;
+        public string CustomerPhone { get; set; } = string.Empty;
+        public decimal TotalAmount { get; set; }
+        public string NextStatus { get; set; } = string.Empty;
+        public string? Comment { get; set; }
+        public DateTimeOffset CreatedAt { get; set; }
+
+        public static OrderEditor From(OrderSummaryResponse order) => new()
+        {
+            Id = order.Id,
+            OrderNumber = order.OrderNumber,
+            CustomerName = order.CustomerName,
+            CustomerPhone = order.CustomerPhone,
+            TotalAmount = order.TotalAmount,
+            NextStatus = order.OrderStatus,
+            CreatedAt = order.CreatedAt
+        };
+    }
+}

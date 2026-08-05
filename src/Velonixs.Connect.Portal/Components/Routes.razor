@@ -1,0 +1,25 @@
+<CascadingAuthenticationState>
+    <Router AppAssembly="@typeof(App).Assembly">
+        <Found Context="routeData">
+            <AuthorizeRouteView RouteData="@routeData" DefaultLayout="@typeof(PortalBlazorLayout)">
+                <NotAuthorized>
+                    <section class="portal-blazor-message">
+                        <h1>Business Portal access required</h1>
+                        <p>Sign in with an active business portal account to continue.</p>
+                        <a class="btn btn-primary" href="/portal/login">Sign in</a>
+                    </section>
+                </NotAuthorized>
+            </AuthorizeRouteView>
+            <FocusOnNavigate RouteData="@routeData" Selector="h1" />
+        </Found>
+        <NotFound>
+            <LayoutView Layout="@typeof(PortalBlazorLayout)">
+                <section class="portal-blazor-message">
+                    <h1>Page not found</h1>
+                    <p>The requested portal workspace does not exist.</p>
+                    <a class="btn btn-primary" href="/portal/blazor">Back to dashboard</a>
+                </section>
+            </LayoutView>
+        </NotFound>
+    </Router>
+</CascadingAuthenticationState>

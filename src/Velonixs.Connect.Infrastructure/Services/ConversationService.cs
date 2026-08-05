@@ -27,6 +27,9 @@ public sealed partial class ConversationService(
         CancellationToken cancellationToken = default)
     {
         var stopwatch = Stopwatch.StartNew();
+        var providerMessageId = string.IsNullOrWhiteSpace(message.WhatsAppMessageId)
+            ? null
+            : message.WhatsAppMessageId.Trim();
 
         if (string.IsNullOrWhiteSpace(message.PhoneNumberId) ||
             string.IsNullOrWhiteSpace(message.FromPhoneNumber) ||
@@ -35,9 +38,9 @@ public sealed partial class ConversationService(
             return WhatsAppWebhookProcessResult.Ignored("Missing phone number id, sender, or message text.");
         }
 
-        if (!string.IsNullOrWhiteSpace(message.WhatsAppMessageId) &&
+        if (providerMessageId is not null &&
             await dbContext.MessageLogs.AnyAsync(
-                x => x.WhatsAppMessageId == message.WhatsAppMessageId,
+                x => x.WhatsAppMessageId == providerMessageId,
                 cancellationToken))
         {
             return WhatsAppWebhookProcessResult.Ignored("Duplicate WhatsApp message.");
@@ -55,7 +58,7 @@ public sealed partial class ConversationService(
         var customer = await GetOrCreateCustomerAsync(restaurant.Id, message, cancellationToken);
         var conversation = await GetOrCreateConversationAsync(restaurant.Id, customer, cancellationToken);
 
-        if (string.IsNullOrWhiteSpace(message.WhatsAppMessageId) &&
+        if (providerMessageId is null &&
             await IsRecentDuplicateIncomingMessageAsync(restaurant.Id, customer.Id, message, cancellationToken))
         {
             return WhatsAppWebhookProcessResult.Ignored("Duplicate WhatsApp message.");
@@ -68,11 +71,30 @@ public sealed partial class ConversationService(
             ConversationId = conversation.Id,
             Direction = MessageDirections.Incoming,
             MessageText = message.MessageText,
-            WhatsAppMessageId = message.WhatsAppMessageId,
+            WhatsAppMessageId = providerMessageId,
             Status = MessageStatuses.Received,
             CreatedAt = message.ReceivedAt ?? DateTimeOffset.UtcNow
         });
-        await dbContext.SaveChangesAsync(cancellationToken);
+        try
+        {
+            await dbContext.SaveChangesAsync(cancellationToken);
+        }
+        catch (DbUpdateException) when (providerMessageId is not null)
+        {
+            // The filtered unique index is the authority under concurrent Meta
+            // retries. Confirm the competing delivery was recorded before
+            // treating this as an idempotent duplicate; otherwise propagate the
+            // underlying persistence failure.
+            dbContext.ChangeTracker.Clear();
+            if (await dbContext.MessageLogs
+                    .AsNoTracking()
+                    .AnyAsync(x => x.WhatsAppMessageId == providerMessageId, cancellationToken))
+            {
+                return WhatsAppWebhookProcessResult.Ignored("Duplicate WhatsApp message.");
+            }
+
+            throw;
+        }
 
         OutgoingReply reply;
         try
@@ -698,7 +720,10 @@ public sealed partial class ConversationService(
                                    item.IsActive &&
                                    item.IsAvailable &&
                                    item.ProductRetailerId != null &&
-                                   item.ProductRetailerId != string.Empty))
+                                   item.ProductRetailerId != string.Empty &&
+                                   item.SyncStatus == "Synced" &&
+                                   item.MetaProductId != null &&
+                                   item.MetaProductId != string.Empty))
             .OrderBy(category => category.DisplayOrder)
             .ThenBy(category => category.Name)
             .ToArrayAsync(cancellationToken);
@@ -706,7 +731,7 @@ public sealed partial class ConversationService(
         if (categories.Length == 0)
         {
             logger.LogInformation(
-                "WhatsApp catalog menu skipped for restaurant {RestaurantId} because no active available menu items have product retailer ids.",
+                "WhatsApp catalog menu skipped for restaurant {RestaurantId} because no active available menu items are confirmed in Meta.",
                 restaurant.Id);
             return null;
         }
@@ -716,10 +741,14 @@ public sealed partial class ConversationService(
             .AsNoTracking()
             .Where(item => item.RestaurantId == restaurant.Id &&
                            categoryIds.Contains(item.CategoryId) &&
-                           item.IsActive &&
-                           item.IsAvailable &&
-                           item.ProductRetailerId != null &&
-                           item.ProductRetailerId != string.Empty)
+                            item.IsActive &&
+                            item.IsAvailable &&
+                            item.Category.IsActive &&
+                            item.ProductRetailerId != null &&
+                            item.ProductRetailerId != string.Empty &&
+                            item.SyncStatus == "Synced" &&
+                            item.MetaProductId != null &&
+                            item.MetaProductId != string.Empty)
             .OrderBy(item => item.ItemCode)
             .ThenBy(item => item.Name)
             .ToArrayAsync(cancellationToken);
@@ -810,7 +839,11 @@ public sealed partial class ConversationService(
             .Where(item => item.RestaurantId == restaurant.Id &&
                            item.IsActive &&
                            item.IsAvailable &&
+                           item.Category.IsActive &&
                            item.ProductRetailerId != null &&
+                           item.SyncStatus == "Synced" &&
+                           item.MetaProductId != null &&
+                           item.MetaProductId != string.Empty &&
                            productRetailerIds.Contains(item.ProductRetailerId))
             .ToArrayAsync(cancellationToken);
         var menuItemByRetailerId = menuItems

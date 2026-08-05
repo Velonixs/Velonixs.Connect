@@ -26,18 +26,24 @@ public sealed class RestaurantService(RestaurantConnectDbContext dbContext) : IR
 
     public async Task<RestaurantResponse> CreateRestaurantAsync(CreateRestaurantRequest request, CancellationToken cancellationToken = default)
     {
-        ValidateTaxPercent(request.CgstPercent, nameof(request.CgstPercent));
-        ValidateTaxPercent(request.SgstPercent, nameof(request.SgstPercent));
+        ValidateRestaurantRequest(request.Name, request.WhatsAppPhoneNumberId, request.CgstPercent, request.SgstPercent);
+        var phoneNumberId = request.WhatsAppPhoneNumberId.Trim();
+        if (await dbContext.Restaurants.AnyAsync(x => x.WhatsAppPhoneNumberId == phoneNumberId, cancellationToken))
+        {
+            throw new InvalidOperationException("Another business already uses this WhatsApp Phone Number ID.");
+        }
 
         var restaurant = new Domain.Entities.Restaurant
         {
             Name = request.Name.Trim(),
             BusinessType = BusinessTypes.Normalize(request.BusinessType),
-            WhatsAppPhoneNumberId = request.WhatsAppPhoneNumberId.Trim(),
+            WhatsAppPhoneNumberId = phoneNumberId,
             BusinessPhone = request.BusinessPhone?.Trim(),
             NotificationEmail = request.NotificationEmail?.Trim(),
             StaffWhatsAppNumber = request.StaffWhatsAppNumber?.Trim(),
-            WhatsAppCatalogId = NormalizeOptional(request.WhatsAppCatalogId),
+            // WhatsAppCatalogId is a legacy read model mirror. Only
+            // IMetaCatalogSyncService.SaveSettingsAsync may change it so a
+            // catalog switch also reconciles product state and queued work.
             Address = request.Address?.Trim(),
             CgstPercent = request.CgstPercent,
             SgstPercent = request.SgstPercent,
@@ -52,6 +58,7 @@ public sealed class RestaurantService(RestaurantConnectDbContext dbContext) : IR
 
     public async Task<RestaurantResponse?> UpdateRestaurantAsync(Guid id, UpdateRestaurantRequest request, CancellationToken cancellationToken = default)
     {
+        ValidateRestaurantRequest(request.Name, request.WhatsAppPhoneNumberId, request.CgstPercent, request.SgstPercent);
         var restaurant = await dbContext.Restaurants.FirstOrDefaultAsync(x => x.Id == id, cancellationToken);
 
         if (restaurant is null)
@@ -59,16 +66,25 @@ public sealed class RestaurantService(RestaurantConnectDbContext dbContext) : IR
             return null;
         }
 
+        var phoneNumberId = request.WhatsAppPhoneNumberId.Trim();
+        if (await dbContext.Restaurants.AnyAsync(
+                x => x.Id != id && x.WhatsAppPhoneNumberId == phoneNumberId,
+                cancellationToken))
+        {
+            throw new InvalidOperationException("Another business already uses this WhatsApp Phone Number ID.");
+        }
+
         restaurant.Name = request.Name.Trim();
         restaurant.BusinessType = BusinessTypes.Normalize(request.BusinessType);
-        restaurant.WhatsAppPhoneNumberId = request.WhatsAppPhoneNumberId.Trim();
+        restaurant.WhatsAppPhoneNumberId = phoneNumberId;
         restaurant.BusinessPhone = request.BusinessPhone?.Trim();
         restaurant.NotificationEmail = request.NotificationEmail?.Trim();
         restaurant.StaffWhatsAppNumber = request.StaffWhatsAppNumber?.Trim();
-        restaurant.WhatsAppCatalogId = NormalizeOptional(request.WhatsAppCatalogId);
+        // Keep the legacy catalog mirror unchanged. Direct restaurant updates
+        // intentionally accept the old DTO field for API compatibility, but
+        // catalog changes must flow through Meta catalog settings so they are
+        // reconciled with product IDs and outbox records.
         restaurant.Address = request.Address?.Trim();
-        ValidateTaxPercent(request.CgstPercent, nameof(request.CgstPercent));
-        ValidateTaxPercent(request.SgstPercent, nameof(request.SgstPercent));
         restaurant.CgstPercent = request.CgstPercent;
         restaurant.SgstPercent = request.SgstPercent;
         restaurant.IsActive = request.IsActive;
@@ -139,14 +155,31 @@ public sealed class RestaurantService(RestaurantConnectDbContext dbContext) : IR
             restaurant.WhatsAppCatalogId);
     }
 
-    private static string? NormalizeOptional(string? value) =>
-        string.IsNullOrWhiteSpace(value) ? null : value.Trim();
-
     private static void ValidateTaxPercent(decimal value, string fieldName)
     {
         if (value is < 0 or > 100)
         {
             throw new InvalidOperationException($"{fieldName} must be between 0 and 100.");
         }
+    }
+
+    private static void ValidateRestaurantRequest(
+        string? name,
+        string? whatsAppPhoneNumberId,
+        decimal cgstPercent,
+        decimal sgstPercent)
+    {
+        if (string.IsNullOrWhiteSpace(name))
+        {
+            throw new ArgumentException("Business name is required.", nameof(name));
+        }
+
+        if (string.IsNullOrWhiteSpace(whatsAppPhoneNumberId))
+        {
+            throw new ArgumentException("WhatsApp Phone Number ID is required.", nameof(whatsAppPhoneNumberId));
+        }
+
+        ValidateTaxPercent(cgstPercent, nameof(cgstPercent));
+        ValidateTaxPercent(sgstPercent, nameof(sgstPercent));
     }
 }

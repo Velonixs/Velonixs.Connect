@@ -6,10 +6,28 @@
     <Nullable>enable</Nullable>
     <IsPackable>false</IsPackable>
     <IsTestProject>true</IsTestProject>
+    <!--
+      This is intentionally a scoped gate. It measures the two production
+      services that implement the Meta catalog workflow, rather than claiming
+      repository-wide coverage. The include filter also keeps EF migrations and
+      generated sources out of the measured surface.
+    -->
+    <CollectCoverage>true</CollectCoverage>
+    <CoverletOutput>$(MSBuildProjectDirectory)\TestResults\meta-catalog-coverage\</CoverletOutput>
+    <CoverletOutputFormat>cobertura</CoverletOutputFormat>
+    <Threshold>85</Threshold>
+    <ThresholdType>line</ThresholdType>
+    <ThresholdStat>total</ThresholdStat>
+    <Include>[Velonixs.Connect.Infrastructure]Velonixs.Connect.Infrastructure.Services.MetaCatalogSyncService,[Velonixs.Connect.Infrastructure]Velonixs.Connect.Infrastructure.Services.MenuService</Include>
+    <ExcludeByFile>**/Migrations/*.cs;**/*.g.cs;**/*.designer.cs</ExcludeByFile>
   </PropertyGroup>
 
   <ItemGroup>
     <PackageReference Include="coverlet.collector" Version="6.0.2">
+      <PrivateAssets>all</PrivateAssets>
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+    </PackageReference>
+    <PackageReference Include="coverlet.msbuild" Version="6.0.2">
       <PrivateAssets>all</PrivateAssets>
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
     </PackageReference>
@@ -23,6 +41,7 @@
   </ItemGroup>
 
   <ItemGroup>
+    <ProjectReference Include="..\..\src\Velonixs.Connect.Api\Velonixs.Connect.Api.csproj" />
     <ProjectReference Include="..\..\src\Velonixs.Connect.Infrastructure\Velonixs.Connect.Infrastructure.csproj" />
   </ItemGroup>
 

@@ -11,6 +11,14 @@ public static class AppRoles
     public const string PortalRoles =
         BusinessOwner + "," + BusinessManager + "," + Cashier + "," + Staff;
 
+    public static readonly string[] PortalRoleNames =
+    [
+        BusinessOwner,
+        BusinessManager,
+        Cashier,
+        Staff
+    ];
+
     public static readonly IReadOnlyCollection<string> All =
     [
         PlatformAdmin,

@@ -21,6 +21,26 @@ public sealed class CatalogService(IMenuService menuService) : ICatalogService
         return ToCategoryResponse(category);
     }
 
+    public async Task<CatalogCategoryResponse?> UpdateCategoryAsync(Guid id, UpdateCatalogCategoryRequest request, CancellationToken cancellationToken = default)
+    {
+        var category = await menuService.UpdateCategoryAsync(
+            id,
+            new UpdateMenuCategoryRequest(request.Name, request.DisplayOrder, request.IsActive),
+            cancellationToken);
+
+        return category is null ? null : ToCategoryResponse(category);
+    }
+
+    public Task<bool> DeactivateCategoryAsync(Guid id, CancellationToken cancellationToken = default)
+    {
+        return menuService.DeactivateCategoryAsync(id, cancellationToken);
+    }
+
+    public Task<bool> DeleteCategoryAsync(Guid id, CancellationToken cancellationToken = default)
+    {
+        return menuService.DeleteCategoryAsync(id, cancellationToken);
+    }
+
     public async Task<CatalogProductResponse> CreateProductAsync(Guid businessId, CreateCatalogProductRequest request, CancellationToken cancellationToken = default)
     {
         var item = await menuService.CreateItemAsync(
@@ -34,7 +54,8 @@ public sealed class CatalogService(IMenuService menuService) : ICatalogService
                 request.Price,
                 request.IsAvailable,
                 request.IsActive,
-                request.ProductRetailerId),
+                request.ProductRetailerId,
+                request.ImageUrl),
             cancellationToken);
 
         return ToProductResponse(item);
@@ -53,7 +74,8 @@ public sealed class CatalogService(IMenuService menuService) : ICatalogService
                 request.Price,
                 request.IsAvailable,
                 request.IsActive,
-                request.ProductRetailerId),
+                request.ProductRetailerId,
+                request.ImageUrl),
             cancellationToken);
 
         return item is null ? null : ToProductResponse(item);
@@ -96,6 +118,9 @@ public sealed class CatalogService(IMenuService menuService) : ICatalogService
             item.Price,
             item.IsAvailable,
             item.IsActive,
-            item.ProductRetailerId);
+            item.ProductRetailerId,
+            item.ImageUrl,
+            item.MetaProductId,
+            item.SyncStatus);
     }
 }

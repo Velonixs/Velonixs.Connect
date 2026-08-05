@@ -1,11 +1,9 @@
 using System.Security.Claims;
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Identity;
-using Microsoft.AspNetCore.Mvc.Authorization;
 using Velonixs.Connect.Application;
 using Velonixs.Connect.Infrastructure;
 using Velonixs.Connect.Persistence.Identity;
-using Velonixs.Connect.Persistence.Persistence;
 using Velonixs.Connect.Shared.Security;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -32,33 +30,16 @@ builder.Services
             }
         };
     });
-builder.Services.AddControllersWithViews(options =>
-{
-    options.Filters.Add(new AuthorizeFilter());
-});
+builder.Services.AddControllersWithViews();
+builder.Services.AddRazorComponents()
+    .AddInteractiveServerComponents();
+builder.Services.AddCascadingAuthenticationState();
 builder.Services.AddHealthChecks();
 
 var app = builder.Build();
 var allowRemoteAdmin = builder.Configuration.GetValue<bool>("Admin:AllowRemote");
 
-using (var scope = app.Services.CreateScope())
-{
-    var logger = scope.ServiceProvider
-        .GetRequiredService<ILoggerFactory>()
-        .CreateLogger("Startup");
-    try
-    {
-        await scope.ServiceProvider.GetRequiredService<DatabaseInitializer>().InitializeAsync();
-    }
-    catch (Exception ex)
-    {
-        logger.LogCritical(ex, "Admin startup failed while initializing the database.");
-        throw;
-    }
-}
-
-app.UseExceptionHandler("/admin/error");
-app.UseStatusCodePagesWithReExecute("/admin/error", "?statusCode={0}");
+app.UseExceptionHandler("/admin/blazor");
 
 app.UseStaticFiles();
 
@@ -82,10 +63,18 @@ app.Use(async (context, next) =>
 app.UseRouting();
 app.UseAuthentication();
 app.UseAuthorization();
+app.UseAntiforgery();
 
 app.MapHealthChecks("/health");
+app.MapGet("/", () => Results.Redirect("/admin/blazor"))
+    .RequireAuthorization(policy => policy.RequireRole(AppRoles.PlatformAdmin));
+app.MapGet("/admin", () => Results.Redirect("/admin/blazor"))
+    .RequireAuthorization(policy => policy.RequireRole(AppRoles.PlatformAdmin));
+app.MapRazorComponents<Velonixs.Connect.Admin.Components.App>()
+    .AddInteractiveServerRenderMode()
+    .RequireAuthorization(policy => policy.RequireRole(AppRoles.PlatformAdmin));
 app.MapControllerRoute(
-    name: "default",
-    pattern: "{controller=Admin}/{action=Index}/{id?}");
+    name: "account",
+    pattern: "{controller=Account}/{action=Login}/{id?}");
 
 app.Run();

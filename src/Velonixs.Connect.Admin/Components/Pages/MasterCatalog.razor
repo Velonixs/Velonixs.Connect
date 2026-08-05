@@ -1,0 +1,306 @@
+@page "/admin/blazor/master-catalog"
+@attribute [Authorize(Roles = AppRoles.PlatformAdmin)]
+@inject IMenuService MenuService
+
+<header class="page-head">
+    <div>
+        <p>Platform Catalog</p>
+        <h1>Master Catalog</h1>
+    </div>
+    <div class="toolbar">
+        <a href="/admin/blazor">Dashboard</a>
+    </div>
+</header>
+
+@if (!string.IsNullOrWhiteSpace(_message))
+{
+    <div class="notice">@_message</div>
+}
+
+<section class="work-surface mb-3">
+    <div class="surface-title">
+        <h2>Add Master Category</h2>
+    </div>
+    <form class="form-grid-compact" @onsubmit="CreateCategoryAsync" @onsubmit:preventDefault>
+        <label>Name <span class="required-marker" aria-hidden="true">*</span><input @bind="_newCategory.Name" required /></label>
+        <label>Display Order <input type="number" @bind="_newCategory.DisplayOrder" /></label>
+        <label>Active <input type="checkbox" @bind="_newCategory.IsActive" /></label>
+        <label><span>&nbsp;</span><button type="submit" class="btn btn-primary">Add category</button></label>
+    </form>
+</section>
+
+<section class="work-surface mb-3">
+    <div class="surface-title">
+        <h2>Master Categories</h2>
+    </div>
+    <div class="table-responsive">
+        <table class="table align-middle">
+            <thead><tr><th>Name</th><th>Order</th><th>Active</th><th></th></tr></thead>
+            <tbody>
+            @foreach (var category in _categories)
+            {
+                <tr>
+                    <td><input class="inline-input" @bind="category.Name" /></td>
+                    <td><input class="inline-input" type="number" @bind="category.DisplayOrder" /></td>
+                    <td><input type="checkbox" @bind="category.IsActive" /></td>
+                    <td class="action-row">
+                        <button @onclick="() => SaveCategoryAsync(category)">Save</button>
+                        <button @onclick="() => DeleteCategoryAsync(category)">Delete</button>
+                    </td>
+                </tr>
+            }
+            </tbody>
+        </table>
+    </div>
+</section>
+
+<section class="work-surface mb-3">
+    <div class="surface-title">
+        <h2>Add Master Item</h2>
+    </div>
+    <form class="form-grid-compact" @onsubmit="CreateItemAsync" @onsubmit:preventDefault>
+        <label>Category <span class="required-marker" aria-hidden="true">*</span>
+            <select @bind="_newItem.MasterCategoryId" required>
+                @foreach (var category in _categories.Where(x => x.IsActive))
+                {
+                    <option value="@category.Id">@category.Name</option>
+                }
+            </select>
+        </label>
+        <label>Name <span class="required-marker" aria-hidden="true">*</span><input @bind="_newItem.Name" required /></label>
+        <label>Description <input @bind="_newItem.Description" /></label>
+        <label>Active <input type="checkbox" @bind="_newItem.IsActive" /></label>
+        <label><span>&nbsp;</span><button type="submit" class="btn btn-primary">Add item</button></label>
+    </form>
+</section>
+
+<section class="work-surface">
+    <div class="surface-title">
+        <h2>Master Items</h2>
+    </div>
+    <div class="table-responsive">
+        <table class="table align-middle">
+            <thead><tr><th>Category</th><th>Name</th><th>Description</th><th>Active</th><th></th></tr></thead>
+            <tbody>
+            @foreach (var item in _items)
+            {
+                <tr>
+                    <td>
+                        <select class="inline-input" @bind="item.MasterCategoryId">
+                            @foreach (var category in _categories)
+                            {
+                                <option value="@category.Id">@category.Name</option>
+                            }
+                        </select>
+                    </td>
+                    <td><input class="inline-input" @bind="item.Name" /></td>
+                    <td><input class="inline-input" @bind="item.Description" /></td>
+                    <td><input type="checkbox" @bind="item.IsActive" /></td>
+                    <td class="action-row">
+                        <button @onclick="() => SaveItemAsync(item)">Save</button>
+                        <button @onclick="() => DeleteItemAsync(item)">Delete</button>
+                    </td>
+                </tr>
+            }
+            </tbody>
+        </table>
+    </div>
+</section>
+
+@code {
+    private readonly List<MasterCategoryEditor> _categories = new();
+    private readonly List<MasterItemEditor> _items = new();
+    private MasterCategoryEditor _newCategory = new() { IsActive = true };
+    private MasterItemEditor _newItem = new() { IsActive = true };
+    private string? _message;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadAsync();
+    }
+
+    private async Task LoadAsync()
+    {
+        var catalog = await MenuService.GetMasterCatalogAsync();
+        _categories.Clear();
+        _items.Clear();
+        _categories.AddRange(catalog.Categories.Select(MasterCategoryEditor.From));
+        _items.AddRange(catalog.Items.Select(MasterItemEditor.From));
+        _newItem.MasterCategoryId = _categories.FirstOrDefault(x => x.IsActive)?.Id ?? Guid.Empty;
+    }
+
+    private async Task CreateCategoryAsync()
+    {
+        if (string.IsNullOrWhiteSpace(_newCategory.Name))
+        {
+            _message = "Enter a valid master category name.";
+            return;
+        }
+
+        try
+        {
+            await MenuService.CreateMasterCategoryAsync(new CreateMasterMenuCategoryRequest(_newCategory.Name, _newCategory.DisplayOrder, _newCategory.IsActive));
+            _newCategory = new MasterCategoryEditor { IsActive = true };
+            _message = "Master category added.";
+            await LoadAsync();
+        }
+        catch (InvalidOperationException ex)
+        {
+            _message = ex.Message;
+        }
+    }
+
+    private async Task SaveCategoryAsync(MasterCategoryEditor editor)
+    {
+        if (string.IsNullOrWhiteSpace(editor.Name))
+        {
+            _message = "Enter a valid master category name.";
+            return;
+        }
+
+        try
+        {
+            var category = await MenuService.UpdateMasterCategoryAsync(
+                editor.Id,
+                new UpdateMasterMenuCategoryRequest(editor.Name, editor.DisplayOrder, editor.IsActive));
+            if (category is null)
+            {
+                _message = "Master category was not found.";
+                return;
+            }
+
+            _message = "Master category saved.";
+            await LoadAsync();
+        }
+        catch (Exception ex) when (ex is InvalidOperationException or ArgumentException)
+        {
+            _message = ex.Message;
+        }
+    }
+
+    private async Task DeleteCategoryAsync(MasterCategoryEditor editor)
+    {
+        try
+        {
+            if (!await MenuService.DeleteMasterCategoryAsync(editor.Id))
+            {
+                _message = "Master category was not found.";
+                return;
+            }
+
+            _message = "Master category deleted.";
+            await LoadAsync();
+        }
+        catch (InvalidOperationException ex)
+        {
+            _message = ex.Message;
+        }
+    }
+
+    private async Task CreateItemAsync()
+    {
+        if (_newItem.MasterCategoryId == Guid.Empty || string.IsNullOrWhiteSpace(_newItem.Name))
+        {
+            _message = "Enter valid master menu item details.";
+            return;
+        }
+
+        try
+        {
+            await MenuService.CreateMasterItemAsync(
+                new CreateMasterMenuItemRequest(_newItem.MasterCategoryId, _newItem.Name, _newItem.Description, _newItem.IsActive));
+            _newItem = new MasterItemEditor { IsActive = true };
+            _message = "Master menu item added.";
+            await LoadAsync();
+        }
+        catch (InvalidOperationException ex)
+        {
+            _message = ex.Message;
+        }
+    }
+
+    private async Task SaveItemAsync(MasterItemEditor editor)
+    {
+        if (editor.MasterCategoryId == Guid.Empty || string.IsNullOrWhiteSpace(editor.Name))
+        {
+            _message = "Enter valid master menu item details.";
+            return;
+        }
+
+        try
+        {
+            var item = await MenuService.UpdateMasterItemAsync(
+                editor.Id,
+                new UpdateMasterMenuItemRequest(
+                    editor.MasterCategoryId,
+                    editor.Name,
+                    editor.Description,
+                    editor.IsActive));
+            if (item is null)
+            {
+                _message = "Master menu item was not found.";
+                return;
+            }
+
+            _message = "Master menu item saved.";
+            await LoadAsync();
+        }
+        catch (Exception ex) when (ex is InvalidOperationException or ArgumentException)
+        {
+            _message = ex.Message;
+        }
+    }
+
+    private async Task DeleteItemAsync(MasterItemEditor editor)
+    {
+        try
+        {
+            if (!await MenuService.DeleteMasterItemAsync(editor.Id))
+            {
+                _message = "Master menu item was not found.";
+                return;
+            }
+
+            _message = "Master menu item deleted.";
+            await LoadAsync();
+        }
+        catch (InvalidOperationException ex)
+        {
+            _message = ex.Message;
+        }
+    }
+
+    private sealed class MasterCategoryEditor
+    {
+        public Guid Id { get; set; }
+        public string Name { get; set; } = string.Empty;
+        public int DisplayOrder { get; set; }
+        public bool IsActive { get; set; } = true;
+
+        public static MasterCategoryEditor From(MasterMenuCategoryResponse category) => new()
+        {
+            Id = category.Id,
+            Name = category.Name,
+            DisplayOrder = category.DisplayOrder,
+            IsActive = category.IsActive
+        };
+    }
+
+    private sealed class MasterItemEditor
+    {
+        public Guid Id { get; set; }
+        public Guid MasterCategoryId { get; set; }
+        public string Name { get; set; } = string.Empty;
+        public string? Description { get; set; }
+        public bool IsActive { get; set; } = true;
+
+        public static MasterItemEditor From(MasterMenuItemResponse item) => new()
+        {
+            Id = item.Id,
+            MasterCategoryId = item.MasterCategoryId,
+            Name = item.Name,
+            Description = item.Description,
+            IsActive = item.IsActive
+        };
+    }
+}

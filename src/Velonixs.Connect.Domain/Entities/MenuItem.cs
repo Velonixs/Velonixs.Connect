@@ -11,6 +11,9 @@ public sealed class MenuItem
     public string? Description { get; set; }
     public decimal Price { get; set; }
     public string? ProductRetailerId { get; set; }
+    public string? ImageUrl { get; set; }
+    public string? MetaProductId { get; set; }
+    public string SyncStatus { get; set; } = "NotQueued";
     public bool IsAvailable { get; set; } = true;
     public bool IsActive { get; set; } = true;
 

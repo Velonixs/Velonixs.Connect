@@ -55,6 +55,18 @@ public static class DependencyInjection
                 options.Port = smtpPort;
             }
         });
+        services.Configure<MetaCatalogOptions>(options =>
+        {
+            configuration.GetSection("MetaCatalog").Bind(options);
+
+            options.GraphApiBaseUrl = PreferConfiguredSecret(configuration["META_CATALOG_GRAPH_API_BASE_URL"], options.GraphApiBaseUrl) ?? options.GraphApiBaseUrl;
+            options.Currency = PreferConfiguredSecret(configuration["META_CATALOG_CURRENCY"], options.Currency) ?? options.Currency;
+
+            if (bool.TryParse(configuration["META_CATALOG_DISABLE_SENDING"], out var disableSending))
+            {
+                options.DisableSending = disableSending;
+            }
+        });
 
         var authOptions = configuration.GetSection("Auth").Get<AuthOptions>() ?? new AuthOptions();
 
@@ -106,12 +118,27 @@ public static class DependencyInjection
         services.AddScoped<IConversationService, ConversationService>();
         services.AddScoped<INotificationService, NotificationService>();
         services.AddScoped<IAuthTokenService, AuthTokenService>();
+        services.AddScoped<IPlatformAdministrationService, PlatformAdministrationService>();
         services.AddHttpClient<IWhatsAppMessageSender, WhatsAppCloudMessageSender>(client =>
         {
             var timeoutSeconds = Math.Clamp(configuration.GetSection("WhatsApp").Get<WhatsAppOptions>()?.SendTimeoutSeconds ?? 10, 1, 30);
             client.Timeout = TimeSpan.FromSeconds(timeoutSeconds);
         });
+        services.AddHttpClient<IMetaCatalogSyncService, MetaCatalogSyncService>(client =>
+        {
+            client.Timeout = TimeSpan.FromSeconds(30);
+        });
 
+        return services;
+    }
+
+    /// <summary>
+    /// Registers the catalog worker in exactly one composition root. Web UI
+    /// hosts intentionally do not process another tenant's sync queue.
+    /// </summary>
+    public static IServiceCollection AddMetaCatalogBackgroundProcessing(this IServiceCollection services)
+    {
+        services.AddHostedService<MetaCatalogSyncWorker>();
         return services;
     }
 

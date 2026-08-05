@@ -1,0 +1,271 @@
+@page "/admin/blazor/businesses/{BusinessId:guid}"
+@attribute [Authorize(Roles = AppRoles.PlatformAdmin)]
+@inject IRestaurantService RestaurantService
+@inject IMenuService MenuService
+@inject IOrderService OrderService
+@inject IPlatformAdministrationService PlatformAdministrationService
+
+<header class="page-head">
+    <div>
+        <p>@_restaurant?.Name</p>
+        <h1>Business Settings</h1>
+    </div>
+    <div class="toolbar">
+        <a href="/admin/blazor">Dashboard</a>
+        <a href="/admin/blazor/products/@BusinessId">Products</a>
+        <a href="/admin/blazor/orders/@BusinessId">Orders</a>
+        <a href="/admin/blazor/customers/@BusinessId">Customers</a>
+        <a href="/admin/blazor/sync/@BusinessId">Sync</a>
+    </div>
+</header>
+
+@if (!string.IsNullOrWhiteSpace(_message))
+{
+    <div class="notice">@_message</div>
+}
+
+<section class="metric-grid">
+    <article><span>Active Products</span><strong>@_activeProductCount</strong></article>
+    <article><span>Pending Orders</span><strong>@_pendingOrderCount</strong></article>
+    <article><span>Orders</span><strong>@_orders.Count</strong></article>
+    <article><span>Revenue</span><strong>Rs @_revenue.ToString("0.##")</strong></article>
+</section>
+
+<section class="work-surface mb-3">
+    <div class="surface-title">
+        <h2>Business Profile</h2>
+    </div>
+    <form class="form-grid-compact" @onsubmit="SaveBusinessAsync" @onsubmit:preventDefault>
+        <label>Name <span class="required-marker" aria-hidden="true">*</span><input @bind="_editor.Name" required /></label>
+        <label>Type
+            <select @bind="_editor.BusinessType">
+                @foreach (var type in BusinessTypes.All)
+                {
+                    <option value="@type">@type</option>
+                }
+            </select>
+        </label>
+        <label>WhatsApp Phone ID <span class="required-marker" aria-hidden="true">*</span><input @bind="_editor.WhatsAppPhoneNumberId" required /></label>
+        <label>Business Phone <input @bind="_editor.BusinessPhone" /></label>
+        <label>Notification Email <input type="email" @bind="_editor.NotificationEmail" /></label>
+        <label>Staff WhatsApp <input @bind="_editor.StaffWhatsAppNumber" /></label>
+        <label>Catalog ID <input value="@CatalogIdDisplay" readonly /></label>
+        <label>Meta Catalog <a href="/admin/blazor/sync/@BusinessId">Manage settings and sync</a></label>
+        <label>Address <input @bind="_editor.Address" /></label>
+        <label>CGST % <input type="number" step="0.01" min="0" max="100" @bind="_editor.CgstPercent" /></label>
+        <label>SGST % <input type="number" step="0.01" min="0" max="100" @bind="_editor.SgstPercent" /></label>
+        <label>Active <input type="checkbox" @bind="_editor.IsActive" /></label>
+        <label><span>&nbsp;</span><button type="submit" class="btn btn-primary">Save business</button></label>
+    </form>
+</section>
+
+<section class="work-surface mb-3">
+    <div class="surface-title">
+        <h2>Create Owner Account</h2>
+    </div>
+    <form class="form-grid-compact" @onsubmit="CreateOwnerAsync" @onsubmit:preventDefault>
+        <label>Name <span class="required-marker" aria-hidden="true">*</span><input @bind="_newOwner.DisplayName" required /></label>
+        <label>Email <span class="required-marker" aria-hidden="true">*</span><input type="email" @bind="_newOwner.Email" required /></label>
+        <label>Password <span class="required-marker" aria-hidden="true">*</span><input type="password" @bind="_newOwner.Password" required /></label>
+        <label><span>&nbsp;</span><button type="submit" class="btn btn-primary">Create owner</button></label>
+    </form>
+</section>
+
+<section class="work-surface">
+    <div class="surface-title">
+        <h2>Business Users</h2>
+    </div>
+    <div class="table-responsive">
+        <table class="table align-middle">
+            <thead><tr><th>Name</th><th>Email</th><th>Role</th><th>Status</th><th>Temporary Password</th><th></th></tr></thead>
+            <tbody>
+            @foreach (var user in _users)
+            {
+                <tr>
+                    <td>@user.DisplayName</td>
+                    <td>@user.Email</td>
+                    <td>@user.Role</td>
+                    <td><span class="status-pill">@(user.IsActive ? "Active" : "Inactive")</span></td>
+                    <td><input class="inline-input" type="password" @bind="user.NewPassword" /></td>
+                    <td class="action-row">
+                        <button @onclick="() => ResetPasswordAsync(user)">Reset password</button>
+                    </td>
+                </tr>
+            }
+            </tbody>
+        </table>
+    </div>
+</section>
+
+@code {
+    [Parameter] public Guid BusinessId { get; set; }
+
+    private RestaurantResponse? _restaurant;
+    private BusinessEditor _editor = new();
+    private OwnerEditor _newOwner = new();
+    private readonly List<UserEditor> _users = new();
+    private IReadOnlyCollection<OrderSummaryResponse> _orders = Array.Empty<OrderSummaryResponse>();
+    private int _activeProductCount;
+    private int _pendingOrderCount;
+    private decimal _revenue;
+    private string? _message;
+    private string CatalogIdDisplay => _restaurant?.WhatsAppCatalogId ?? "Not configured";
+
+    protected override async Task OnParametersSetAsync()
+    {
+        await LoadAsync();
+    }
+
+    private async Task LoadAsync()
+    {
+        _restaurant = await RestaurantService.GetRestaurantAsync(BusinessId);
+        if (_restaurant is null)
+        {
+            _message = "Business was not found.";
+            return;
+        }
+
+        _editor = BusinessEditor.From(_restaurant);
+        var menu = await MenuService.GetMenuAsync(BusinessId);
+        _orders = await OrderService.GetRestaurantOrdersAsync(BusinessId);
+        _activeProductCount = menu?.Items.Count(x => x.IsActive && x.IsAvailable) ?? 0;
+        _pendingOrderCount = _orders.Count(x => x.OrderStatus == OrderStatuses.PendingConfirmation);
+        _revenue = _orders.Sum(x => x.TotalAmount);
+
+        _users.Clear();
+        foreach (var user in await PlatformAdministrationService.GetBusinessUsersAsync(BusinessId))
+        {
+            _users.Add(new UserEditor
+            {
+                Id = user.Id,
+                DisplayName = user.DisplayName,
+                Email = user.Email,
+                Role = user.Role,
+                IsActive = user.IsActive
+            });
+        }
+    }
+
+    private async Task SaveBusinessAsync()
+    {
+        if (string.IsNullOrWhiteSpace(_editor.Name) || string.IsNullOrWhiteSpace(_editor.WhatsAppPhoneNumberId))
+        {
+            _message = "Name and WhatsApp Phone ID are required.";
+            return;
+        }
+
+        try
+        {
+            await RestaurantService.UpdateRestaurantAsync(
+                BusinessId,
+                new UpdateRestaurantRequest(
+                    _editor.Name,
+                    _editor.BusinessType,
+                    _editor.WhatsAppPhoneNumberId.Trim(),
+                    _editor.BusinessPhone,
+                    _editor.NotificationEmail,
+                    _editor.StaffWhatsAppNumber,
+                    _editor.Address,
+                    _editor.CgstPercent,
+                    _editor.SgstPercent,
+                    _editor.IsActive,
+                    null));
+            _message = "Business settings saved.";
+            await LoadAsync();
+        }
+        catch (InvalidOperationException ex)
+        {
+            _message = ex.Message;
+        }
+    }
+
+    private async Task CreateOwnerAsync()
+    {
+        if (string.IsNullOrWhiteSpace(_newOwner.DisplayName) ||
+            string.IsNullOrWhiteSpace(_newOwner.Email) ||
+            string.IsNullOrWhiteSpace(_newOwner.Password))
+        {
+            _message = "Owner name, email, and password are required.";
+            return;
+        }
+
+        try
+        {
+            var owner = await PlatformAdministrationService.CreateBusinessOwnerAsync(
+                BusinessId,
+                new CreateBusinessOwnerRequest(_newOwner.DisplayName, _newOwner.Email, _newOwner.Password));
+            _newOwner = new OwnerEditor();
+            _message = $"Created owner account {owner.Email}.";
+            await LoadAsync();
+        }
+        catch (InvalidOperationException ex)
+        {
+            _message = ex.Message;
+        }
+    }
+
+    private async Task ResetPasswordAsync(UserEditor user)
+    {
+        if (string.IsNullOrWhiteSpace(user.NewPassword))
+        {
+            _message = "Enter a temporary password.";
+            return;
+        }
+
+        try
+        {
+            await PlatformAdministrationService.ResetBusinessUserPasswordAsync(BusinessId, user.Id, user.NewPassword);
+            _message = $"Password reset for {user.Email}.";
+            user.NewPassword = string.Empty;
+        }
+        catch (Exception ex) when (ex is InvalidOperationException or KeyNotFoundException)
+        {
+            _message = ex.Message;
+        }
+    }
+
+    private sealed class BusinessEditor
+    {
+        public string Name { get; set; } = string.Empty;
+        public string BusinessType { get; set; } = BusinessTypes.Restaurant;
+        public string WhatsAppPhoneNumberId { get; set; } = string.Empty;
+        public string? BusinessPhone { get; set; }
+        public string? NotificationEmail { get; set; }
+        public string? StaffWhatsAppNumber { get; set; }
+        public string? Address { get; set; }
+        public decimal CgstPercent { get; set; }
+        public decimal SgstPercent { get; set; }
+        public bool IsActive { get; set; } = true;
+
+        public static BusinessEditor From(RestaurantResponse restaurant) => new()
+        {
+            Name = restaurant.Name,
+            BusinessType = restaurant.BusinessType,
+            WhatsAppPhoneNumberId = restaurant.WhatsAppPhoneNumberId,
+            BusinessPhone = restaurant.BusinessPhone,
+            NotificationEmail = restaurant.NotificationEmail,
+            StaffWhatsAppNumber = restaurant.StaffWhatsAppNumber,
+            Address = restaurant.Address,
+            CgstPercent = restaurant.CgstPercent,
+            SgstPercent = restaurant.SgstPercent,
+            IsActive = restaurant.IsActive
+        };
+    }
+
+    private sealed class OwnerEditor
+    {
+        public string DisplayName { get; set; } = string.Empty;
+        public string Email { get; set; } = string.Empty;
+        public string Password { get; set; } = string.Empty;
+    }
+
+    private sealed class UserEditor
+    {
+        public Guid Id { get; set; }
+        public string DisplayName { get; set; } = string.Empty;
+        public string Email { get; set; } = string.Empty;
+        public string Role { get; set; } = string.Empty;
+        public bool IsActive { get; set; }
+        public string NewPassword { get; set; } = string.Empty;
+    }
+}

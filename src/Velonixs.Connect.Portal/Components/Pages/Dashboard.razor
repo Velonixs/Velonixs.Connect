@@ -1,0 +1,180 @@
+@page "/portal/blazor"
+@page "/portal/blazor/dashboard"
+@attribute [Authorize(Roles = AppRoles.PortalRoles)]
+@inject IRestaurantService RestaurantService
+@inject IMenuService MenuService
+@inject IOrderService OrderService
+
+<PageTitle>Business Dashboard | Velonixs Connect</PageTitle>
+
+@if (_loading)
+{
+    <section class="portal-blazor-message">
+        <h1>Loading dashboard</h1>
+        <p>Retrieving your current business activity.</p>
+    </section>
+}
+else if (!string.IsNullOrWhiteSpace(_error))
+{
+    <section class="portal-blazor-message portal-blazor-message-error">
+        <h1>Dashboard unavailable</h1>
+        <p>@_error</p>
+        <button class="btn btn-primary" @onclick="LoadAsync">Try again</button>
+    </section>
+}
+else if (_restaurant is not null)
+{
+    <header class="portal-blazor-page-head">
+        <div>
+            <p class="portal-blazor-eyebrow">@_restaurant.Name</p>
+            <h1>Today at a glance</h1>
+            <p class="text-muted mb-0">Track orders and keep your WhatsApp menu ready for customers.</p>
+        </div>
+        <button class="btn btn-outline-primary" @onclick="LoadAsync">Refresh</button>
+    </header>
+
+    <section class="portal-blazor-metrics" aria-label="Business metrics">
+        <article class="portal-blazor-metric portal-blazor-metric-urgent">
+            <span>Needs confirmation</span>
+            <strong>@_pendingCount</strong>
+            <a href="/portal/blazor/orders">Review orders</a>
+        </article>
+        <article class="portal-blazor-metric">
+            <span>Orders today</span>
+            <strong>@_todayOrderCount</strong>
+            <small>All channels</small>
+        </article>
+        <article class="portal-blazor-metric">
+            <span>Today’s revenue</span>
+            <strong>₹@_todayRevenue.ToString("N2")</strong>
+            <small>Completed and active orders</small>
+        </article>
+        <article class="portal-blazor-metric">
+            <span>Available products</span>
+            <strong>@_availableItemCount</strong>
+            <a href="/portal/blazor/menu">Manage menu</a>
+        </article>
+    </section>
+
+    <section class="portal-blazor-surface">
+        <div class="portal-blazor-surface-head">
+            <div>
+                <p class="portal-blazor-eyebrow">Live work queue</p>
+                <h2>Recent orders</h2>
+            </div>
+            <a class="btn btn-outline-primary btn-sm" href="/portal/blazor/orders">All orders</a>
+        </div>
+
+        @if (_recentOrders.Count == 0)
+        {
+            <div class="portal-blazor-empty">No orders have been received for this business yet.</div>
+        }
+        else
+        {
+            <div class="table-responsive">
+                <table class="table align-middle portal-blazor-table">
+                    <thead>
+                        <tr>
+                            <th>Order</th>
+                            <th>Customer</th>
+                            <th>Status</th>
+                            <th>Received</th>
+                            <th class="text-end">Total</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                    @foreach (var order in _recentOrders)
+                    {
+                        <tr>
+                            <td><a href="/portal/blazor/orders">@order.OrderNumber</a></td>
+                            <td>
+                                <strong>@order.CustomerName</strong>
+                                <small>@order.CustomerPhone</small>
+                            </td>
+                            <td><span class="portal-blazor-status">@FormatStatus(order.OrderStatus)</span></td>
+                            <td>@order.CreatedAt.LocalDateTime.ToString("dd MMM, HH:mm")</td>
+                            <td class="text-end">₹@order.TotalAmount.ToString("N2")</td>
+                        </tr>
+                    }
+                    </tbody>
+                </table>
+            </div>
+        }
+    </section>
+}
+
+@code {
+    [CascadingParameter]
+    private Task<AuthenticationState>? AuthenticationStateTask { get; set; }
+
+    private RestaurantResponse? _restaurant;
+    private IReadOnlyCollection<OrderSummaryResponse> _recentOrders = Array.Empty<OrderSummaryResponse>();
+    private bool _loading = true;
+    private string? _error;
+    private int _pendingCount;
+    private int _todayOrderCount;
+    private int _availableItemCount;
+    private decimal _todayRevenue;
+
+    protected override async Task OnInitializedAsync() => await LoadAsync();
+
+    private async Task LoadAsync()
+    {
+        _loading = true;
+        _error = null;
+
+        try
+        {
+            var businessId = await GetBusinessIdAsync();
+            if (businessId is null)
+            {
+                _error = "Your account is missing its business assignment. Please contact your administrator.";
+                return;
+            }
+
+            _restaurant = await RestaurantService.GetRestaurantAsync(businessId.Value);
+            if (_restaurant is null)
+            {
+                _error = "The business linked to your account could not be found.";
+                return;
+            }
+
+            // Application services share the circuit's scoped data session, so keep these calls
+            // sequential rather than issuing parallel database operations from one Blazor circuit.
+            var orders = await OrderService.GetRestaurantOrdersAsync(businessId.Value);
+            var menu = await MenuService.GetMenuAsync(businessId.Value);
+            var today = DateTime.UtcNow.Date;
+
+            _recentOrders = orders.Take(8).ToArray();
+            _pendingCount = orders.Count(order => string.Equals(order.OrderStatus, "PendingConfirmation", StringComparison.OrdinalIgnoreCase));
+            _todayOrderCount = orders.Count(order => order.CreatedAt.UtcDateTime.Date == today);
+            _todayRevenue = orders
+                .Where(order => order.CreatedAt.UtcDateTime.Date == today)
+                .Sum(order => order.TotalAmount);
+            _availableItemCount = menu?.Items.Count(item => item.IsActive && item.IsAvailable) ?? 0;
+        }
+        catch (Exception)
+        {
+            _error = "We could not load the business dashboard. Please try again.";
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+
+    private async Task<Guid?> GetBusinessIdAsync()
+    {
+        var authenticationState = AuthenticationStateTask is null
+            ? null
+            : await AuthenticationStateTask;
+        var value = authenticationState?.User.FindFirst(AppClaimTypes.BusinessId)?.Value;
+
+        return Guid.TryParse(value, out var businessId) ? businessId : null;
+    }
+
+    private static string FormatStatus(string status) =>
+        string.IsNullOrWhiteSpace(status)
+            ? "Unknown"
+            : System.Text.RegularExpressions.Regex.Replace(status, "(?<!^)([A-Z])", " $1");
+}

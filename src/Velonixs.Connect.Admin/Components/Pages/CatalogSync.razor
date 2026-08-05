@@ -1,0 +1,206 @@
+@page "/admin/blazor/sync/{BusinessId:guid}"
+@attribute [Authorize(Roles = AppRoles.PlatformAdmin)]
+@inject IRestaurantService RestaurantService
+@inject IMetaCatalogSyncService MetaSyncService
+@inject Microsoft.Extensions.Options.IOptions<Velonixs.Connect.Infrastructure.Configuration.MetaCatalogOptions> MetaCatalogOptions
+
+<header class="page-head">
+    <div>
+        <p>@_restaurant?.Name</p>
+        <h1>Catalog Sync</h1>
+    </div>
+    <div class="toolbar">
+        <a href="/admin/blazor">Dashboard</a>
+        <a href="/admin/blazor/products/@BusinessId">Products</a>
+    </div>
+</header>
+
+@if (!string.IsNullOrWhiteSpace(_message))
+{
+    <div class="notice">@_message</div>
+}
+
+<section class="work-surface mb-3">
+    <div class="surface-title"><h2>Meta Settings</h2></div>
+    <div class="form-grid-compact">
+        <label>WABA ID (reference) <input @bind="_settings.WabaId" /></label>
+        <label>Catalog ID <input @bind="_settings.CatalogId" /></label>
+        <label>Meta Phone Number ID (must match Business Settings) <input @bind="_settings.PhoneNumberId" /></label>
+        <label>Access Token <input type="password" @bind="_settings.AccessToken" placeholder="Leave blank to keep existing" /></label>
+        <label>Sync Mode
+            <select @bind="_settings.SyncMode">
+                <option value="default">Default</option>
+                <option value="manual">Manual</option>
+                <option value="automatic">Automatic</option>
+            </select>
+        </label>
+        <label>Enabled <input type="checkbox" @bind="_settings.IsEnabled" /></label>
+        <label><span>&nbsp;</span><button class="btn btn-primary" @onclick="SaveSettingsAsync">Save settings</button></label>
+    </div>
+</section>
+
+<section class="work-surface mb-3">
+    <div class="surface-title">
+        <h2>Actions</h2>
+        <div class="toolbar">
+            <button @onclick="QueueAllAsync">Sync all</button>
+            <button @onclick="ProcessAsync" disabled="@MetaCatalogOptions.Value.DisableSending">Process pending</button>
+        </div>
+    </div>
+    @if (MetaCatalogOptions.Value.DisableSending)
+    {
+        <p class="text-muted mb-0">This Admin host is configured for dry run. Queue processing is owned by the API worker; enable live sending on that host before relying on remote delivery.</p>
+    }
+</section>
+
+<section class="work-surface mb-3">
+    <div class="surface-title"><h2>Queue</h2></div>
+    <div class="table-responsive">
+        <table class="table align-middle">
+            <thead><tr><th>Product</th><th>Event</th><th>Status</th><th>Retries</th><th>Next</th><th>Error</th><th></th></tr></thead>
+            <tbody>
+            @foreach (var item in _queue)
+            {
+                <tr>
+                    <td>@item.ProductName</td>
+                    <td>@item.EventType</td>
+                    <td><span class="status-pill">@item.Status</span></td>
+                    <td>@item.RetryCount</td>
+                    <td>@(item.NextAttemptAt?.ToLocalTime().ToString("dd MMM, hh:mm tt") ?? "-")</td>
+                    <td>@item.LastError</td>
+                    <td>
+                        @if (item.Status == "Failed")
+                        {
+                            <button @onclick="() => RetryAsync(item.Id)">Retry</button>
+                        }
+                        else if (item.Status == "Waiting")
+                        {
+                            <span class="text-muted">Waiting for prior sync</span>
+                        }
+                    </td>
+                </tr>
+            }
+            </tbody>
+        </table>
+    </div>
+</section>
+
+<section class="work-surface">
+    <div class="surface-title"><h2>Logs</h2></div>
+    <div class="table-responsive">
+        <table class="table align-middle">
+            <thead><tr><th>Time</th><th>Product</th><th>Event</th><th>Status</th><th>HTTP</th><th>Error</th></tr></thead>
+            <tbody>
+            @foreach (var log in _logs)
+            {
+                <tr>
+                    <td>@log.CreatedAt.ToLocalTime().ToString("dd MMM yyyy, hh:mm tt")</td>
+                    <td>@log.ProductName</td>
+                    <td>@log.EventType</td>
+                    <td><span class="status-pill">@log.Status</span></td>
+                    <td>@log.ResponseCode</td>
+                    <td>@log.ErrorMessage</td>
+                </tr>
+            }
+            </tbody>
+        </table>
+    </div>
+</section>
+
+@code {
+    [Parameter] public Guid BusinessId { get; set; }
+
+    private RestaurantResponse? _restaurant;
+    private SettingsEditor _settings = new();
+    private IReadOnlyCollection<CatalogSyncQueueSummary> _queue = Array.Empty<CatalogSyncQueueSummary>();
+    private IReadOnlyCollection<CatalogSyncLogSummary> _logs = Array.Empty<CatalogSyncLogSummary>();
+    private string? _message;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        await LoadAsync();
+    }
+
+    private async Task LoadAsync()
+    {
+        _restaurant = await RestaurantService.GetRestaurantAsync(BusinessId);
+        if (_restaurant is null)
+        {
+            _message = "Business was not found.";
+            _queue = Array.Empty<CatalogSyncQueueSummary>();
+            _logs = Array.Empty<CatalogSyncLogSummary>();
+            return;
+        }
+
+        var settings = await MetaSyncService.GetSettingsAsync(BusinessId);
+        _settings = SettingsEditor.From(settings);
+        _queue = await MetaSyncService.GetQueueAsync(BusinessId);
+        _logs = await MetaSyncService.GetLogsAsync(BusinessId);
+    }
+
+    private async Task SaveSettingsAsync()
+    {
+        try
+        {
+            await MetaSyncService.SaveSettingsAsync(
+                BusinessId,
+                new MetaCatalogSettingsInput(
+                    _settings.WabaId,
+                    _settings.CatalogId,
+                    _settings.PhoneNumberId,
+                    _settings.AccessToken,
+                    null,
+                    _settings.IsEnabled,
+                    _settings.SyncMode));
+            _message = "Meta catalog settings saved.";
+            await LoadAsync();
+        }
+        catch (Exception ex) when (ex is InvalidOperationException or ArgumentException or KeyNotFoundException)
+        {
+            _message = ex.Message;
+        }
+    }
+
+    private async Task QueueAllAsync()
+    {
+        var count = await MetaSyncService.QueueAllProductsAsync(BusinessId);
+        _message = count == 0
+            ? "No products were queued. Check that the Meta connection is enabled and configured."
+            : $"Queued {count} product synchronization event(s).";
+        await LoadAsync();
+    }
+
+    private async Task ProcessAsync()
+    {
+        await MetaSyncService.ProcessPendingAsync();
+        _message = "Pending catalog sync work was processed.";
+        await LoadAsync();
+    }
+
+    private async Task RetryAsync(Guid id)
+    {
+        _message = await MetaSyncService.RetryQueueItemAsync(BusinessId, id)
+            ? "Failed sync queued for retry."
+            : "Only failed sync records can be retried.";
+        await LoadAsync();
+    }
+
+    private sealed class SettingsEditor
+    {
+        public string? WabaId { get; set; }
+        public string? CatalogId { get; set; }
+        public string? PhoneNumberId { get; set; }
+        public string? AccessToken { get; set; }
+        public bool IsEnabled { get; set; } = true;
+        public string SyncMode { get; set; } = "default";
+
+        public static SettingsEditor From(MetaCatalogSettingsSummary? settings) => new()
+        {
+            WabaId = settings?.WabaId,
+            CatalogId = settings?.CatalogId,
+            PhoneNumberId = settings?.PhoneNumberId,
+            IsEnabled = settings?.IsEnabled ?? true,
+            SyncMode = settings?.SyncMode ?? "default"
+        };
+    }
+}

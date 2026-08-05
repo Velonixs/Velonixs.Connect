@@ -2,13 +2,39 @@
 
 ## Target Shape
 
-```text
-Customer WhatsApp
-  -> WhatsApp Cloud API
-  -> Velonixs Connect API
-  -> SQL Server data store
-  -> Admin / staff portals
+```mermaid
+flowchart LR
+    Customer[Customer on WhatsApp] <--> Meta[WhatsApp Cloud API / Meta Catalog]
+
+    subgraph Experience[User interfaces]
+        Admin[Admin Blazor]
+        Portal[Business Portal Blazor]
+    end
+
+    subgraph Platform[Velonixs Connect]
+        Api[API and WhatsApp webhook]
+        Application[Application services and contracts]
+        Domain[Domain entities and rules]
+        Catalog[Catalog sync outbox worker]
+        Persistence[EF Core persistence]
+    end
+
+    Database[(SQL Server)]
+
+    Admin --> Application
+    Portal --> Application
+    Meta -->|Webhook messages| Api
+    Api --> Application
+    Application --> Domain
+    Application --> Persistence
+    Persistence <--> Database
+    Application -->|Commit catalog change and outbox item| Persistence
+    Api -.Hosts.-> Catalog
+    Catalog <--> Persistence
+    Catalog -->|Create, update, delete products| Meta
 ```
+
+The catalog outbox makes Meta synchronization durable: a menu change is committed to SQL Server first, then processed asynchronously with ordering, retries, leases, and a dry-run option. The API is the only host that runs the database initializer and catalog worker.
 
 ## Projects
 
@@ -26,7 +52,7 @@ src/Velonixs.Connect.Shared          Shared security roles and claim names
 ## Technology
 
 - ASP.NET Core Web API
-- Razor/Bootstrap UI currently; Blazor Web App is the target UI direction
+- Interactive Server Blazor Web Apps for both the Admin and Portal interfaces, with Bootstrap styling; MVC endpoints remain for sign-in and legacy screens
 - SQL Server with Entity Framework Core
 - WhatsApp Cloud API
 - Azure App Service and Azure SQL for production hosting

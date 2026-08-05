@@ -153,6 +153,130 @@ namespace Velonixs.Connect.Persistence.Persistence.Migrations
                     b.ToTable("AuthUserToken", (string)null);
                 });
 
+            modelBuilder.Entity("Velonixs.Connect.Domain.Entities.CatalogSyncLog", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid>("BusinessId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<string>("ErrorMessage")
+                        .HasMaxLength(1000)
+                        .HasColumnType("nvarchar(1000)");
+
+                    b.Property<string>("EventType")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)");
+
+                    b.Property<Guid>("ProductId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("ResponseBody")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<int>("ResponseCode")
+                        .HasColumnType("int");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("nvarchar(20)");
+
+                    b.HasKey("Id");
+
+                    b.ToTable("CatalogSyncLog", (string)null);
+                });
+
+            modelBuilder.Entity("Velonixs.Connect.Domain.Entities.CatalogSyncQueueItem", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid>("BusinessId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("CatalogId")
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<string>("EventType")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)");
+
+                    b.Property<string>("LastError")
+                        .HasMaxLength(1000)
+                        .HasColumnType("nvarchar(1000)");
+
+                    b.Property<DateTimeOffset?>("LeaseExpiresAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<Guid?>("LeaseId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTimeOffset?>("NextAttemptAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<string>("PayloadJson")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<Guid?>("PredecessorQueueItemId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid>("ProductId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("ProductRetailerId")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
+                    b.Property<int>("RetryCount")
+                        .HasColumnType("int");
+
+                    b.Property<byte[]>("RowVersion")
+                        .IsConcurrencyToken()
+                        .IsRequired()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("rowversion");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("nvarchar(20)");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("PredecessorQueueItemId");
+
+                    b.HasIndex("BusinessId", "Status", "NextAttemptAt");
+
+                    b.HasIndex("Status", "NextAttemptAt", "LeaseExpiresAt");
+
+                    b.HasIndex(new[] { "BusinessId", "ProductId" }, "UX_CatalogSyncQueue_ActiveProduct")
+                        .IsUnique()
+                        .HasFilter("[Status] IN ('Pending', 'Failed', 'Processing', 'Paused', 'Simulated')");
+
+                    b.HasIndex(new[] { "BusinessId", "ProductId" }, "UX_CatalogSyncQueue_WaitingProduct")
+                        .IsUnique()
+                        .HasFilter("[Status] = 'Waiting'");
+
+                    b.ToTable("CatalogSyncQueueItem", (string)null);
+                });
+
             modelBuilder.Entity("Velonixs.Connect.Domain.Entities.Conversation", b =>
                 {
                     b.Property<Guid>("Id")
@@ -335,6 +459,10 @@ namespace Velonixs.Connect.Persistence.Persistence.Migrations
                         .HasMaxLength(1000)
                         .HasColumnType("nvarchar(1000)");
 
+                    b.Property<string>("ImageUrl")
+                        .HasMaxLength(1000)
+                        .HasColumnType("nvarchar(1000)");
+
                     b.Property<bool>("IsActive")
                         .HasColumnType("bit");
 
@@ -346,6 +474,10 @@ namespace Velonixs.Connect.Persistence.Persistence.Migrations
 
                     b.Property<Guid?>("MasterMenuItemId")
                         .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("MetaProductId")
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
 
                     b.Property<string>("Name")
                         .IsRequired()
@@ -363,6 +495,13 @@ namespace Velonixs.Connect.Persistence.Persistence.Migrations
                     b.Property<Guid>("RestaurantId")
                         .HasColumnType("uniqueidentifier");
 
+                    b.Property<string>("SyncStatus")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(20)
+                        .HasColumnType("nvarchar(20)")
+                        .HasDefaultValue("NotQueued");
+
                     b.HasKey("Id");
 
                     b.HasIndex("CategoryId");
@@ -371,6 +510,10 @@ namespace Velonixs.Connect.Persistence.Persistence.Migrations
 
                     b.HasIndex("RestaurantId", "ItemCode")
                         .IsUnique();
+
+                    b.HasIndex("RestaurantId", "ProductRetailerId")
+                        .IsUnique()
+                        .HasFilter("[ProductRetailerId] IS NOT NULL");
 
                     b.ToTable("MenuItem", (string)null);
                 });
@@ -419,9 +562,65 @@ namespace Velonixs.Connect.Persistence.Persistence.Migrations
 
                     b.HasIndex("RestaurantId");
 
-                    b.HasIndex("WhatsAppMessageId");
+                    b.HasIndex("WhatsAppMessageId")
+                        .IsUnique()
+                        .HasFilter("[WhatsAppMessageId] IS NOT NULL");
 
                     b.ToTable("MessageLog", (string)null);
+                });
+
+            modelBuilder.Entity("Velonixs.Connect.Domain.Entities.MetaCatalogSetting", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("AccessTokenEncrypted")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<Guid>("BusinessId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("CatalogId")
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<bool>("IsEnabled")
+                        .HasColumnType("bit");
+
+                    b.Property<string>("PhoneNumberId")
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<bool>("ReconciliationRequired")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bit")
+                        .HasDefaultValue(false);
+
+                    b.Property<string>("SyncMode")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<string>("WabaId")
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<string>("WebhookVerifyTokenEncrypted")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("BusinessId")
+                        .IsUnique();
+
+                    b.ToTable("MetaCatalogSetting", (string)null);
                 });
 
             modelBuilder.Entity("Velonixs.Connect.Domain.Entities.Order", b =>

@@ -1,0 +1,211 @@
+@page "/admin/blazor"
+@attribute [Authorize(Roles = AppRoles.PlatformAdmin)]
+@inject IRestaurantService RestaurantService
+@inject IPlatformAdministrationService PlatformAdministrationService
+@inject NavigationManager Navigation
+
+<header class="page-head">
+    <div>
+        <p>Blazor Admin</p>
+        <h1>Dashboard</h1>
+    </div>
+</header>
+
+<section class="metric-grid">
+    <article><span>Businesses</span><strong>@_businesses.Count</strong></article>
+    <article><span>Active Products</span><strong>@_activeProducts</strong></article>
+    <article><span>Pending Sync</span><strong>@_pendingSync</strong></article>
+    <article><span>Today's Orders</span><strong>@_todaysOrders</strong></article>
+    <article><span>Total Revenue</span><strong>Rs @_revenue.ToString("0.##")</strong></article>
+</section>
+
+@if (!string.IsNullOrWhiteSpace(_message))
+{
+    <div class="notice">@_message</div>
+}
+
+<section class="work-surface mb-3">
+    <div class="surface-title">
+        <h2>Platform GST Defaults</h2>
+    </div>
+    <div class="form-grid-compact">
+        <label>CGST % <input type="number" step="0.01" min="0" max="100" @bind="_tax.CgstPercent" /></label>
+        <label>SGST % <input type="number" step="0.01" min="0" max="100" @bind="_tax.SgstPercent" /></label>
+        <label><span>&nbsp;</span><button class="btn btn-primary" @onclick="SaveTaxAsync">Save defaults</button></label>
+    </div>
+</section>
+
+<section class="work-surface mb-3">
+    <div class="surface-title">
+        <h2>Create Business</h2>
+    </div>
+    <form class="form-grid-compact" @onsubmit="CreateBusinessAsync" @onsubmit:preventDefault>
+        <label>Name <span class="required-marker" aria-hidden="true">*</span><input @bind="_newBusiness.Name" required /></label>
+        <label>Type <span class="required-marker" aria-hidden="true">*</span>
+            <select @bind="_newBusiness.BusinessType">
+                @foreach (var type in BusinessTypes.All)
+                {
+                    <option value="@type">@type</option>
+                }
+            </select>
+        </label>
+        <label>WhatsApp Phone ID <span class="required-marker" aria-hidden="true">*</span><input @bind="_newBusiness.WhatsAppPhoneNumberId" required /></label>
+        <label>Business Phone <input @bind="_newBusiness.BusinessPhone" /></label>
+        <label>Notification Email <input @bind="_newBusiness.NotificationEmail" /></label>
+        <label>Staff WhatsApp <input @bind="_newBusiness.StaffWhatsAppNumber" /></label>
+        <label>Meta Catalog <span>Configure it from Catalog Sync after the business is created.</span></label>
+        <label>Address <input @bind="_newBusiness.Address" /></label>
+        <label>CGST % <input type="number" step="0.01" min="0" max="100" @bind="_newBusiness.CgstPercent" /></label>
+        <label>SGST % <input type="number" step="0.01" min="0" max="100" @bind="_newBusiness.SgstPercent" /></label>
+        <label>Owner Name <span class="required-marker" aria-hidden="true">*</span><input @bind="_newBusiness.OwnerName" required /></label>
+        <label>Owner Email <span class="required-marker" aria-hidden="true">*</span><input type="email" @bind="_newBusiness.OwnerEmail" required /></label>
+        <label>Owner Password <span class="required-marker" aria-hidden="true">*</span><input type="password" @bind="_newBusiness.OwnerPassword" required /></label>
+        <label>Active <input type="checkbox" @bind="_newBusiness.IsActive" /></label>
+        <label><span>&nbsp;</span><button type="submit" class="btn btn-primary">Create business</button></label>
+    </form>
+</section>
+
+<section class="work-surface">
+    <div class="surface-title">
+        <h2>Businesses</h2>
+    </div>
+    <div class="table-responsive">
+        <table class="table align-middle">
+            <thead>
+                <tr>
+                    <th>Name</th>
+                    <th>Type</th>
+                    <th>Status</th>
+                    <th>Products</th>
+                    <th>Orders</th>
+                    <th></th>
+                </tr>
+            </thead>
+            <tbody>
+            @foreach (var business in _businesses)
+            {
+                <tr>
+                    <td><strong>@business.Name</strong></td>
+                    <td>@business.BusinessType</td>
+                    <td><span class="status-pill">@((business.IsActive) ? "Active" : "Inactive")</span></td>
+                    <td>@business.ActiveProductCount</td>
+                    <td>@business.OrderCount</td>
+                    <td class="action-row">
+                        <a href="/admin/blazor/businesses/@business.BusinessId">Settings</a>
+                        <a href="/admin/blazor/products/@business.BusinessId">Products</a>
+                        <a href="/admin/blazor/orders/@business.BusinessId">Orders</a>
+                        <a href="/admin/blazor/customers/@business.BusinessId">Customers</a>
+                        <a href="/admin/blazor/sync/@business.BusinessId">Sync</a>
+                    </td>
+                </tr>
+            }
+            </tbody>
+        </table>
+    </div>
+</section>
+
+@code {
+    private IReadOnlyCollection<PlatformBusinessSummary> _businesses = Array.Empty<PlatformBusinessSummary>();
+    private int _activeProducts;
+    private int _pendingSync;
+    private int _todaysOrders;
+    private decimal _revenue;
+    private string? _message;
+    private TaxEditor _tax = new();
+    private BusinessEditor _newBusiness = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadAsync();
+    }
+
+    private async Task LoadAsync()
+    {
+        var dashboard = await PlatformAdministrationService.GetDashboardAsync();
+        _businesses = dashboard.Businesses;
+        var tax = await RestaurantService.GetPlatformTaxSettingAsync();
+        _tax = new TaxEditor { CgstPercent = tax.CgstPercent, SgstPercent = tax.SgstPercent };
+        _activeProducts = dashboard.ActiveProductCount;
+        _pendingSync = dashboard.PendingCatalogSyncCount;
+        _todaysOrders = dashboard.TodaysOrderCount;
+        _revenue = dashboard.TotalRevenue;
+
+        _newBusiness.CgstPercent = tax.CgstPercent;
+        _newBusiness.SgstPercent = tax.SgstPercent;
+    }
+
+    private async Task SaveTaxAsync()
+    {
+        try
+        {
+            await RestaurantService.UpdatePlatformTaxSettingAsync(_tax.CgstPercent, _tax.SgstPercent);
+            _message = "Platform GST defaults saved.";
+            await LoadAsync();
+        }
+        catch (InvalidOperationException ex)
+        {
+            _message = ex.Message;
+        }
+    }
+
+    private async Task CreateBusinessAsync()
+    {
+        if (string.IsNullOrWhiteSpace(_newBusiness.Name) ||
+            string.IsNullOrWhiteSpace(_newBusiness.WhatsAppPhoneNumberId) ||
+            string.IsNullOrWhiteSpace(_newBusiness.OwnerName) ||
+            string.IsNullOrWhiteSpace(_newBusiness.OwnerEmail) ||
+            string.IsNullOrWhiteSpace(_newBusiness.OwnerPassword))
+        {
+            _message = "Business, WhatsApp phone ID, and owner account details are required.";
+            return;
+        }
+
+        try
+        {
+            var restaurant = await PlatformAdministrationService.CreateBusinessWithOwnerAsync(
+                new CreateBusinessWithOwnerRequest(
+                _newBusiness.Name,
+                _newBusiness.BusinessType,
+                _newBusiness.WhatsAppPhoneNumberId,
+                _newBusiness.BusinessPhone,
+                _newBusiness.NotificationEmail,
+                _newBusiness.StaffWhatsAppNumber,
+                _newBusiness.Address,
+                _newBusiness.CgstPercent,
+                _newBusiness.SgstPercent,
+                _newBusiness.IsActive,
+                null,
+                _newBusiness.OwnerName,
+                _newBusiness.OwnerEmail,
+                _newBusiness.OwnerPassword));
+            Navigation.NavigateTo($"/admin/blazor/businesses/{restaurant.Id}");
+        }
+        catch (InvalidOperationException ex)
+        {
+            _message = ex.Message;
+        }
+    }
+
+    private sealed class TaxEditor
+    {
+        public decimal CgstPercent { get; set; }
+        public decimal SgstPercent { get; set; }
+    }
+
+    private sealed class BusinessEditor
+    {
+        public string Name { get; set; } = string.Empty;
+        public string BusinessType { get; set; } = BusinessTypes.Restaurant;
+        public string WhatsAppPhoneNumberId { get; set; } = string.Empty;
+        public string? BusinessPhone { get; set; }
+        public string? NotificationEmail { get; set; }
+        public string? StaffWhatsAppNumber { get; set; }
+        public string? Address { get; set; }
+        public decimal CgstPercent { get; set; }
+        public decimal SgstPercent { get; set; }
+        public bool IsActive { get; set; } = true;
+        public string OwnerName { get; set; } = string.Empty;
+        public string OwnerEmail { get; set; } = string.Empty;
+        public string OwnerPassword { get; set; } = string.Empty;
+    }
+}

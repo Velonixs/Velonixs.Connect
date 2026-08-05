@@ -28,6 +28,9 @@ jobs:
         dotnet restore
         dotnet build --configuration Release
 
+    - name: Run Meta catalog tests and focused coverage gate
+      run: dotnet test tests/Velonixs.Connect.Infrastructure.Tests/Velonixs.Connect.Infrastructure.Tests.csproj --configuration Release --no-build --logger "console;verbosity=minimal"
+
     # 1. Log into Azure securely using your single master credential
     - name: Log in to Azure
       uses: azure/login@v2

@@ -53,20 +53,7 @@ Content-Type: application/json
 {
   "messageText": "Hi",
   "phoneNumberId": "{{PhoneNumberId}}",
-  "fromPhoneNumber": "+919876543210",
-  "profileName": "Rajesh"
-}
-
-###
-
-POST {{Velonixs.Connect.Api_HostAddress}}/api/webhooks/whatsapp/local-test
-Content-Type: application/json
-
-{
-  "messageText": "1",
-  "phoneNumberId": "{{PhoneNumberId}}",
-  "fromPhoneNumber": "+919876543210",
-  "profileName": "Rajesh"
+  "fromPhoneNumber": "+919876543210"
 }
 
 ###
@@ -77,8 +64,18 @@ Content-Type: application/json
 {
   "messageText": "Order: 1 x 2, 4 x 1",
   "phoneNumberId": "{{PhoneNumberId}}",
-  "fromPhoneNumber": "+919876543210",
-  "profileName": "Rajesh"
+  "fromPhoneNumber": "+919876543210"
+}
+
+###
+
+POST {{Velonixs.Connect.Api_HostAddress}}/api/webhooks/whatsapp/local-test
+Content-Type: application/json
+
+{
+  "messageText": "checkout",
+  "phoneNumberId": "{{PhoneNumberId}}",
+  "fromPhoneNumber": "+919876543210"
 }
 
 ###
@@ -89,8 +86,18 @@ Content-Type: application/json
 {
   "messageText": "Rajesh",
   "phoneNumberId": "{{PhoneNumberId}}",
-  "fromPhoneNumber": "+919876543210",
-  "profileName": "Rajesh"
+  "fromPhoneNumber": "+919876543210"
+}
+
+###
+
+POST {{Velonixs.Connect.Api_HostAddress}}/api/webhooks/whatsapp/local-test
+Content-Type: application/json
+
+{
+  "messageText": "checkout.delivery",
+  "phoneNumberId": "{{PhoneNumberId}}",
+  "fromPhoneNumber": "+919876543210"
 }
 
 ###
@@ -101,8 +108,7 @@ Content-Type: application/json
 {
   "messageText": "Near Station Road, Jamtara",
   "phoneNumberId": "{{PhoneNumberId}}",
-  "fromPhoneNumber": "+919876543210",
-  "profileName": "Rajesh"
+  "fromPhoneNumber": "+919876543210"
 }
 
 ###
@@ -113,8 +119,7 @@ Content-Type: application/json
 {
   "messageText": "YES",
   "phoneNumberId": "{{PhoneNumberId}}",
-  "fromPhoneNumber": "+919876543210",
-  "profileName": "Rajesh"
+  "fromPhoneNumber": "+919876543210"
 }
 
 ###

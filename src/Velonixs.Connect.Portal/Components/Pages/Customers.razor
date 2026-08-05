@@ -1,0 +1,190 @@
+@page "/portal/blazor/customers"
+@attribute [Authorize(Roles = AppRoles.PortalRoles)]
+@inject IRestaurantService RestaurantService
+@inject IOrderService OrderService
+
+<PageTitle>Customers | Velonixs Connect</PageTitle>
+
+@if (_loading)
+{
+    <section class="portal-blazor-message">
+        <h1>Loading customers</h1>
+        <p>Building the customer directory from your restaurant’s order history.</p>
+    </section>
+}
+else if (!string.IsNullOrWhiteSpace(_error))
+{
+    <section class="portal-blazor-message portal-blazor-message-error">
+        <h1>Customers unavailable</h1>
+        <p>@_error</p>
+        <button class="btn btn-primary" @onclick="LoadAsync">Try again</button>
+    </section>
+}
+else if (_restaurant is not null)
+{
+    <header class="portal-blazor-page-head">
+        <div>
+            <p class="portal-blazor-eyebrow">@_restaurant.Name</p>
+            <h1>Customers</h1>
+            <p class="text-muted mb-0">A business-scoped directory summarized from orders received by this restaurant.</p>
+        </div>
+        <button class="btn btn-outline-primary" @onclick="LoadAsync">Refresh</button>
+    </header>
+
+    <section class="portal-blazor-surface">
+        <div class="portal-blazor-surface-head">
+            <div>
+                <p class="portal-blazor-eyebrow">@_customers.Count customers</p>
+                <h2>Customer directory</h2>
+            </div>
+            <label class="portal-blazor-filter">
+                <span>Find a customer</span>
+                <input class="form-control" placeholder="Name, phone, or address" @bind="_search" @bind:event="oninput" />
+            </label>
+        </div>
+
+        @if (FilteredCustomers.Count == 0)
+        {
+            <div class="portal-blazor-empty">No customers match your search.</div>
+        }
+        else
+        {
+            <div class="table-responsive">
+                <table class="table align-middle portal-blazor-table">
+                    <thead>
+                        <tr>
+                            <th>Customer</th>
+                            <th>Latest address</th>
+                            <th>Orders</th>
+                            <th>Last order</th>
+                            <th class="text-end">Lifetime spend</th>
+                            <th></th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                    @foreach (var customer in FilteredCustomers)
+                    {
+                        <tr @key="customer.Key">
+                            <td>
+                                <strong>@customer.Name</strong>
+                                <small>@customer.Phone</small>
+                            </td>
+                            <td>@(string.IsNullOrWhiteSpace(customer.Address) ? "—" : customer.Address)</td>
+                            <td>@customer.OrderCount</td>
+                            <td>@customer.LastOrderAt.LocalDateTime.ToString("dd MMM yyyy")</td>
+                            <td class="text-end">₹@customer.LifetimeSpend.ToString("N2")</td>
+                            <td class="text-end">
+                                @if (BuildWhatsAppUrl(customer.Phone) is string whatsAppUrl)
+                                {
+                                    <a class="btn btn-sm btn-outline-primary" href="@whatsAppUrl" target="_blank" rel="noopener noreferrer">WhatsApp</a>
+                                }
+                            </td>
+                        </tr>
+                    }
+                    </tbody>
+                </table>
+            </div>
+        }
+    </section>
+}
+
+@code {
+    [CascadingParameter]
+    private Task<AuthenticationState>? AuthenticationStateTask { get; set; }
+
+    private RestaurantResponse? _restaurant;
+    private IReadOnlyCollection<CustomerSummary> _customers = Array.Empty<CustomerSummary>();
+    private bool _loading = true;
+    private string? _error;
+    private string _search = string.Empty;
+
+    private IReadOnlyCollection<CustomerSummary> FilteredCustomers =>
+        string.IsNullOrWhiteSpace(_search)
+            ? _customers
+            : _customers.Where(customer =>
+                    customer.Name.Contains(_search, StringComparison.OrdinalIgnoreCase) ||
+                    customer.Phone.Contains(_search, StringComparison.OrdinalIgnoreCase) ||
+                    customer.Address.Contains(_search, StringComparison.OrdinalIgnoreCase))
+                .ToArray();
+
+    protected override async Task OnInitializedAsync() => await LoadAsync();
+
+    private async Task LoadAsync()
+    {
+        _loading = true;
+        _error = null;
+
+        try
+        {
+            var authenticationState = AuthenticationStateTask is null
+                ? null
+                : await AuthenticationStateTask;
+            var businessId = ParseBusinessId(authenticationState?.User);
+
+            if (businessId is null)
+            {
+                _error = "Your account is missing its business assignment. Please contact your administrator.";
+                return;
+            }
+
+            _restaurant = await RestaurantService.GetRestaurantAsync(businessId.Value);
+            if (_restaurant is null)
+            {
+                _error = "The business linked to your account could not be found.";
+                return;
+            }
+
+            var orders = await OrderService.GetRestaurantOrdersAsync(businessId.Value);
+            _customers = orders
+                .GroupBy(order => CustomerKey(order), StringComparer.OrdinalIgnoreCase)
+                .Select(group =>
+                {
+                    var lastOrder = group.OrderByDescending(order => order.CreatedAt).First();
+                    return new CustomerSummary(
+                        group.Key,
+                        string.IsNullOrWhiteSpace(lastOrder.CustomerName) ? "Unnamed customer" : lastOrder.CustomerName,
+                        lastOrder.CustomerPhone,
+                        lastOrder.Address,
+                        group.Count(),
+                        group.Sum(order => order.TotalAmount),
+                        lastOrder.CreatedAt);
+                })
+                .OrderByDescending(customer => customer.LastOrderAt)
+                .ToArray();
+        }
+        catch (Exception)
+        {
+            _error = "We could not load the customer directory. Please try again.";
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+
+    private static Guid? ParseBusinessId(ClaimsPrincipal? user)
+    {
+        var value = user?.FindFirst(AppClaimTypes.BusinessId)?.Value;
+        return Guid.TryParse(value, out var businessId) ? businessId : null;
+    }
+
+    private static string CustomerKey(OrderSummaryResponse order) =>
+        string.IsNullOrWhiteSpace(order.CustomerPhone)
+            ? $"name:{order.CustomerName}:{order.Address}"
+            : $"phone:{order.CustomerPhone}";
+
+    private static string? BuildWhatsAppUrl(string phone)
+    {
+        var digits = new string(phone.Where(char.IsDigit).ToArray());
+        return string.IsNullOrWhiteSpace(digits) ? null : $"https://wa.me/{digits}";
+    }
+
+    private sealed record CustomerSummary(
+        string Key,
+        string Name,
+        string Phone,
+        string Address,
+        int OrderCount,
+        decimal LifetimeSpend,
+        DateTimeOffset LastOrderAt);
+}

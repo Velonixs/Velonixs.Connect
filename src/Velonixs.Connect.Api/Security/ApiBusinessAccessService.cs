@@ -33,6 +33,17 @@ public sealed class ApiBusinessAccessService(
         return IsPlatformAdmin;
     }
 
+    /// <summary>
+    /// Meta credentials and the durable catalog-sync queue are platform-level
+    /// integration controls. They are intentionally narrower than ordinary
+    /// menu/catalog maintenance, while still retaining the route's business
+    /// scope check.
+    /// </summary>
+    public bool CanManageMetaCatalog(Guid businessId)
+    {
+        return CanManageBusiness() && CanReadBusiness(businessId);
+    }
+
     public bool CanManageCatalog(Guid businessId)
     {
         return CanReadBusiness(businessId) &&
@@ -67,6 +78,17 @@ public sealed class ApiBusinessAccessService(
         var businessId = await dbContext.MenuItems
             .AsNoTracking()
             .Where(x => x.Id == productId)
+            .Select(x => (Guid?)x.RestaurantId)
+            .FirstOrDefaultAsync(cancellationToken);
+
+        return businessId is Guid id && CanManageCatalog(id);
+    }
+
+    public async Task<bool> CanManageCategoryAsync(Guid categoryId, CancellationToken cancellationToken)
+    {
+        var businessId = await dbContext.MenuCategories
+            .AsNoTracking()
+            .Where(x => x.Id == categoryId)
             .Select(x => (Guid?)x.RestaurantId)
             .FirstOrDefaultAsync(cancellationToken);
 

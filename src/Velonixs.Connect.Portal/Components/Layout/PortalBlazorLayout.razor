@@ -1,0 +1,52 @@
+@inherits LayoutComponentBase
+@inject NavigationManager Navigation
+
+<div class="portal-blazor-shell">
+    <aside class="portal-blazor-sidebar">
+        <a class="portal-blazor-brand" href="/portal/blazor">
+            <span class="portal-blazor-brand-mark">V</span>
+            <span>
+                <strong>Business Portal</strong>
+                <small>Velonixs Connect</small>
+            </span>
+        </a>
+
+        <nav class="portal-blazor-nav" aria-label="Business portal">
+            <a class="@NavClass("/portal/blazor")" href="/portal/blazor">Dashboard</a>
+            <a class="@NavClass("/portal/blazor/menu")" href="/portal/blazor/menu">Menu</a>
+            <a class="@NavClass("/portal/blazor/orders")" href="/portal/blazor/orders">Orders</a>
+            <a class="@NavClass("/portal/blazor/customers")" href="/portal/blazor/customers">Customers</a>
+        </nav>
+
+        <AuthorizeView Roles="@AppRoles.PortalRoles">
+            <Authorized Context="authenticationState">
+                <div class="portal-blazor-account">
+                    <span>Signed in as</span>
+                    <strong>@(authenticationState.User.Identity?.Name ?? "Business user")</strong>
+                </div>
+                <form method="post" action="/portal/logout">
+                    <AntiforgeryToken />
+                    <button class="portal-blazor-signout" type="submit">Sign out</button>
+                </form>
+            </Authorized>
+        </AuthorizeView>
+
+        <a class="portal-blazor-classic-link" href="/portal">Open classic portal</a>
+    </aside>
+
+    <main class="portal-blazor-main">
+        @Body
+    </main>
+</div>
+
+@code {
+    private string NavClass(string href)
+    {
+        var path = Navigation.ToBaseRelativePath(Navigation.Uri).TrimEnd('/');
+        var target = href.TrimStart('/').TrimEnd('/');
+
+        return string.Equals(path, target, StringComparison.OrdinalIgnoreCase)
+            ? "active"
+            : string.Empty;
+    }
+}

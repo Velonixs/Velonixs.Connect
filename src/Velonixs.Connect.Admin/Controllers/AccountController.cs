@@ -50,7 +50,7 @@ public sealed class AccountController(UserManager<ApplicationUser> userManager) 
 
         var returnUrl = !string.IsNullOrWhiteSpace(model.ReturnUrl) && Url.IsLocalUrl(model.ReturnUrl)
             ? model.ReturnUrl
-            : "/admin";
+            : "/admin/blazor";
 
         return LocalRedirect(returnUrl);
     }

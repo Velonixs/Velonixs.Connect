@@ -115,6 +115,8 @@ public sealed class ConversationContinuationFlowTests
         };
         var item = MenuItem(restaurant, category, "Paneer Pizza", 249, 1);
         item.ProductRetailerId = "paneer-pizza";
+        item.MetaProductId = "meta-paneer-pizza";
+        item.SyncStatus = "Synced";
 
         dbContext.AddRange(restaurant, category, item);
         await dbContext.SaveChangesAsync();
@@ -152,6 +154,8 @@ public sealed class ConversationContinuationFlowTests
         };
         var item = MenuItem(restaurant, category, "Paneer Pizza", 249, 1);
         item.ProductRetailerId = "paneer-pizza";
+        item.MetaProductId = "meta-paneer-pizza";
+        item.SyncStatus = "Synced";
 
         dbContext.AddRange(restaurant, category, item);
         await dbContext.SaveChangesAsync();
@@ -173,6 +177,45 @@ public sealed class ConversationContinuationFlowTests
         Assert.Contains("Rs 747", result.ReplyText);
         Assert.Contains("Total: Rs 747", result.ReplyText);
         Assert.Equal(new[] { "cart.add_more", "cart.checkout", "cart.cancel" }, sender.LastButtons.Select(x => x.Id));
+    }
+
+    [Fact]
+    public async Task CatalogOrderWebhook_RejectsProductsFromAnInactiveCategory()
+    {
+        await using var dbContext = CreateDbContext();
+        var restaurant = new Restaurant
+        {
+            Name = "99 Restaurant",
+            WhatsAppPhoneNumberId = "phone-id",
+            WhatsAppCatalogId = "catalog-id"
+        };
+        var category = new MenuCategory
+        {
+            Restaurant = restaurant,
+            Name = "Pizza",
+            DisplayOrder = 1,
+            IsActive = false
+        };
+        var item = MenuItem(restaurant, category, "Paneer Pizza", 249, 1);
+        item.ProductRetailerId = "paneer-pizza";
+        item.MetaProductId = "meta-paneer-pizza";
+        item.SyncStatus = "Synced";
+
+        dbContext.AddRange(restaurant, category, item);
+        await dbContext.SaveChangesAsync();
+
+        var service = CreateService(dbContext, new FakeMessageSender());
+        var result = await service.ProcessIncomingMessageAsync(
+            new IncomingWhatsAppMessage(
+                "phone-id",
+                "919999999999",
+                "catalog.order",
+                Guid.NewGuid().ToString("N"),
+                "Customer",
+                DateTimeOffset.UtcNow,
+                new[] { new IncomingWhatsAppOrderItem("paneer-pizza", 1) }));
+
+        Assert.Contains("not available", result.ReplyText, StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]

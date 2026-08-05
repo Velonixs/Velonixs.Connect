@@ -1,0 +1,21 @@
+@inherits LayoutComponentBase
+
+<div class="blazor-shell">
+    <aside class="blazor-sidebar">
+        <a class="blazor-brand" href="/admin/blazor">
+            <span>V</span>
+            <strong>Velonixs Connect</strong>
+        </a>
+        <nav>
+            <a href="/admin/blazor">Dashboard</a>
+            <a href="/admin/blazor/master-catalog">Master Catalog</a>
+            <form method="post" action="/admin/logout">
+                <AntiforgeryToken />
+                <button type="submit">Sign out</button>
+            </form>
+        </nav>
+    </aside>
+    <main class="blazor-main">
+        @Body
+    </main>
+</div>

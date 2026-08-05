@@ -1,7 +1,10 @@
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging.Abstractions;
+using Microsoft.Extensions.Options;
 using Velonixs.Connect.Application.Models;
 using Velonixs.Connect.Domain.Entities;
 using Velonixs.Connect.Infrastructure.Services;
+using Velonixs.Connect.Infrastructure.Configuration;
 using Velonixs.Connect.Persistence.Persistence;
 using Velonixs.Connect.Persistence.Security;
 using Xunit;
@@ -23,7 +26,13 @@ public sealed class MasterCatalogMenuServiceTests
         dbContext.Restaurants.Add(restaurant);
         await dbContext.SaveChangesAsync();
 
-        var service = new MenuService(dbContext);
+        var service = new MenuService(
+            dbContext,
+            new MetaCatalogSyncService(
+                dbContext,
+                new HttpClient(new StubHandler()),
+                Options.Create(new MetaCatalogOptions()),
+                NullLogger<MetaCatalogSyncService>.Instance));
         var masterCategory = await service.CreateMasterCategoryAsync(
             new CreateMasterMenuCategoryRequest("Pizza", DisplayOrder: 1));
         var masterItem = await service.CreateMasterItemAsync(
@@ -69,5 +78,11 @@ public sealed class MasterCatalogMenuServiceTests
     {
         public string Encrypt(string plaintext) => plaintext;
         public string Decrypt(string protectedValue) => protectedValue;
+    }
+
+    private sealed class StubHandler : HttpMessageHandler
+    {
+        protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken) =>
+            Task.FromResult(new HttpResponseMessage(System.Net.HttpStatusCode.NoContent));
     }
 }

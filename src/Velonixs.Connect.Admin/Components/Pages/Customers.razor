@@ -1,0 +1,48 @@
+@page "/admin/blazor/customers/{BusinessId:guid}"
+@attribute [Authorize(Roles = AppRoles.PlatformAdmin)]
+@inject IRestaurantService RestaurantService
+@inject IPlatformAdministrationService PlatformAdministrationService
+
+<header class="page-head">
+    <div>
+        <p>@_restaurant?.Name</p>
+        <h1>Customers</h1>
+    </div>
+    <div class="toolbar">
+        <a href="/admin/blazor">Dashboard</a>
+        <a href="/admin/blazor/orders/@BusinessId">Orders</a>
+    </div>
+</header>
+
+<section class="work-surface">
+    <div class="table-responsive">
+        <table class="table align-middle">
+            <thead><tr><th>Name</th><th>Phone</th><th>Orders</th><th>Last Address</th><th>Last Active</th></tr></thead>
+            <tbody>
+            @foreach (var customer in _customers)
+            {
+                <tr>
+                    <td>@(customer.Name ?? "WhatsApp Customer")</td>
+                    <td>@customer.PhoneNumber</td>
+                    <td>@customer.OrderCount</td>
+                    <td>@customer.LastAddress</td>
+                    <td>@customer.LastInteractionAt.ToLocalTime().ToString("dd MMM yyyy, hh:mm tt")</td>
+                </tr>
+            }
+            </tbody>
+        </table>
+    </div>
+</section>
+
+@code {
+    [Parameter] public Guid BusinessId { get; set; }
+
+    private RestaurantResponse? _restaurant;
+    private IReadOnlyCollection<CustomerSummaryResponse> _customers = Array.Empty<CustomerSummaryResponse>();
+
+    protected override async Task OnParametersSetAsync()
+    {
+        _restaurant = await RestaurantService.GetRestaurantAsync(BusinessId);
+        _customers = await PlatformAdministrationService.GetCustomerSummariesAsync(BusinessId);
+    }
+}

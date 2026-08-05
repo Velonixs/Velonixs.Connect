@@ -24,12 +24,20 @@ public sealed record CatalogProductResponse(
     decimal Price,
     bool IsAvailable,
     bool IsActive,
-    string? ProductRetailerId = null);
+    string? ProductRetailerId = null,
+    string? ImageUrl = null,
+    string? MetaProductId = null,
+    string SyncStatus = "NotQueued");
 
 public sealed record CreateCatalogCategoryRequest(
     string Name,
     int DisplayOrder = 0,
     bool IsActive = true);
+
+public sealed record UpdateCatalogCategoryRequest(
+    string Name,
+    int DisplayOrder,
+    bool IsActive);
 
 public sealed record CreateCatalogProductRequest(
     Guid CategoryId,
@@ -39,7 +47,8 @@ public sealed record CreateCatalogProductRequest(
     decimal Price,
     bool IsAvailable = true,
     bool IsActive = true,
-    string? ProductRetailerId = null);
+    string? ProductRetailerId = null,
+    string? ImageUrl = null);
 
 public sealed record UpdateCatalogProductRequest(
     Guid CategoryId,
@@ -49,4 +58,5 @@ public sealed record UpdateCatalogProductRequest(
     decimal Price,
     bool IsAvailable,
     bool IsActive,
-    string? ProductRetailerId = null);
+    string? ProductRetailerId = null,
+    string? ImageUrl = null);

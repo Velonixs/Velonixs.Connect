@@ -26,6 +26,9 @@ public sealed class RestaurantConnectDbContext(
     public DbSet<OrderStatusHistory> OrderStatusHistory => Set<OrderStatusHistory>();
     public DbSet<MessageLog> MessageLogs => Set<MessageLog>();
     public DbSet<DataProtectionState> DataProtectionStates => Set<DataProtectionState>();
+    public DbSet<MetaCatalogSetting> MetaCatalogSettings => Set<MetaCatalogSetting>();
+    public DbSet<CatalogSyncQueueItem> CatalogSyncQueue => Set<CatalogSyncQueueItem>();
+    public DbSet<CatalogSyncLog> CatalogSyncLogs => Set<CatalogSyncLog>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -51,6 +54,9 @@ public sealed class RestaurantConnectDbContext(
         ConfigureOrderItem(modelBuilder);
         ConfigureOrderStatusHistory(modelBuilder, nullableEncryptedStringConverter);
         ConfigureMessageLog(modelBuilder, encryptedStringConverter);
+        ConfigureMetaCatalogSetting(modelBuilder, nullableEncryptedStringConverter);
+        ConfigureCatalogSyncQueueItem(modelBuilder);
+        ConfigureCatalogSyncLog(modelBuilder);
     }
 
     private static void ConfigureDataProtectionState(ModelBuilder modelBuilder)
@@ -178,9 +184,15 @@ public sealed class RestaurantConnectDbContext(
             entity.Property(x => x.Name).HasMaxLength(200).IsRequired();
             entity.Property(x => x.Description).HasMaxLength(1000);
             entity.Property(x => x.ProductRetailerId).HasMaxLength(200);
+            entity.Property(x => x.ImageUrl).HasMaxLength(1000);
+            entity.Property(x => x.MetaProductId).HasMaxLength(200);
+            entity.Property(x => x.SyncStatus).HasMaxLength(20).IsRequired().HasDefaultValue("NotQueued");
             entity.Property(x => x.Price).HasPrecision(18, 2);
 
             entity.HasIndex(x => new { x.RestaurantId, x.ItemCode }).IsUnique();
+            entity.HasIndex(x => new { x.RestaurantId, x.ProductRetailerId })
+                .IsUnique()
+                .HasFilter("[ProductRetailerId] IS NOT NULL");
             entity.HasOne(x => x.Restaurant)
                 .WithMany(x => x.MenuItems)
                 .HasForeignKey(x => x.RestaurantId)
@@ -333,7 +345,9 @@ public sealed class RestaurantConnectDbContext(
             entity.Property(x => x.WhatsAppMessageId).HasMaxLength(512);
             entity.Property(x => x.Status).HasMaxLength(30).IsRequired();
 
-            entity.HasIndex(x => x.WhatsAppMessageId);
+            entity.HasIndex(x => x.WhatsAppMessageId)
+                .IsUnique()
+                .HasFilter("[WhatsAppMessageId] IS NOT NULL");
             entity.HasOne(x => x.Restaurant)
                 .WithMany(x => x.MessageLogs)
                 .HasForeignKey(x => x.RestaurantId)
@@ -346,6 +360,64 @@ public sealed class RestaurantConnectDbContext(
                 .WithMany(x => x.MessageLogs)
                 .HasForeignKey(x => x.ConversationId)
                 .OnDelete(DeleteBehavior.Restrict);
+        });
+    }
+
+    private static void ConfigureMetaCatalogSetting(ModelBuilder modelBuilder, ValueConverter<string?, string?> nullableEncryptedStringConverter)
+    {
+        modelBuilder.Entity<MetaCatalogSetting>(entity =>
+        {
+            entity.ToTable("MetaCatalogSetting");
+            entity.HasKey(x => x.Id);
+            entity.HasIndex(x => x.BusinessId).IsUnique();
+            entity.Property(x => x.WabaId).HasMaxLength(100);
+            entity.Property(x => x.CatalogId).HasMaxLength(100);
+            entity.Property(x => x.PhoneNumberId).HasMaxLength(100);
+            entity.Property(x => x.AccessTokenEncrypted).HasColumnType("nvarchar(max)").HasConversion(nullableEncryptedStringConverter);
+            entity.Property(x => x.WebhookVerifyTokenEncrypted).HasColumnType("nvarchar(max)").HasConversion(nullableEncryptedStringConverter);
+            entity.Property(x => x.SyncMode).HasMaxLength(50).IsRequired();
+            entity.Property(x => x.ReconciliationRequired).HasDefaultValue(false);
+        });
+    }
+
+    private static void ConfigureCatalogSyncQueueItem(ModelBuilder modelBuilder)
+    {
+        modelBuilder.Entity<CatalogSyncQueueItem>(entity =>
+        {
+            entity.ToTable("CatalogSyncQueueItem");
+            entity.HasKey(x => x.Id);
+            entity.Property(x => x.CatalogId).HasMaxLength(100);
+            entity.Property(x => x.EventType).HasMaxLength(50).IsRequired();
+            entity.Property(x => x.ProductRetailerId).HasMaxLength(200).IsRequired();
+            entity.Property(x => x.Status).HasMaxLength(20).IsRequired();
+            entity.Property(x => x.LastError).HasMaxLength(1000);
+            entity.Property(x => x.PayloadJson).HasColumnType("nvarchar(max)");
+            entity.Property(x => x.RowVersion).IsRowVersion();
+            entity.HasIndex(x => new { x.Status, x.NextAttemptAt, x.LeaseExpiresAt });
+            entity.HasIndex(x => new { x.BusinessId, x.Status, x.NextAttemptAt });
+            entity.HasIndex(x => x.PredecessorQueueItemId);
+            // At most one deliverable event and one successor may exist for a
+            // product. The successor waits until the in-flight event finishes,
+            // which prevents remote create/update/delete reordering.
+            entity.HasIndex(x => new { x.BusinessId, x.ProductId }, "UX_CatalogSyncQueue_ActiveProduct")
+                .IsUnique()
+                .HasFilter("[Status] IN ('Pending', 'Failed', 'Processing', 'Paused', 'Simulated')");
+            entity.HasIndex(x => new { x.BusinessId, x.ProductId }, "UX_CatalogSyncQueue_WaitingProduct")
+                .IsUnique()
+                .HasFilter("[Status] = 'Waiting'");
+        });
+    }
+
+    private static void ConfigureCatalogSyncLog(ModelBuilder modelBuilder)
+    {
+        modelBuilder.Entity<CatalogSyncLog>(entity =>
+        {
+            entity.ToTable("CatalogSyncLog");
+            entity.HasKey(x => x.Id);
+            entity.Property(x => x.EventType).HasMaxLength(50).IsRequired();
+            entity.Property(x => x.Status).HasMaxLength(20).IsRequired();
+            entity.Property(x => x.ErrorMessage).HasMaxLength(1000);
+            entity.Property(x => x.ResponseBody).HasColumnType("nvarchar(max)");
         });
     }
 }

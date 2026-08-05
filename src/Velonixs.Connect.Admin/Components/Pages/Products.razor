@@ -1,0 +1,290 @@
+@page "/admin/blazor/products/{BusinessId:guid}"
+@attribute [Authorize(Roles = AppRoles.PlatformAdmin)]
+@inject IRestaurantService RestaurantService
+@inject IMenuService MenuService
+@inject IMetaCatalogSyncService MetaSyncService
+
+<header class="page-head">
+    <div>
+        <p>@_restaurant?.Name</p>
+        <h1>Products & Categories</h1>
+    </div>
+    <div class="toolbar">
+        <a href="/admin/blazor">Dashboard</a>
+        <a href="/admin/blazor/sync/@BusinessId">Catalog Sync</a>
+    </div>
+</header>
+
+<section class="work-surface mb-3">
+    <div class="surface-title">
+        <h2>Add Category</h2>
+    </div>
+    <form class="form-grid-compact" @onsubmit="CreateCategoryAsync" @onsubmit:preventDefault>
+        <label>Name <span class="required-marker" aria-hidden="true">*</span><input @bind="_newCategory.Name" required /></label>
+        <label>Display Order <input type="number" @bind="_newCategory.DisplayOrder" /></label>
+        <label>Active <input type="checkbox" @bind="_newCategory.IsActive" /></label>
+        <label><span>&nbsp;</span><button type="submit" class="btn btn-primary">Add category</button></label>
+    </form>
+</section>
+
+<section class="work-surface mb-3">
+    <div class="surface-title">
+        <h2>Categories</h2>
+    </div>
+    <div class="table-responsive">
+        <table class="table align-middle">
+            <thead><tr><th>Name</th><th>Order</th><th>Active</th><th></th></tr></thead>
+            <tbody>
+            @foreach (var category in _categories)
+            {
+                <tr>
+                    <td><input class="inline-input" @bind="category.Name" /></td>
+                    <td><input class="inline-input" type="number" @bind="category.DisplayOrder" /></td>
+                    <td><input type="checkbox" @bind="category.IsActive" /></td>
+                    <td class="action-row">
+                        <button @onclick="() => SaveCategoryAsync(category)">Save</button>
+                        <button @onclick="() => DeactivateCategoryAsync(category)">Deactivate</button>
+                        <button @onclick="() => DeleteCategoryAsync(category)">Delete</button>
+                    </td>
+                </tr>
+            }
+            </tbody>
+        </table>
+    </div>
+</section>
+
+<section class="work-surface mb-3">
+    <div class="surface-title">
+        <h2>Add Product</h2>
+    </div>
+    <form class="form-grid-compact" @onsubmit="CreateProductAsync" @onsubmit:preventDefault>
+        <label>Category <span class="required-marker" aria-hidden="true">*</span>
+            <select @bind="_newProduct.CategoryId" required>
+                @foreach (var category in _categories.Where(x => x.IsActive))
+                {
+                    <option value="@category.Id">@category.Name</option>
+                }
+            </select>
+        </label>
+        <label>Code <span class="required-marker" aria-hidden="true">*</span><input type="number" min="1" @bind="_newProduct.ItemCode" required /></label>
+        <label>Name <span class="required-marker" aria-hidden="true">*</span><input @bind="_newProduct.Name" required /></label>
+        <label>Price <span class="required-marker" aria-hidden="true">*</span><input type="number" min="0" step="0.01" @bind="_newProduct.Price" required /></label>
+        <label>SKU <input @bind="_newProduct.ProductRetailerId" /></label>
+        <label>Image URL <input @bind="_newProduct.ImageUrl" /> <small>Required for Meta sync (public HTTPS).</small></label>
+        <label>Description <input @bind="_newProduct.Description" /></label>
+        <label>Available <input type="checkbox" @bind="_newProduct.IsAvailable" /></label>
+        <label>Active <input type="checkbox" @bind="_newProduct.IsActive" /></label>
+        <label><span>&nbsp;</span><button type="submit" class="btn btn-primary">Add product</button></label>
+    </form>
+</section>
+
+<section class="work-surface">
+    <div class="surface-title">
+        <h2>Products</h2>
+    </div>
+    <div class="table-responsive">
+        <table class="table align-middle">
+            <thead>
+                <tr>
+                    <th>Code</th>
+                    <th>Category</th>
+                    <th>Name</th>
+                    <th>Price</th>
+                    <th>SKU</th>
+                    <th>Image</th>
+                    <th>Status</th>
+                    <th></th>
+                </tr>
+            </thead>
+            <tbody>
+            @foreach (var item in _products)
+            {
+                <tr>
+                    <td><input class="inline-input" type="number" @bind="item.ItemCode" /></td>
+                    <td>
+                        <select class="inline-input" @bind="item.CategoryId">
+                            @foreach (var category in _categories)
+                            {
+                                <option value="@category.Id">@category.Name</option>
+                            }
+                        </select>
+                    </td>
+                    <td><input class="inline-input" @bind="item.Name" /></td>
+                    <td><input class="inline-input" type="number" step="0.01" @bind="item.Price" /></td>
+                    <td><input class="inline-input" @bind="item.ProductRetailerId" disabled="@item.IsSkuLocked" /></td>
+                    <td><input class="inline-input" @bind="item.ImageUrl" /></td>
+                    <td><span class="status-pill">@item.SyncStatus</span></td>
+                    <td class="action-row">
+                        <label><input type="checkbox" @bind="item.IsAvailable" /> Stock</label>
+                        <label><input type="checkbox" @bind="item.IsActive" /> Active</label>
+                        <button @onclick="() => SaveProductAsync(item)">Save</button>
+                        <button @onclick="() => QueueProductAsync(item)">Sync</button>
+                        <button @onclick="() => DeactivateProductAsync(item)">Deactivate</button>
+                    </td>
+                </tr>
+            }
+            </tbody>
+        </table>
+    </div>
+</section>
+
+@code {
+    [Parameter] public Guid BusinessId { get; set; }
+
+    private RestaurantResponse? _restaurant;
+    private readonly List<CategoryEditor> _categories = new();
+    private readonly List<ProductEditor> _products = new();
+    private CategoryEditor _newCategory = new();
+    private ProductEditor _newProduct = new() { IsActive = true, IsAvailable = true };
+
+    protected override async Task OnParametersSetAsync()
+    {
+        await LoadAsync();
+    }
+
+    private async Task LoadAsync()
+    {
+        _restaurant = await RestaurantService.GetRestaurantAsync(BusinessId);
+        var menu = await MenuService.GetMenuAsync(BusinessId);
+        _categories.Clear();
+        _products.Clear();
+
+        if (menu is not null)
+        {
+            _categories.AddRange(menu.Categories.Select(CategoryEditor.From));
+            _products.AddRange(menu.Items.OrderBy(x => x.ItemCode).Select(ProductEditor.From));
+        }
+
+        _newProduct = new ProductEditor
+        {
+            CategoryId = _categories.FirstOrDefault(x => x.IsActive)?.Id ?? Guid.Empty,
+            ItemCode = (_products.Select(x => x.ItemCode).DefaultIfEmpty().Max()) + 1,
+            IsActive = true,
+            IsAvailable = true
+        };
+    }
+
+    private async Task CreateCategoryAsync()
+    {
+        if (!string.IsNullOrWhiteSpace(_newCategory.Name))
+        {
+            await MenuService.CreateCategoryAsync(BusinessId, new CreateMenuCategoryRequest(_newCategory.Name, _newCategory.DisplayOrder, _newCategory.IsActive));
+            _newCategory = new CategoryEditor { IsActive = true };
+            await LoadAsync();
+        }
+    }
+
+    private async Task SaveCategoryAsync(CategoryEditor category)
+    {
+        await MenuService.UpdateCategoryAsync(category.Id, new UpdateMenuCategoryRequest(category.Name, category.DisplayOrder, category.IsActive));
+        await LoadAsync();
+    }
+
+    private async Task DeactivateCategoryAsync(CategoryEditor category)
+    {
+        await MenuService.DeactivateCategoryAsync(category.Id);
+        await LoadAsync();
+    }
+
+    private async Task DeleteCategoryAsync(CategoryEditor category)
+    {
+        try
+        {
+            await MenuService.DeleteCategoryAsync(category.Id);
+            await LoadAsync();
+        }
+        catch (InvalidOperationException)
+        {
+        }
+    }
+
+    private async Task CreateProductAsync()
+    {
+        if (_newProduct.CategoryId != Guid.Empty && !string.IsNullOrWhiteSpace(_newProduct.Name))
+        {
+            var item = await MenuService.CreateItemAsync(
+                BusinessId,
+                new CreateMenuItemRequest(
+                    _newProduct.CategoryId,
+                    null,
+                    _newProduct.ItemCode,
+                    _newProduct.Name,
+                    _newProduct.Description,
+                    _newProduct.Price,
+                    _newProduct.IsAvailable,
+                    _newProduct.IsActive,
+                    _newProduct.ProductRetailerId,
+                    _newProduct.ImageUrl));
+            await LoadAsync();
+        }
+    }
+
+    private async Task SaveProductAsync(ProductEditor item)
+    {
+        await MenuService.UpdateItemAsync(
+            item.Id,
+            new UpdateMenuItemRequest(item.CategoryId, null, item.ItemCode, item.Name, item.Description, item.Price, item.IsAvailable, item.IsActive, item.ProductRetailerId, item.ImageUrl));
+        await LoadAsync();
+    }
+
+    private async Task QueueProductAsync(ProductEditor item)
+    {
+        await MetaSyncService.QueueProductSyncAsync(BusinessId, item.Id, item.IsActive ? "update" : "delete", force: true);
+        await LoadAsync();
+    }
+
+    private async Task DeactivateProductAsync(ProductEditor item)
+    {
+        await MenuService.DeactivateItemAsync(item.Id);
+        await LoadAsync();
+    }
+
+    private sealed class CategoryEditor
+    {
+        public Guid Id { get; set; }
+        public string Name { get; set; } = string.Empty;
+        public int DisplayOrder { get; set; }
+        public bool IsActive { get; set; } = true;
+
+        public static CategoryEditor From(MenuCategoryResponse category) => new()
+        {
+            Id = category.Id,
+            Name = category.Name,
+            DisplayOrder = category.DisplayOrder,
+            IsActive = category.IsActive
+        };
+    }
+
+    private sealed class ProductEditor
+    {
+        public Guid Id { get; set; }
+        public Guid CategoryId { get; set; }
+        public int ItemCode { get; set; }
+        public string Name { get; set; } = string.Empty;
+        public string? Description { get; set; }
+        public decimal Price { get; set; }
+        public string? ProductRetailerId { get; set; }
+        public string? ImageUrl { get; set; }
+        public string? MetaProductId { get; set; }
+        public string SyncStatus { get; set; } = "NotQueued";
+        public bool IsAvailable { get; set; } = true;
+        public bool IsActive { get; set; } = true;
+        public bool IsSkuLocked => !string.IsNullOrWhiteSpace(ProductRetailerId);
+
+        public static ProductEditor From(MenuItemResponse item) => new()
+        {
+            Id = item.Id,
+            CategoryId = item.CategoryId,
+            ItemCode = item.ItemCode,
+            Name = item.Name,
+            Description = item.Description,
+            Price = item.Price,
+            ProductRetailerId = item.ProductRetailerId,
+            ImageUrl = item.ImageUrl,
+            MetaProductId = item.MetaProductId,
+            SyncStatus = item.SyncStatus,
+            IsAvailable = item.IsAvailable,
+            IsActive = item.IsActive
+        };
+    }
+}

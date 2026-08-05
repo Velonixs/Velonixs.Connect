@@ -96,12 +96,15 @@ Run these requests in order:
 3. `GET /api/businesses/{restaurantId}/catalog`
 4. Run the `local-test` requests:
    - `Hi`
-   - `1`
    - `Order: 1 x 2, 4 x 1`
+   - `checkout`
    - `Rajesh`
+   - `checkout.delivery`
    - `Near Station Road, Jamtara`
    - `YES`
 5. Run `GET /api/businesses/{restaurantId}/orders`.
+
+The local test sequence intentionally omits a WhatsApp profile name so that it demonstrates the name prompt. For a diagram, dummy data, and representative production webhook payload, see [WhatsApp Messaging Demo Flow](WhatsApp-Demo-Flow.md).
 
 ## Projects
 

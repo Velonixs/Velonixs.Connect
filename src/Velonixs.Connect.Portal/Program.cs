@@ -5,7 +5,6 @@ using Microsoft.AspNetCore.Mvc.Authorization;
 using Velonixs.Connect.Application;
 using Velonixs.Connect.Infrastructure;
 using Velonixs.Connect.Persistence.Identity;
-using Velonixs.Connect.Persistence.Persistence;
 using Velonixs.Connect.Shared.Security;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -30,7 +29,8 @@ builder.Services
             if (user is null ||
                 !user.IsActive ||
                 user.BusinessId is null ||
-                !string.Equals(user.BusinessId.Value.ToString(), businessClaim, StringComparison.OrdinalIgnoreCase))
+                !string.Equals(user.BusinessId.Value.ToString(), businessClaim, StringComparison.OrdinalIgnoreCase) ||
+                !(await userManager.GetRolesAsync(user)).Any(AppRoles.PortalRoleNames.Contains))
             {
                 context.RejectPrincipal();
             }
@@ -40,25 +40,12 @@ builder.Services.AddControllersWithViews(options =>
 {
     options.Filters.Add(new AuthorizeFilter());
 });
+builder.Services.AddRazorComponents()
+    .AddInteractiveServerComponents();
+builder.Services.AddCascadingAuthenticationState();
 builder.Services.AddHealthChecks();
 
 var app = builder.Build();
-
-using (var scope = app.Services.CreateScope())
-{
-    var logger = scope.ServiceProvider
-        .GetRequiredService<ILoggerFactory>()
-        .CreateLogger("Startup");
-    try
-    {
-        await scope.ServiceProvider.GetRequiredService<DatabaseInitializer>().InitializeAsync();
-    }
-    catch (Exception ex)
-    {
-        logger.LogCritical(ex, "Portal startup failed while initializing the database.");
-        throw;
-    }
-}
 
 app.UseExceptionHandler("/portal/error");
 app.UseStatusCodePagesWithReExecute("/portal/error", "?statusCode={0}");
@@ -67,8 +54,12 @@ app.UseStaticFiles();
 app.UseRouting();
 app.UseAuthentication();
 app.UseAuthorization();
+app.UseAntiforgery();
 
 app.MapHealthChecks("/health");
+app.MapRazorComponents<Velonixs.Connect.Portal.Components.App>()
+    .AddInteractiveServerRenderMode()
+    .RequireAuthorization(policy => policy.RequireRole(AppRoles.PortalRoleNames));
 app.MapControllerRoute(
     name: "default",
     pattern: "{controller=Portal}/{action=Index}/{id?}");

@@ -108,10 +108,6 @@ public sealed class PortalController(
                 CgstPercent = restaurant.CgstPercent,
                 SgstPercent = restaurant.SgstPercent
             },
-            WhatsAppCatalog =
-            {
-                WhatsAppCatalogId = restaurant.WhatsAppCatalogId
-            },
             CanManageMenu = User.IsInRole(AppRoles.BusinessOwner) || User.IsInRole(AppRoles.BusinessManager)
         });
     }
@@ -286,23 +282,14 @@ public sealed class PortalController(
     [HttpPost("portal/whatsapp-catalog")]
     [Authorize(Roles = AppRoles.BusinessOwner + "," + AppRoles.BusinessManager)]
     [ValidateAntiForgeryToken]
-    public async Task<IActionResult> UpdateWhatsAppCatalog(RestaurantWhatsAppCatalogFormModel form, CancellationToken cancellationToken)
+    public IActionResult UpdateWhatsAppCatalog(RestaurantWhatsAppCatalogFormModel form, CancellationToken cancellationToken)
     {
-        var restaurant = await dbContext.Restaurants.FirstOrDefaultAsync(x => x.Id == GetBusinessId(), cancellationToken);
-
-        if (restaurant is null)
-        {
-            return NotFound();
-        }
-
-        restaurant.WhatsAppCatalogId = string.IsNullOrWhiteSpace(form.WhatsAppCatalogId)
-            ? null
-            : form.WhatsAppCatalogId.Trim();
-        await dbContext.SaveChangesAsync(cancellationToken);
-
-        TempData["Success"] = string.IsNullOrWhiteSpace(restaurant.WhatsAppCatalogId)
-            ? "WhatsApp catalog ID cleared. Customers will see the numbered menu."
-            : "WhatsApp catalog ID saved. Customers will see catalog products when active menu items have matching SKUs.";
+        // Keep this legacy POST route non-mutating for existing bookmarks and
+        // forms. Catalog changes must use the platform Catalog Sync page,
+        // which persists MetaCatalogSetting and reconciles product/outbox data.
+        _ = form;
+        _ = cancellationToken;
+        TempData["Info"] = "WhatsApp catalog settings are managed by a platform administrator from Catalog Sync.";
         return RedirectToAction(nameof(Menu));
     }
 
@@ -430,7 +417,7 @@ public sealed class PortalController(
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> DeleteMenuItem(Guid id, CancellationToken cancellationToken)
     {
-        var item = await dbContext.MenuItems.FirstOrDefaultAsync(x => x.Id == id, cancellationToken);
+        var item = await dbContext.MenuItems.AsNoTracking().FirstOrDefaultAsync(x => x.Id == id, cancellationToken);
 
         if (item is null)
         {
@@ -442,14 +429,18 @@ public sealed class PortalController(
             return Forbid();
         }
 
-        if (await dbContext.OrderItems.AnyAsync(x => x.MenuItemId == id, cancellationToken))
+        try
         {
-            TempData["Error"] = "This item has order history. Deactivate it instead of deleting it.";
+            if (!await menuService.DeleteItemAsync(id, cancellationToken))
+            {
+                return NotFound();
+            }
+        }
+        catch (InvalidOperationException ex)
+        {
+            TempData["Error"] = ex.Message;
             return RedirectToAction(nameof(Menu));
         }
-
-        dbContext.MenuItems.Remove(item);
-        await dbContext.SaveChangesAsync(cancellationToken);
 
         TempData["Success"] = "Menu product deleted.";
         return RedirectToAction(nameof(Menu));
@@ -460,7 +451,7 @@ public sealed class PortalController(
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> UpdateAvailability(Guid id, MenuAvailabilityFormModel form, CancellationToken cancellationToken)
     {
-        var item = await dbContext.MenuItems.FirstOrDefaultAsync(x => x.Id == id, cancellationToken);
+        var item = await dbContext.MenuItems.AsNoTracking().FirstOrDefaultAsync(x => x.Id == id, cancellationToken);
 
         if (item is null)
         {
@@ -472,10 +463,14 @@ public sealed class PortalController(
             return Forbid();
         }
 
-        item.IsAvailable = form.IsAvailable;
-        await dbContext.SaveChangesAsync(cancellationToken);
+        var updatedItem = await menuService.SetItemAvailabilityAsync(id, form.IsAvailable, cancellationToken);
 
-        TempData["Success"] = $"{item.Name} is now {(item.IsAvailable ? "available" : "unavailable")}.";
+        if (updatedItem is null)
+        {
+            return NotFound();
+        }
+
+        TempData["Success"] = $"{updatedItem.Name} is now {(updatedItem.IsAvailable ? "available" : "unavailable")}.";
         return RedirectToAction(nameof(Menu));
     }
 

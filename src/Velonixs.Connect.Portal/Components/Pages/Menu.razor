@@ -1,0 +1,479 @@
+@page "/portal/blazor/menu"
+@attribute [Authorize(Roles = AppRoles.PortalRoles)]
+@inject IRestaurantService RestaurantService
+@inject IMenuService MenuService
+
+<PageTitle>Menu | Velonixs Connect</PageTitle>
+
+@if (_loading)
+{
+    <section class="portal-blazor-message">
+        <h1>Loading menu</h1>
+        <p>Retrieving the current products for your business.</p>
+    </section>
+}
+else if (!string.IsNullOrWhiteSpace(_error))
+{
+    <section class="portal-blazor-message portal-blazor-message-error">
+        <h1>Menu unavailable</h1>
+        <p>@_error</p>
+        <button class="btn btn-primary" @onclick="LoadAsync">Try again</button>
+    </section>
+}
+else if (_restaurant is not null)
+{
+    <header class="portal-blazor-page-head">
+        <div>
+            <p class="portal-blazor-eyebrow">@_restaurant.Name</p>
+            <h1>Menu management</h1>
+            <p class="text-muted mb-0">Keep the products shown to customers accurate and available.</p>
+        </div>
+        <button class="btn btn-outline-primary" @onclick="LoadAsync">Refresh</button>
+    </header>
+
+    @if (!string.IsNullOrWhiteSpace(_message))
+    {
+        <div class="portal-blazor-notice @(_messageIsError ? "portal-blazor-notice-error" : "portal-blazor-notice-success")">@_message</div>
+    }
+
+    @if (!CanManage)
+    {
+        <div class="portal-blazor-notice portal-blazor-notice-info">
+            You have view-only access to the menu. A business owner or manager can make changes.
+        </div>
+    }
+
+    @if (CanManage)
+    {
+        <section class="portal-blazor-surface portal-blazor-form-surface">
+            <div class="portal-blazor-surface-head">
+                <div>
+                    <p class="portal-blazor-eyebrow">Step 1</p>
+                    <h2>Add a category</h2>
+                </div>
+            </div>
+            <form class="portal-blazor-form-grid" @onsubmit="CreateCategoryAsync" @onsubmit:preventDefault>
+                <label>
+                    <span>Category name <span class="required-marker" aria-hidden="true">*</span></span>
+                    <input class="form-control" @bind="_newCategory.Name" placeholder="For example, Main dishes" required="@(_newCategory.MasterCategoryId is null)" />
+                </label>
+                <label>
+                    <span>Standard category (or enter a category name above)</span>
+                    <select class="form-select" @bind="_newCategory.MasterCategoryId">
+                        <option value="">Use the category name above</option>
+                        @foreach (var category in _masterCategories.Where(category => category.IsActive))
+                        {
+                            <option value="@category.Id">@category.Name</option>
+                        }
+                    </select>
+                </label>
+                <label>
+                    <span>Display order</span>
+                    <input class="form-control" type="number" @bind="_newCategory.DisplayOrder" />
+                </label>
+                <div class="portal-blazor-form-action">
+                    <button type="submit" class="btn btn-primary">Add category</button>
+                </div>
+            </form>
+        </section>
+
+        <section class="portal-blazor-surface portal-blazor-form-surface">
+            <div class="portal-blazor-surface-head">
+                <div>
+                    <p class="portal-blazor-eyebrow">Step 2</p>
+                    <h2>Add a product</h2>
+                </div>
+            </div>
+            <form class="portal-blazor-form-grid portal-blazor-form-grid-wide" @onsubmit="CreateItemAsync" @onsubmit:preventDefault>
+                <label>
+                    <span>Category <span class="required-marker" aria-hidden="true">*</span></span>
+                    <select class="form-select" @bind="_newItem.CategoryId" disabled="@(!_categories.Any(category => category.IsActive))">
+                        <option value="@Guid.Empty">Select a category</option>
+                        @foreach (var category in _categories.Where(category => category.IsActive))
+                        {
+                            <option value="@category.Id">@category.Name</option>
+                        }
+                    </select>
+                </label>
+                <label>
+                    <span>Catalog template (optional)</span>
+                    <select class="form-select" @bind="_newItem.MasterMenuItemId">
+                        <option value="">Custom product</option>
+                        @foreach (var item in _masterItems.Where(item => item.IsActive))
+                        {
+                            <option value="@item.Id">@item.MasterCategoryName — @item.Name</option>
+                        }
+                    </select>
+                </label>
+                <label>
+                    <span>Product code <span class="required-marker" aria-hidden="true">*</span></span>
+                    <input class="form-control" type="number" min="1" @bind="_newItem.ItemCode" required />
+                </label>
+                <label>
+                    <span>Name <span class="required-marker" aria-hidden="true">*</span></span>
+                    <input class="form-control" @bind="_newItem.Name" placeholder="For a custom product" required="@(_newItem.MasterMenuItemId is null)" />
+                </label>
+                <label>
+                    <span>Price <span class="required-marker" aria-hidden="true">*</span></span>
+                    <input class="form-control" type="number" min="0" step="0.01" @bind="_newItem.Price" required />
+                </label>
+                <label>
+                    <span>WhatsApp retailer ID</span>
+                    <input class="form-control" @bind="_newItem.ProductRetailerId" placeholder="Optional catalog SKU" />
+                </label>
+                <label class="portal-blazor-form-span-2">
+                    <span>Description</span>
+                    <input class="form-control" @bind="_newItem.Description" placeholder="Optional description" />
+                </label>
+                <label class="portal-blazor-form-span-2">
+                    <span>Image URL</span>
+                    <input class="form-control" type="url" @bind="_newItem.ImageUrl" placeholder="Optional public image URL" />
+                </label>
+                <div class="portal-blazor-form-action">
+                    <button type="submit" class="btn btn-primary" disabled="@(!_categories.Any(category => category.IsActive))">Add product</button>
+                </div>
+            </form>
+        </section>
+    }
+
+    <section class="portal-blazor-surface">
+        <div class="portal-blazor-surface-head">
+            <div>
+                <p class="portal-blazor-eyebrow">@_categories.Count categories · @_items.Count products</p>
+                <h2>Current menu</h2>
+            </div>
+        </div>
+
+        @if (_items.Count == 0)
+        {
+            <div class="portal-blazor-empty">No menu products are set up yet.</div>
+        }
+        else
+        {
+            <div class="table-responsive">
+                <table class="table align-middle portal-blazor-table">
+                    <thead>
+                        <tr>
+                            <th>Code</th>
+                            <th>Product</th>
+                            <th>Category</th>
+                            <th>Retailer ID</th>
+                            <th>Status</th>
+                            <th class="text-end">Price</th>
+                            @if (CanManage)
+                            {
+                                <th></th>
+                            }
+                        </tr>
+                    </thead>
+                    <tbody>
+                    @foreach (var item in _items)
+                    {
+                        <tr @key="item.Id">
+                            <td>@item.ItemCode</td>
+                            <td>
+                                <strong>@item.Name</strong>
+                                @if (!string.IsNullOrWhiteSpace(item.Description))
+                                {
+                                    <small>@item.Description</small>
+                                }
+                            </td>
+                            <td>@item.CategoryName</td>
+                            <td>@(item.ProductRetailerId ?? "—")</td>
+                            <td>
+                                @if (!item.IsActive)
+                                {
+                                    <span class="portal-blazor-status portal-blazor-status-muted">Inactive</span>
+                                }
+                                else if (item.IsAvailable)
+                                {
+                                    <span class="portal-blazor-status portal-blazor-status-good">Available</span>
+                                }
+                                else
+                                {
+                                    <span class="portal-blazor-status portal-blazor-status-warning">Unavailable</span>
+                                }
+                            </td>
+                            <td class="text-end">₹@item.Price.ToString("N2")</td>
+                            @if (CanManage)
+                            {
+                                <td class="text-end portal-blazor-actions">
+                                    @if (item.IsActive)
+                                    {
+                                        <button class="btn btn-sm btn-outline-primary" @onclick="() => ToggleAvailabilityAsync(item)">
+                                            @(item.IsAvailable ? "Mark unavailable" : "Mark available")
+                                        </button>
+                                        <button class="btn btn-sm btn-outline-danger" @onclick="() => DeactivateItemAsync(item)">Deactivate</button>
+                                    }
+                                </td>
+                            }
+                        </tr>
+                    }
+                    </tbody>
+                </table>
+            </div>
+        }
+    </section>
+}
+
+@code {
+    [CascadingParameter]
+    private Task<AuthenticationState>? AuthenticationStateTask { get; set; }
+
+    private RestaurantResponse? _restaurant;
+    private IReadOnlyCollection<MenuCategoryResponse> _categories = Array.Empty<MenuCategoryResponse>();
+    private IReadOnlyCollection<MenuItemResponse> _items = Array.Empty<MenuItemResponse>();
+    private IReadOnlyCollection<MasterMenuCategoryResponse> _masterCategories = Array.Empty<MasterMenuCategoryResponse>();
+    private IReadOnlyCollection<MasterMenuItemResponse> _masterItems = Array.Empty<MasterMenuItemResponse>();
+    private CategoryDraft _newCategory = new();
+    private MenuItemDraft _newItem = new();
+    private Guid? _businessId;
+    private bool _loading = true;
+    private bool _messageIsError;
+    private string? _error;
+    private string? _message;
+
+    private bool CanManage { get; set; }
+
+    protected override async Task OnInitializedAsync() => await LoadAsync();
+
+    private async Task LoadAsync()
+    {
+        _loading = true;
+        _error = null;
+
+        try
+        {
+            var authenticationState = AuthenticationStateTask is null
+                ? null
+                : await AuthenticationStateTask;
+            _businessId = ParseBusinessId(authenticationState?.User);
+            CanManage = authenticationState?.User.IsInRole(AppRoles.BusinessOwner) == true ||
+                        authenticationState?.User.IsInRole(AppRoles.BusinessManager) == true;
+
+            if (_businessId is null)
+            {
+                _error = "Your account is missing its business assignment. Please contact your administrator.";
+                return;
+            }
+
+            _restaurant = await RestaurantService.GetRestaurantAsync(_businessId.Value);
+            if (_restaurant is null)
+            {
+                _error = "The business linked to your account could not be found.";
+                return;
+            }
+
+            // Both application-service calls use the circuit's scoped data session. Run them
+            // sequentially to avoid overlapping operations on that session.
+            var menu = await MenuService.GetMenuAsync(_businessId.Value);
+            var catalog = await MenuService.GetMasterCatalogAsync();
+            _categories = menu?.Categories ?? Array.Empty<MenuCategoryResponse>();
+            _items = menu?.Items ?? Array.Empty<MenuItemResponse>();
+            _masterCategories = catalog.Categories;
+            _masterItems = catalog.Items;
+            _newItem = new MenuItemDraft
+            {
+                CategoryId = _categories.FirstOrDefault(category => category.IsActive)?.Id ?? Guid.Empty,
+                ItemCode = (_items.Select(item => item.ItemCode).DefaultIfEmpty().Max()) + 1,
+                IsActive = true,
+                IsAvailable = true
+            };
+        }
+        catch (Exception)
+        {
+            _error = "We could not load this menu. Please try again.";
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+
+    private async Task CreateCategoryAsync()
+    {
+        if (!EnsureCanManage())
+        {
+            return;
+        }
+
+        if (string.IsNullOrWhiteSpace(_newCategory.Name) && _newCategory.MasterCategoryId is null)
+        {
+            SetMessage("Enter a category name or select a standard category.", true);
+            return;
+        }
+
+        try
+        {
+            await MenuService.CreateCategoryAsync(
+                _businessId!.Value,
+                new CreateMenuCategoryRequest(
+                    _newCategory.Name,
+                    _newCategory.DisplayOrder,
+                    true,
+                    _newCategory.MasterCategoryId));
+            _newCategory = new CategoryDraft();
+            SetMessage("Menu category added.");
+            await LoadAsync();
+        }
+        catch (InvalidOperationException exception)
+        {
+            SetMessage(exception.Message, true);
+        }
+        catch (Exception)
+        {
+            SetMessage("The category could not be saved. It may already exist.", true);
+        }
+    }
+
+    private async Task CreateItemAsync()
+    {
+        if (!EnsureCanManage())
+        {
+            return;
+        }
+
+        if (_newItem.CategoryId == Guid.Empty || _newItem.ItemCode <= 0 || _newItem.Price < 0 ||
+            (string.IsNullOrWhiteSpace(_newItem.Name) && _newItem.MasterMenuItemId is null))
+        {
+            SetMessage("Choose a category and enter valid product details.", true);
+            return;
+        }
+
+        try
+        {
+            await MenuService.CreateItemAsync(
+                _businessId!.Value,
+                new CreateMenuItemRequest(
+                    _newItem.CategoryId,
+                    _newItem.MasterMenuItemId,
+                    _newItem.ItemCode,
+                    _newItem.Name,
+                    _newItem.Description,
+                    _newItem.Price,
+                    _newItem.IsAvailable,
+                    _newItem.IsActive,
+                    _newItem.ProductRetailerId,
+                    _newItem.ImageUrl));
+            SetMessage("Menu product added.");
+            await LoadAsync();
+        }
+        catch (InvalidOperationException exception)
+        {
+            SetMessage(exception.Message, true);
+        }
+        catch (Exception)
+        {
+            SetMessage("The product could not be saved. Check that its code and name are unique.", true);
+        }
+    }
+
+    private async Task ToggleAvailabilityAsync(MenuItemResponse item)
+    {
+        if (!EnsureCanManage() || !BelongsToCurrentBusiness(item))
+        {
+            return;
+        }
+
+        try
+        {
+            await MenuService.UpdateItemAsync(
+                item.Id,
+                new UpdateMenuItemRequest(
+                    item.CategoryId,
+                    item.MasterMenuItemId,
+                    item.ItemCode,
+                    item.Name,
+                    item.Description,
+                    item.Price,
+                    !item.IsAvailable,
+                    item.IsActive,
+                    item.ProductRetailerId,
+                    item.ImageUrl));
+            SetMessage($"{item.Name} is now {(!item.IsAvailable ? "available" : "unavailable")}.");
+            await LoadAsync();
+        }
+        catch (InvalidOperationException exception)
+        {
+            SetMessage(exception.Message, true);
+        }
+        catch (Exception)
+        {
+            SetMessage("The availability change could not be saved.", true);
+        }
+    }
+
+    private async Task DeactivateItemAsync(MenuItemResponse item)
+    {
+        if (!EnsureCanManage() || !BelongsToCurrentBusiness(item))
+        {
+            return;
+        }
+
+        try
+        {
+            await MenuService.DeactivateItemAsync(item.Id);
+            SetMessage($"{item.Name} has been deactivated.");
+            await LoadAsync();
+        }
+        catch (Exception)
+        {
+            SetMessage("The product could not be deactivated.", true);
+        }
+    }
+
+    private bool EnsureCanManage()
+    {
+        if (CanManage && _businessId is not null)
+        {
+            return true;
+        }
+
+        SetMessage("Only a business owner or manager can change the menu.", true);
+        return false;
+    }
+
+    private bool BelongsToCurrentBusiness(MenuItemResponse item)
+    {
+        if (item.RestaurantId == _businessId)
+        {
+            return true;
+        }
+
+        SetMessage("That product does not belong to this business.", true);
+        return false;
+    }
+
+    private void SetMessage(string message, bool isError = false)
+    {
+        _message = message;
+        _messageIsError = isError;
+    }
+
+    private static Guid? ParseBusinessId(ClaimsPrincipal? user)
+    {
+        var value = user?.FindFirst(AppClaimTypes.BusinessId)?.Value;
+        return Guid.TryParse(value, out var businessId) ? businessId : null;
+    }
+
+    private sealed class CategoryDraft
+    {
+        public string Name { get; set; } = string.Empty;
+        public Guid? MasterCategoryId { get; set; }
+        public int DisplayOrder { get; set; }
+    }
+
+    private sealed class MenuItemDraft
+    {
+        public Guid CategoryId { get; set; }
+        public Guid? MasterMenuItemId { get; set; }
+        public int ItemCode { get; set; }
+        public string Name { get; set; } = string.Empty;
+        public string? Description { get; set; }
+        public decimal Price { get; set; }
+        public bool IsAvailable { get; set; } = true;
+        public bool IsActive { get; set; } = true;
+        public string? ProductRetailerId { get; set; }
+        public string? ImageUrl { get; set; }
+    }
+}

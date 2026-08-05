@@ -5,9 +5,15 @@
     var masterItems = Model.MasterCatalog?.Items ?? Array.Empty<MasterMenuItemResponse>();
     var categories = Model.Menu?.Categories ?? Array.Empty<MenuCategoryResponse>();
     var items = Model.Menu?.Items ?? Array.Empty<MenuItemResponse>();
-    var catalogSkuCount = items.Count(x => x.IsActive && x.IsAvailable && !string.IsNullOrWhiteSpace(x.ProductRetailerId));
+    var catalogProductCount = items.Count(x =>
+        x.IsActive &&
+        x.IsAvailable &&
+        categories.Any(category => category.Id == x.CategoryId && category.IsActive) &&
+        !string.IsNullOrWhiteSpace(x.ProductRetailerId) &&
+        !string.IsNullOrWhiteSpace(x.MetaProductId) &&
+        string.Equals(x.SyncStatus, "Synced", StringComparison.OrdinalIgnoreCase));
     var hasCatalogId = !string.IsNullOrWhiteSpace(Model.Restaurant.WhatsAppCatalogId);
-    var catalogReady = hasCatalogId && catalogSkuCount > 0;
+    var catalogReady = hasCatalogId && catalogProductCount > 0;
 }
 
 <section class="d-flex flex-column flex-lg-row align-items-lg-center justify-content-between gap-3 mb-4">
@@ -26,30 +32,29 @@
             <div class="section-heading">
                 <div>
                     <h2>WhatsApp Catalog</h2>
-                    <p class="text-secondary mb-0">Catalog product messages require a Meta catalog ID and matching item SKUs.</p>
+                    <p class="text-secondary mb-0">Catalog product messages require a configured Meta catalog and successfully synced products.</p>
                 </div>
                 <span class="badge @(catalogReady ? "text-bg-success" : "text-bg-warning")">
                     @(catalogReady ? "Ready" : "Needs setup")
                 </span>
             </div>
-            <form class="row g-3 align-items-end" asp-action="UpdateWhatsAppCatalog" method="post">
-                @Html.AntiForgeryToken()
+            <div class="row g-3 align-items-end">
                 <div class="col-12 col-lg-5">
-                    <label class="form-label">WhatsApp catalog ID</label>
-                    <input class="form-control" asp-for="WhatsAppCatalog.WhatsAppCatalogId" name="WhatsAppCatalogId" placeholder="Meta catalog ID" />
+                    <label class="form-label">Configured WhatsApp catalog ID</label>
+                    <input class="form-control" value="@(Model.Restaurant.WhatsAppCatalogId ?? "Not configured")" readonly />
                 </div>
                 <div class="col-12 col-lg">
-                    <div class="small text-secondary">Active products with catalog SKU</div>
-                    <div class="fs-5 fw-semibold">@catalogSkuCount / @items.Count(x => x.IsActive && x.IsAvailable)</div>
+                    <div class="small text-secondary">Active products synced to catalog</div>
+                    <div class="fs-5 fw-semibold">@catalogProductCount / @items.Count(x => x.IsActive && x.IsAvailable)</div>
                 </div>
                 <div class="col-12 col-lg-auto">
-                    <button class="btn btn-primary" type="submit">Save catalog</button>
+                    <span class="small text-secondary">Catalog configuration and synchronization are managed by a platform administrator.</span>
                 </div>
-            </form>
+            </div>
             @if (!catalogReady)
             {
                 <div class="alert alert-warning mt-3 mb-0">
-                    Customers will continue to receive the numbered menu until the catalog ID is saved and at least one active in-stock item has a matching Product Retailer ID.
+                    Customers will continue to receive the numbered menu until a platform administrator configures catalog sync and at least one active in-stock item is synced.
                 </div>
             }
         </div>

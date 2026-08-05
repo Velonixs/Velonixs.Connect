@@ -32,7 +32,7 @@ public sealed class WhatsAppWebhookController(
     {
         if (mode == "subscribe" &&
             !string.IsNullOrWhiteSpace(challenge) &&
-            verifyToken == _whatsAppOptions.VerifyToken)
+            HasExpectedSecret(_whatsAppOptions.VerifyToken, verifyToken))
         {
             return Content(challenge, "text/plain");
         }
@@ -53,17 +53,29 @@ public sealed class WhatsAppWebhookController(
 
         using var jsonDocument = JsonDocument.Parse(rawBody);
         var payload = jsonDocument.RootElement;
-        var message = TryReadIncomingMessage(payload);
+        var messages = ReadIncomingMessages(payload);
 
-        if (message is null)
+        if (messages.Count == 0)
         {
             logger.LogInformation("WhatsApp webhook received no supported text message.");
             return Ok(new { processed = false, reason = "No supported text message found." });
         }
 
-        var result = await conversationService.ProcessIncomingMessageAsync(message, cancellationToken);
+        var results = new List<WhatsAppWebhookProcessResult>(messages.Count);
+        foreach (var message in messages)
+        {
+            // Process every delivery in a Meta batch. If one operation fails,
+            // the request fails so Meta can retry the batch; the message-ID
+            // uniqueness invariant makes already-completed deliveries safe.
+            results.Add(await conversationService.ProcessIncomingMessageAsync(message, cancellationToken));
+        }
 
-        return Ok(result);
+        return Ok(new
+        {
+            processed = results.Count(result => result.IsProcessed),
+            ignored = results.Count(result => !result.IsProcessed),
+            results
+        });
     }
 
     [HttpPost("local-test")]
@@ -89,11 +101,12 @@ public sealed class WhatsAppWebhookController(
         return Ok(result);
     }
 
-    private static IncomingWhatsAppMessage? TryReadIncomingMessage(JsonElement payload)
+    private static IReadOnlyCollection<IncomingWhatsAppMessage> ReadIncomingMessages(JsonElement payload)
     {
+        var incomingMessages = new List<IncomingWhatsAppMessage>();
         if (!payload.TryGetProperty("entry", out var entries) || entries.ValueKind != JsonValueKind.Array)
         {
-            return null;
+            return incomingMessages;
         }
 
         foreach (var entry in entries.EnumerateArray())
@@ -138,19 +151,19 @@ public sealed class WhatsAppWebhookController(
                         continue;
                     }
 
-                    return new IncomingWhatsAppMessage(
+                    incomingMessages.Add(new IncomingWhatsAppMessage(
                         phoneNumberId,
                         from,
                         text,
                         id,
                         profileName,
                         DateTimeOffset.UtcNow,
-                        orderItems);
+                        orderItems));
                 }
             }
         }
 
-        return null;
+        return incomingMessages;
     }
 
     private static string? ReadFirstContactName(JsonElement value)
@@ -273,7 +286,14 @@ public sealed class WhatsAppWebhookController(
     {
         if (string.IsNullOrWhiteSpace(_whatsAppOptions.AppSecret))
         {
-            return true;
+            if (environment.IsDevelopment())
+            {
+                logger.LogWarning("Accepting an unsigned WhatsApp webhook in Development because WhatsApp:AppSecret is not configured.");
+                return true;
+            }
+
+            logger.LogError("Rejected WhatsApp webhook because WhatsApp:AppSecret is not configured.");
+            return false;
         }
 
         if (!Request.Headers.TryGetValue("X-Hub-Signature-256", out var signatureHeader))
@@ -291,6 +311,13 @@ public sealed class WhatsAppWebhookController(
             Encoding.UTF8.GetBytes(expected),
             Encoding.UTF8.GetBytes(provided));
     }
+
+    private static bool HasExpectedSecret(string? expected, string? provided) =>
+        !string.IsNullOrWhiteSpace(expected) &&
+        !string.IsNullOrWhiteSpace(provided) &&
+        CryptographicOperations.FixedTimeEquals(
+            Encoding.UTF8.GetBytes(expected),
+            Encoding.UTF8.GetBytes(provided));
 }
 
 public sealed record LocalWhatsAppMessageRequest(

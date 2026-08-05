@@ -33,7 +33,10 @@ public sealed record MenuItemResponse(
     decimal Price,
     bool IsAvailable,
     bool IsActive,
-    string? ProductRetailerId = null)
+    string? ProductRetailerId = null,
+    string? ImageUrl = null,
+    string? MetaProductId = null,
+    string SyncStatus = "NotQueued")
 {
     public Guid BusinessId => RestaurantId;
     public int ProductCode => ItemCode;
@@ -54,7 +57,8 @@ public sealed record CreateMenuItemRequest(
     decimal Price,
     bool IsAvailable = true,
     bool IsActive = true,
-    string? ProductRetailerId = null);
+    string? ProductRetailerId = null,
+    string? ImageUrl = null);
 
 public sealed record UpdateMenuItemRequest(
     Guid CategoryId,
@@ -65,7 +69,13 @@ public sealed record UpdateMenuItemRequest(
     decimal Price,
     bool IsAvailable,
     bool IsActive,
-    string? ProductRetailerId = null);
+    string? ProductRetailerId = null,
+    string? ImageUrl = null);
+
+public sealed record UpdateMenuCategoryRequest(
+    string Name,
+    int DisplayOrder,
+    bool IsActive);
 
 public sealed record MasterCatalogResponse(
     IReadOnlyCollection<MasterMenuCategoryResponse> Categories,
@@ -90,8 +100,19 @@ public sealed record CreateMasterMenuCategoryRequest(
     int DisplayOrder = 0,
     bool IsActive = true);
 
+public sealed record UpdateMasterMenuCategoryRequest(
+    string Name,
+    int DisplayOrder,
+    bool IsActive);
+
 public sealed record CreateMasterMenuItemRequest(
     Guid MasterCategoryId,
     string Name,
     string? Description,
     bool IsActive = true);
+
+public sealed record UpdateMasterMenuItemRequest(
+    Guid MasterCategoryId,
+    string Name,
+    string? Description,
+    bool IsActive);

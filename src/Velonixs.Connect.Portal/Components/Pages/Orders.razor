@@ -1,0 +1,329 @@
+@page "/portal/blazor/orders"
+@attribute [Authorize(Roles = AppRoles.PortalRoles)]
+@inject IRestaurantService RestaurantService
+@inject IOrderService OrderService
+
+<PageTitle>Orders | Velonixs Connect</PageTitle>
+
+@if (_loading)
+{
+    <section class="portal-blazor-message">
+        <h1>Loading orders</h1>
+        <p>Retrieving the latest restaurant order queue.</p>
+    </section>
+}
+else if (!string.IsNullOrWhiteSpace(_error))
+{
+    <section class="portal-blazor-message portal-blazor-message-error">
+        <h1>Orders unavailable</h1>
+        <p>@_error</p>
+        <button class="btn btn-primary" @onclick="LoadAsync">Try again</button>
+    </section>
+}
+else if (_restaurant is not null)
+{
+    <header class="portal-blazor-page-head">
+        <div>
+            <p class="portal-blazor-eyebrow">@_restaurant.Name</p>
+            <h1>Order queue</h1>
+            <p class="text-muted mb-0">Update an order status to notify the customer through the established workflow.</p>
+        </div>
+        <button class="btn btn-outline-primary" @onclick="LoadAsync">Refresh</button>
+    </header>
+
+    @if (!string.IsNullOrWhiteSpace(_message))
+    {
+        <div class="portal-blazor-notice @(_messageIsError ? "portal-blazor-notice-error" : "portal-blazor-notice-success")">@_message</div>
+    }
+
+    <section class="portal-blazor-surface">
+        <div class="portal-blazor-surface-head">
+            <div>
+                <p class="portal-blazor-eyebrow">@_orders.Count total</p>
+                <h2>All orders</h2>
+            </div>
+            <label class="portal-blazor-filter">
+                <span>Status</span>
+                <select class="form-select" @bind="_statusFilter">
+                    <option value="">All statuses</option>
+                    @foreach (var status in KnownStatuses)
+                    {
+                        <option value="@status">@FormatStatus(status)</option>
+                    }
+                </select>
+            </label>
+        </div>
+
+        @if (FilteredOrders.Count == 0)
+        {
+            <div class="portal-blazor-empty">No orders match the selected status.</div>
+        }
+        else
+        {
+            <div class="portal-blazor-order-list">
+                @foreach (var order in FilteredOrders)
+                {
+                    var editor = GetEditor(order);
+                    var allowedStatuses = GetAllowedStatuses(order.OrderStatus);
+
+                    <article class="portal-blazor-order-card" @key="order.Id">
+                        <header>
+                            <div>
+                                <p class="portal-blazor-order-number">@order.OrderNumber</p>
+                                <h3>@order.CustomerName</h3>
+                                <span>@order.CustomerPhone · @order.CreatedAt.LocalDateTime.ToString("dd MMM yyyy, HH:mm")</span>
+                            </div>
+                            <div class="portal-blazor-order-total">
+                                <span class="portal-blazor-status">@FormatStatus(order.OrderStatus)</span>
+                                <strong>₹@order.TotalAmount.ToString("N2")</strong>
+                            </div>
+                        </header>
+
+                        <div class="portal-blazor-order-meta">
+                            <span><strong>Address:</strong> @order.Address</span>
+                            <span><strong>Source:</strong> @order.Source</span>
+                            @if (order.EstimatedMinutes is not null)
+                            {
+                                <span><strong>Estimate:</strong> @order.EstimatedMinutes min</span>
+                            }
+                        </div>
+
+                        @if (!string.IsNullOrWhiteSpace(order.RestaurantComment))
+                        {
+                            <p class="portal-blazor-order-comment"><strong>Last note:</strong> @order.RestaurantComment</p>
+                        }
+
+                        @if (allowedStatuses.Count > 0)
+                        {
+                            <div class="portal-blazor-order-update">
+                                <label>
+                                    <span>Move to</span>
+                                    <select class="form-select" @bind="editor.Status">
+                                        @foreach (var status in allowedStatuses)
+                                        {
+                                            <option value="@status">@FormatStatus(status)</option>
+                                        }
+                                    </select>
+                                </label>
+                                @if (string.Equals(editor.Status, "Confirmed", StringComparison.OrdinalIgnoreCase))
+                                {
+                                    <label>
+                                        <span>Ready in minutes</span>
+                                        <input class="form-control" type="number" min="1" max="1440" @bind="editor.EstimatedMinutes" />
+                                    </label>
+                                }
+                                <label class="portal-blazor-order-note">
+                                    <span>@(string.Equals(editor.Status, "Rejected", StringComparison.OrdinalIgnoreCase) ? "Rejection reason" : "Customer note (optional)")</span>
+                                    <input class="form-control" @bind="editor.Comment" />
+                                </label>
+                                <div class="portal-blazor-form-action">
+                                    <button class="btn btn-primary" @onclick="() => UpdateOrderAsync(order)">Update customer</button>
+                                </div>
+                            </div>
+                        }
+                        else
+                        {
+                            <p class="portal-blazor-order-final">This order is in a final status and cannot be changed further.</p>
+                        }
+                    </article>
+                }
+            </div>
+        }
+    </section>
+}
+
+@code {
+    private static readonly IReadOnlyCollection<string> KnownStatuses =
+    [
+        "PendingConfirmation",
+        "Confirmed",
+        "Preparing",
+        "ReadyForPickup",
+        "OutForDelivery",
+        "Delivered",
+        "Rejected",
+        "Cancelled"
+    ];
+
+    [CascadingParameter]
+    private Task<AuthenticationState>? AuthenticationStateTask { get; set; }
+
+    private RestaurantResponse? _restaurant;
+    private IReadOnlyCollection<OrderSummaryResponse> _orders = Array.Empty<OrderSummaryResponse>();
+    private readonly Dictionary<Guid, OrderUpdateDraft> _editors = new();
+    private Guid? _businessId;
+    private string _updatedBy = "Business portal";
+    private bool _loading = true;
+    private bool _messageIsError;
+    private string? _error;
+    private string? _message;
+    private string _statusFilter = string.Empty;
+
+    private IReadOnlyCollection<OrderSummaryResponse> FilteredOrders =>
+        string.IsNullOrWhiteSpace(_statusFilter)
+            ? _orders
+            : _orders.Where(order => string.Equals(order.OrderStatus, _statusFilter, StringComparison.OrdinalIgnoreCase)).ToArray();
+
+    protected override async Task OnInitializedAsync() => await LoadAsync();
+
+    private async Task LoadAsync()
+    {
+        _loading = true;
+        _error = null;
+
+        try
+        {
+            var authenticationState = AuthenticationStateTask is null
+                ? null
+                : await AuthenticationStateTask;
+            _businessId = ParseBusinessId(authenticationState?.User);
+            _updatedBy = authenticationState?.User.Identity?.Name ?? "Business portal";
+
+            if (_businessId is null)
+            {
+                _error = "Your account is missing its business assignment. Please contact your administrator.";
+                return;
+            }
+
+            _restaurant = await RestaurantService.GetRestaurantAsync(_businessId.Value);
+            if (_restaurant is null)
+            {
+                _error = "The business linked to your account could not be found.";
+                return;
+            }
+
+            _orders = await OrderService.GetRestaurantOrdersAsync(_businessId.Value);
+            _editors.Clear();
+            foreach (var order in _orders)
+            {
+                var nextStatus = GetAllowedStatuses(order.OrderStatus).FirstOrDefault() ?? order.OrderStatus;
+                _editors[order.Id] = new OrderUpdateDraft
+                {
+                    Status = nextStatus,
+                    EstimatedMinutes = order.EstimatedMinutes ?? 20,
+                    Comment = string.Empty
+                };
+            }
+        }
+        catch (Exception)
+        {
+            _error = "We could not load the order queue. Please try again.";
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+
+    private async Task UpdateOrderAsync(OrderSummaryResponse order)
+    {
+        if (_businessId is null || order.RestaurantId != _businessId)
+        {
+            SetMessage("That order does not belong to this business.", true);
+            return;
+        }
+
+        var editor = GetEditor(order);
+        var allowedStatuses = GetAllowedStatuses(order.OrderStatus);
+        if (!allowedStatuses.Contains(editor.Status, StringComparer.OrdinalIgnoreCase))
+        {
+            SetMessage("Choose a valid next status for this order.", true);
+            return;
+        }
+
+        if (string.Equals(editor.Status, "Confirmed", StringComparison.OrdinalIgnoreCase) &&
+            (editor.EstimatedMinutes is null or <= 0 or > 1440))
+        {
+            SetMessage("Enter a ready-time between 1 and 1,440 minutes when confirming an order.", true);
+            return;
+        }
+
+        if (string.Equals(editor.Status, "Rejected", StringComparison.OrdinalIgnoreCase) &&
+            string.IsNullOrWhiteSpace(editor.Comment))
+        {
+            SetMessage("A rejection reason is required before rejecting an order.", true);
+            return;
+        }
+
+        try
+        {
+            var updatedOrder = await OrderService.UpdateStatusAsync(
+                order.Id,
+                new UpdateOrderStatusRequest(
+                    editor.Status,
+                    editor.Comment,
+                    _updatedBy,
+                    editor.EstimatedMinutes));
+
+            if (updatedOrder is null)
+            {
+                SetMessage("This order no longer exists.", true);
+                return;
+            }
+
+            SetMessage($"Order {updatedOrder.OrderNumber} is now {FormatStatus(updatedOrder.OrderStatus)}.");
+            await LoadAsync();
+        }
+        catch (InvalidOperationException exception)
+        {
+            SetMessage(exception.Message, true);
+        }
+        catch (Exception)
+        {
+            SetMessage("The status could not be updated. Please try again.", true);
+        }
+    }
+
+    private OrderUpdateDraft GetEditor(OrderSummaryResponse order)
+    {
+        if (_editors.TryGetValue(order.Id, out var editor))
+        {
+            return editor;
+        }
+
+        editor = new OrderUpdateDraft
+        {
+            Status = GetAllowedStatuses(order.OrderStatus).FirstOrDefault() ?? order.OrderStatus,
+            EstimatedMinutes = order.EstimatedMinutes ?? 20
+        };
+        _editors[order.Id] = editor;
+        return editor;
+    }
+
+    private static IReadOnlyCollection<string> GetAllowedStatuses(string currentStatus) =>
+        currentStatus switch
+        {
+            "PendingConfirmation" => ["Confirmed", "Rejected", "Cancelled"],
+            "Confirmed" => ["Preparing", "ReadyForPickup", "OutForDelivery", "Delivered", "Cancelled"],
+            "Preparing" => ["ReadyForPickup", "OutForDelivery", "Delivered", "Cancelled"],
+            "ReadyForPickup" => ["Delivered", "Cancelled"],
+            "OutForDelivery" => ["Delivered", "Cancelled"],
+            "Notified" => ["Preparing", "ReadyForPickup", "OutForDelivery", "Delivered", "Cancelled"],
+            "Handled" => ["Delivered", "Cancelled"],
+            _ => Array.Empty<string>()
+        };
+
+    private void SetMessage(string message, bool isError = false)
+    {
+        _message = message;
+        _messageIsError = isError;
+    }
+
+    private static Guid? ParseBusinessId(ClaimsPrincipal? user)
+    {
+        var value = user?.FindFirst(AppClaimTypes.BusinessId)?.Value;
+        return Guid.TryParse(value, out var businessId) ? businessId : null;
+    }
+
+    private static string FormatStatus(string status) =>
+        string.IsNullOrWhiteSpace(status)
+            ? "Unknown"
+            : System.Text.RegularExpressions.Regex.Replace(status, "(?<!^)([A-Z])", " $1");
+
+    private sealed class OrderUpdateDraft
+    {
+        public string Status { get; set; } = string.Empty;
+        public string? Comment { get; set; }
+        public int? EstimatedMinutes { get; set; }
+    }
+}

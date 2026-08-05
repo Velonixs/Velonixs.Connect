@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Diagnostics;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.Extensions.Options;
 using Velonixs.Connect.Application;
 using Velonixs.Connect.Api.Security;
 using Velonixs.Connect.Infrastructure;
@@ -10,6 +11,7 @@ var builder = WebApplication.CreateBuilder(args);
 
 builder.Services.AddApplication();
 builder.Services.AddInfrastructure(builder.Configuration);
+builder.Services.AddMetaCatalogBackgroundProcessing();
 builder.Services.AddControllers();
 builder.Services.AddProblemDetails();
 builder.Services.AddHttpContextAccessor();
@@ -47,6 +49,32 @@ using (var scope = app.Services.CreateScope())
         .CreateLogger("Startup");
     try
     {
+        var whatsAppOptions = scope.ServiceProvider.GetRequiredService<IOptions<WhatsAppOptions>>().Value;
+        if (!app.Environment.IsDevelopment() && !whatsAppOptions.DisableSending)
+        {
+            var missingLiveWhatsAppSettings = new List<string>();
+            if (string.IsNullOrWhiteSpace(whatsAppOptions.AccessToken))
+            {
+                missingLiveWhatsAppSettings.Add("WhatsApp:AccessToken");
+            }
+
+            if (string.IsNullOrWhiteSpace(whatsAppOptions.AppSecret))
+            {
+                missingLiveWhatsAppSettings.Add("WhatsApp:AppSecret");
+            }
+
+            if (string.IsNullOrWhiteSpace(whatsAppOptions.VerifyToken))
+            {
+                missingLiveWhatsAppSettings.Add("WhatsApp:VerifyToken");
+            }
+
+            if (missingLiveWhatsAppSettings.Count > 0)
+            {
+                throw new InvalidOperationException(
+                    $"Live WhatsApp sending requires: {string.Join(", ", missingLiveWhatsAppSettings)}.");
+            }
+        }
+
         var databaseInitializer = scope.ServiceProvider.GetRequiredService<DatabaseInitializer>();
         await databaseInitializer.InitializeAsync();
     }

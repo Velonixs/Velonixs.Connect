@@ -1,4 +1,5 @@
 using System.Security.Cryptography;
+using System.Globalization;
 using System.Text;
 using System.Text.Json;
 using Microsoft.AspNetCore.Authorization;
@@ -135,11 +136,19 @@ public sealed class WhatsAppWebhookController(
                 {
                     var from = ReadString(whatsAppMessage, "from");
                     var id = ReadString(whatsAppMessage, "id");
-                    var text = ReadString(whatsAppMessage, "text", "body")
+                    var messageType = ReadString(whatsAppMessage, "type") ?? "unknown";
+                    var isOrder = string.Equals(messageType, "order", StringComparison.Ordinal);
+                    var text = (isOrder ? ReadString(whatsAppMessage, "order", "text") : null)
+                        ?? ReadString(whatsAppMessage, "text", "body")
                         ?? ReadInteractiveReplyAsText(whatsAppMessage);
-                    var orderItems = ReadOrderItems(whatsAppMessage);
+                    var orderItems = isOrder
+                        ? ReadOrderItems(whatsAppMessage)
+                        : Array.Empty<IncomingWhatsAppOrderItem>();
+                    var orderCatalogId = isOrder
+                        ? ReadString(whatsAppMessage, "order", "catalog_id")
+                        : null;
 
-                    if (orderItems.Count > 0 && string.IsNullOrWhiteSpace(text))
+                    if (isOrder && string.IsNullOrWhiteSpace(text))
                     {
                         text = "catalog.order";
                     }
@@ -158,7 +167,9 @@ public sealed class WhatsAppWebhookController(
                         id,
                         profileName,
                         DateTimeOffset.UtcNow,
-                        orderItems));
+                        orderItems,
+                        orderCatalogId,
+                        messageType));
                 }
             }
         }
@@ -239,16 +250,14 @@ public sealed class WhatsAppWebhookController(
         var items = new List<IncomingWhatsAppOrderItem>();
         foreach (var productItem in productItems.EnumerateArray())
         {
-            var productRetailerId = ReadString(productItem, "product_retailer_id");
+            var productRetailerId = ReadString(productItem, "product_retailer_id") ?? string.Empty;
+            _ = TryReadInt(productItem, "quantity", out var quantity);
+            decimal? itemPrice = TryReadDecimal(productItem, "item_price", out var parsedPrice)
+                ? parsedPrice
+                : null;
+            var currency = ReadString(productItem, "currency");
 
-            if (string.IsNullOrWhiteSpace(productRetailerId) ||
-                !TryReadInt(productItem, "quantity", out var quantity) ||
-                quantity <= 0)
-            {
-                continue;
-            }
-
-            items.Add(new IncomingWhatsAppOrderItem(productRetailerId, quantity));
+            items.Add(new IncomingWhatsAppOrderItem(productRetailerId, quantity, itemPrice, currency));
         }
 
         return items;
@@ -310,6 +319,26 @@ public sealed class WhatsAppWebhookController(
         return CryptographicOperations.FixedTimeEquals(
             Encoding.UTF8.GetBytes(expected),
             Encoding.UTF8.GetBytes(provided));
+    }
+
+    private static bool TryReadDecimal(JsonElement element, string propertyName, out decimal value)
+    {
+        value = 0;
+        if (!element.TryGetProperty(propertyName, out var property))
+        {
+            return false;
+        }
+
+        return property.ValueKind switch
+        {
+            JsonValueKind.Number => property.TryGetDecimal(out value),
+            JsonValueKind.String => decimal.TryParse(
+                property.GetString(),
+                NumberStyles.Number,
+                CultureInfo.InvariantCulture,
+                out value),
+            _ => false
+        };
     }
 
     private static bool HasExpectedSecret(string? expected, string? provided) =>

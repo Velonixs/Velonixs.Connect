@@ -18,7 +18,9 @@ public sealed class Order
     public decimal SgstPercent { get; set; }
     public decimal SgstAmount { get; set; }
     public decimal TotalAmount { get; set; }
+    public string Currency { get; set; } = "INR";
     public string Source { get; set; } = OrderSources.WhatsApp;
+    public string? ExternalWhatsAppMessageId { get; set; }
     public DateTimeOffset CreatedAt { get; set; } = DateTimeOffset.UtcNow;
 
     public Restaurant Restaurant { get; set; } = null!;

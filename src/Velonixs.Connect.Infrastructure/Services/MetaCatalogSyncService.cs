@@ -86,6 +86,8 @@ public sealed class MetaCatalogSyncService(
                 product.ProductRetailerId ??= CreateGeneratedRetailerId(businessId, product.Id);
                 var snapshot = CatalogProductSnapshot.From(product, normalizedEventType);
                 product.SyncStatus = "Pending";
+                product.MetaCatalogId = catalogId;
+                product.UpdatedAt = DateTimeOffset.UtcNow;
 
                 var queuedItem = await dbContext.CatalogSyncQueue
                     .AsNoTracking()
@@ -431,7 +433,11 @@ public sealed class MetaCatalogSyncService(
                 setting.CatalogId,
                 setting.PhoneNumberId,
                 setting.IsEnabled,
-                setting.SyncMode);
+                setting.SyncMode,
+                setting.MetaBusinessId,
+                setting.CredentialReference,
+                setting.IsCartEnabled,
+                setting.LastSuccessfulSyncAt);
     }
 
     public async Task SaveSettingsAsync(Guid businessId, MetaCatalogSettingsInput input, CancellationToken cancellationToken = default)
@@ -480,12 +486,15 @@ public sealed class MetaCatalogSyncService(
         }
 
         setting.WabaId = NormalizeOptional(input.WabaId);
+        setting.MetaBusinessId = NormalizeOptional(input.MetaBusinessId);
         setting.CatalogId = catalogId;
         setting.PhoneNumberId = phoneNumberId;
+        setting.CredentialReference = NormalizeOptional(input.CredentialReference);
         setting.AccessTokenEncrypted = accessToken;
         setting.WebhookVerifyTokenEncrypted = NormalizeOptional(input.WebhookVerifyToken)
             ?? setting.WebhookVerifyTokenEncrypted;
         setting.IsEnabled = input.IsEnabled;
+        setting.IsCartEnabled = input.IsCartEnabled;
         setting.SyncMode = syncMode;
         setting.UpdatedAt = DateTimeOffset.UtcNow;
 
@@ -1213,6 +1222,7 @@ public sealed class MetaCatalogSyncService(
                     return;
                 }
 
+                activeSetting.LastSuccessfulSyncAt = DateTimeOffset.UtcNow;
                 await CompleteAndPersistAsync(item, product, "Synced", null, 204, cancellationToken);
                 return;
             }
@@ -1235,6 +1245,7 @@ public sealed class MetaCatalogSyncService(
                 return;
             }
 
+            activeSetting.LastSuccessfulSyncAt = DateTimeOffset.UtcNow;
             await CompleteAndPersistAsync(item, product, "Synced", responseBody, (int)response.StatusCode, cancellationToken);
             return;
         }
@@ -1255,7 +1266,13 @@ public sealed class MetaCatalogSyncService(
         {
             if (await PrepareTerminalWriteAsync(item, product, leaseId, deliverySetting?.CatalogId, cancellationToken))
             {
-                FailItem(item, product, ex.Message, ex.ResponseCode, ex.ResponseBody);
+                FailItem(
+                    item,
+                    product,
+                    ex.Message,
+                    ex.ResponseCode,
+                    ex.ResponseBody,
+                    IsTransientStatusCode(ex.ResponseCode));
                 logger.LogWarning("Meta catalog sync failed for product {ProductId}. StatusCode={StatusCode}", item.ProductId, ex.ResponseCode);
             }
         }
@@ -1263,7 +1280,7 @@ public sealed class MetaCatalogSyncService(
         {
             if (await PrepareTerminalWriteAsync(item, product, leaseId, deliverySetting?.CatalogId, cancellationToken))
             {
-                FailItem(item, product, ex.Message, 0, null);
+                FailItem(item, product, ex.Message, 0, null, isTransient: true);
                 logger.LogWarning(ex, "Meta catalog sync failed for product {ProductId}", item.ProductId);
             }
         }
@@ -1422,7 +1439,12 @@ public sealed class MetaCatalogSyncService(
                                       queueItem.Id != completedItem.Id &&
                                       outstandingStatuses.Contains(queueItem.Status)))
                 .ExecuteUpdateAsync(setters => setters
-                    .SetProperty(product => product.SyncStatus, status), cancellationToken);
+                    .SetProperty(product => product.SyncStatus, status)
+                    .SetProperty(
+                        product => product.LastSyncedAt,
+                        product => status == "Synced" ? DateTimeOffset.UtcNow : product.LastSyncedAt)
+                    .SetProperty(product => product.LastSyncError, (string?)null)
+                    .SetProperty(product => product.RetryCount, 0), cancellationToken);
             return;
         }
 
@@ -1441,6 +1463,9 @@ public sealed class MetaCatalogSyncService(
         if (product is not null)
         {
             product.SyncStatus = status;
+            product.LastSyncedAt = status == "Synced" ? DateTimeOffset.UtcNow : product.LastSyncedAt;
+            product.LastSyncError = null;
+            product.RetryCount = 0;
             await dbContext.SaveChangesAsync(cancellationToken);
         }
     }
@@ -1450,12 +1475,17 @@ public sealed class MetaCatalogSyncService(
         MenuItem? product,
         string errorMessage,
         int responseCode,
-        string? responseBody)
+        string? responseBody,
+        bool isTransient)
     {
         item.Status = "Failed";
         item.LastError = errorMessage;
-        item.RetryCount += 1;
-        item.NextAttemptAt = DateTimeOffset.UtcNow.AddMinutes(Math.Pow(2, Math.Min(item.RetryCount, 5)));
+        item.RetryCount = isTransient
+            ? item.RetryCount + 1
+            : Math.Max(Math.Max(1, _options.MaxRetryCount), item.RetryCount + 1);
+        item.NextAttemptAt = isTransient
+            ? DateTimeOffset.UtcNow.AddMinutes(Math.Pow(2, Math.Min(item.RetryCount, 5)))
+            : null;
         item.LeaseId = null;
         item.LeaseExpiresAt = null;
         item.UpdatedAt = DateTimeOffset.UtcNow;
@@ -1463,6 +1493,8 @@ public sealed class MetaCatalogSyncService(
         if (product is not null)
         {
             product.SyncStatus = "Failed";
+            product.LastSyncError = errorMessage;
+            product.RetryCount = item.RetryCount;
         }
 
         dbContext.CatalogSyncLogs.Add(new CatalogSyncLog
@@ -1477,6 +1509,9 @@ public sealed class MetaCatalogSyncService(
             CreatedAt = DateTimeOffset.UtcNow
         });
     }
+
+    private static bool IsTransientStatusCode(int statusCode) =>
+        statusCode is 408 or 429 || statusCode >= 500;
 
     private void CancelItem(CatalogSyncQueueItem item, string reason)
     {
@@ -1553,7 +1588,7 @@ public sealed class MetaCatalogSyncService(
 
     private Uri BuildMetaUri(string catalogId, string? metaProductId, string eventType)
     {
-        var baseUrl = _options.GraphApiBaseUrl.TrimEnd('/');
+        var baseUrl = _options.GetVersionedGraphApiBaseUrl();
         var path = eventType == "delete"
             ? $"{baseUrl}/{Uri.EscapeDataString(metaProductId ?? throw new InvalidOperationException("The Meta product ID is required to delete a remote catalog product."))}"
             : $"{baseUrl}/{Uri.EscapeDataString(catalogId)}/products";
@@ -1572,7 +1607,10 @@ public sealed class MetaCatalogSyncService(
             ["availability"] = product.IsActive && product.IsAvailable ? "in stock" : "out of stock",
             ["condition"] = "new",
             ["price"] = ToMetaMinorUnits(product.Price),
-            ["currency"] = NormalizeCurrency(_options.Currency),
+            // The restaurant menu is authoritative. Older queued snapshots did
+            // not have a currency field, so retain the configured fallback only
+            // while those durable rows are drained after deployment.
+            ["currency"] = NormalizeCurrency(product.Currency ?? _options.Currency),
             // Meta's catalog products edge supports retailer-ID upsert, letting
             // a durable update retry succeed even when a prior response was lost.
             ["allow_upsert"] = "true",
@@ -1732,6 +1770,7 @@ public sealed class MetaCatalogSyncService(
         string Name,
         string? Description,
         decimal Price,
+        string? Currency,
         string? ImageUrl,
         string? CategoryName,
         bool IsActive,
@@ -1747,7 +1786,8 @@ public sealed class MetaCatalogSyncService(
                 product.MetaProductId,
                 product.Name,
                 product.Description,
-                product.Price,
+                product.DiscountPrice ?? product.Price,
+                product.Currency,
                 product.ImageUrl,
                 product.Category?.Name,
                 product.IsActive && (product.Category?.IsActive ?? true),

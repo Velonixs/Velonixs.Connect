@@ -10,6 +10,7 @@ namespace Velonixs.Connect.Api.Controllers;
 [Authorize(Roles = AppRoles.PlatformAdmin)]
 public sealed class MetaCatalogSyncController(
     IMetaCatalogSyncService syncService,
+    IMetaCatalogService metaCatalogService,
     ApiBusinessAccessService access) : ControllerBase
 {
     [HttpGet("api/businesses/{businessId:guid}/meta-sync/settings")]
@@ -70,6 +71,32 @@ public sealed class MetaCatalogSyncController(
 
         var count = await syncService.QueueAllProductsAsync(businessId, cancellationToken);
         return Ok(new { queued = count });
+    }
+
+    public sealed record CreateCatalogInput(string Name);
+
+    [HttpPost("api/businesses/{businessId:guid}/meta-sync/create-catalog")]
+    public async Task<IActionResult> CreateCatalog(Guid businessId, [FromBody] CreateCatalogInput input, CancellationToken cancellationToken)
+    {
+        if (!access.CanManageMetaCatalog(businessId))
+        {
+            return Forbid();
+        }
+
+        if (string.IsNullOrWhiteSpace(input?.Name))
+        {
+            return BadRequest("Name is required.");
+        }
+
+        try
+        {
+            var catalogId = await metaCatalogService.CreateCatalogAsync(businessId, input.Name, cancellationToken);
+            return Ok(new { catalogId });
+        }
+        catch (InvalidOperationException ex)
+        {
+            return BadRequest(new { error = ex.Message });
+        }
     }
 
     [HttpPost("api/businesses/{businessId:guid}/meta-sync/queue/{id:guid}/retry")]

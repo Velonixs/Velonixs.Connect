@@ -455,9 +455,25 @@ namespace Velonixs.Connect.Persistence.Persistence.Migrations
                     b.Property<Guid>("CategoryId")
                         .HasColumnType("uniqueidentifier");
 
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("datetimeoffset")
+                        .HasDefaultValueSql("SYSUTCDATETIME()");
+
+                    b.Property<string>("Currency")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(3)
+                        .HasColumnType("nvarchar(3)")
+                        .HasDefaultValue("INR");
+
                     b.Property<string>("Description")
                         .HasMaxLength(1000)
                         .HasColumnType("nvarchar(1000)");
+
+                    b.Property<decimal?>("DiscountPrice")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("decimal(18,2)");
 
                     b.Property<string>("ImageUrl")
                         .HasMaxLength(1000)
@@ -469,11 +485,25 @@ namespace Velonixs.Connect.Persistence.Persistence.Migrations
                     b.Property<bool>("IsAvailable")
                         .HasColumnType("bit");
 
+                    b.Property<bool>("IsVegetarian")
+                        .HasColumnType("bit");
+
                     b.Property<int>("ItemCode")
                         .HasColumnType("int");
 
+                    b.Property<string>("LastSyncError")
+                        .HasMaxLength(1000)
+                        .HasColumnType("nvarchar(1000)");
+
+                    b.Property<DateTimeOffset?>("LastSyncedAt")
+                        .HasColumnType("datetimeoffset");
+
                     b.Property<Guid?>("MasterMenuItemId")
                         .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("MetaCatalogId")
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
 
                     b.Property<string>("MetaProductId")
                         .HasMaxLength(200)
@@ -483,6 +513,9 @@ namespace Velonixs.Connect.Persistence.Persistence.Migrations
                         .IsRequired()
                         .HasMaxLength(200)
                         .HasColumnType("nvarchar(200)");
+
+                    b.Property<int?>("PreparationTimeMinutes")
+                        .HasColumnType("int");
 
                     b.Property<decimal>("Price")
                         .HasPrecision(18, 2)
@@ -495,12 +528,20 @@ namespace Velonixs.Connect.Persistence.Persistence.Migrations
                     b.Property<Guid>("RestaurantId")
                         .HasColumnType("uniqueidentifier");
 
+                    b.Property<int>("RetryCount")
+                        .HasColumnType("int");
+
                     b.Property<string>("SyncStatus")
                         .IsRequired()
                         .ValueGeneratedOnAdd()
                         .HasMaxLength(20)
                         .HasColumnType("nvarchar(20)")
                         .HasDefaultValue("NotQueued");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("datetimeoffset")
+                        .HasDefaultValueSql("SYSUTCDATETIME()");
 
                     b.HasKey("Id");
 
@@ -588,8 +629,24 @@ namespace Velonixs.Connect.Persistence.Persistence.Migrations
                     b.Property<DateTimeOffset>("CreatedAt")
                         .HasColumnType("datetimeoffset");
 
+                    b.Property<string>("CredentialReference")
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
+
+                    b.Property<bool>("IsCartEnabled")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bit")
+                        .HasDefaultValue(true);
+
                     b.Property<bool>("IsEnabled")
                         .HasColumnType("bit");
+
+                    b.Property<DateTimeOffset?>("LastSuccessfulSyncAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<string>("MetaBusinessId")
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
 
                     b.Property<string>("PhoneNumberId")
                         .HasMaxLength(100)
@@ -644,6 +701,13 @@ namespace Velonixs.Connect.Persistence.Persistence.Migrations
                     b.Property<DateTimeOffset>("CreatedAt")
                         .HasColumnType("datetimeoffset");
 
+                    b.Property<string>("Currency")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(3)
+                        .HasColumnType("nvarchar(3)")
+                        .HasDefaultValue("INR");
+
                     b.Property<Guid>("CustomerId")
                         .HasColumnType("uniqueidentifier");
 
@@ -657,6 +721,10 @@ namespace Velonixs.Connect.Persistence.Persistence.Migrations
 
                     b.Property<int?>("EstimatedMinutes")
                         .HasColumnType("int");
+
+                    b.Property<string>("ExternalWhatsAppMessageId")
+                        .HasMaxLength(512)
+                        .HasColumnType("nvarchar(512)");
 
                     b.Property<string>("OrderNumber")
                         .IsRequired()
@@ -699,6 +767,10 @@ namespace Velonixs.Connect.Persistence.Persistence.Migrations
 
                     b.HasIndex("CustomerId");
 
+                    b.HasIndex("ExternalWhatsAppMessageId")
+                        .IsUnique()
+                        .HasFilter("[ExternalWhatsAppMessageId] IS NOT NULL");
+
                     b.HasIndex("OrderNumber")
                         .IsUnique();
 
@@ -712,6 +784,10 @@ namespace Velonixs.Connect.Persistence.Persistence.Migrations
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("CustomerInstructions")
+                        .HasMaxLength(1000)
+                        .HasColumnType("nvarchar(1000)");
 
                     b.Property<string>("ItemName")
                         .IsRequired()
@@ -727,6 +803,10 @@ namespace Velonixs.Connect.Persistence.Persistence.Migrations
 
                     b.Property<Guid>("OrderId")
                         .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("ProductRetailerId")
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
 
                     b.Property<int>("Quantity")
                         .HasColumnType("int");

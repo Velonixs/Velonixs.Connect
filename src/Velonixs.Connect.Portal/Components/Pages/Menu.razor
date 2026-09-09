@@ -2,6 +2,8 @@
 @attribute [Authorize(Roles = AppRoles.PortalRoles)]
 @inject IRestaurantService RestaurantService
 @inject IMenuService MenuService
+@inject IWhatsAppCatalogService WhatsAppCatalogService
+@inject IWhatsAppCommerceService WhatsAppCommerceService
 
 <PageTitle>Menu | Velonixs Connect</PageTitle>
 
@@ -45,6 +47,67 @@ else if (_restaurant is not null)
 
     @if (CanManage)
     {
+        <section class="portal-blazor-surface portal-blazor-form-surface">
+            <div class="portal-blazor-surface-head">
+                <div>
+                    <p class="portal-blazor-eyebrow">Native WhatsApp catalog</p>
+                    <h2>Catalog readiness</h2>
+                </div>
+                <div class="d-flex align-items-center gap-2">
+                    @if (_catalogDiagnostics is not null)
+                    {
+                        <span class="portal-blazor-status @(_catalogDiagnostics.IsReady ? "portal-blazor-status-good" : "portal-blazor-status-warning")">
+                            @(_catalogDiagnostics.IsReady ? "Ready to test" : "Setup required")
+                        </span>
+                    }
+                    <button class="btn btn-sm btn-outline-primary" @onclick="LoadCatalogDiagnosticsAsync" disabled="@_loadingCatalogDiagnostics">
+                        @(_loadingCatalogDiagnostics ? "Checking..." : "Check readiness")
+                    </button>
+                </div>
+            </div>
+
+            @if (!string.IsNullOrWhiteSpace(_catalogDiagnosticsError))
+            {
+                <div class="portal-blazor-notice portal-blazor-notice-error">
+                    @_catalogDiagnosticsError
+                </div>
+            }
+            else if (_catalogDiagnostics is null)
+            {
+                <div class="portal-blazor-empty">Catalog readiness has not been checked yet.</div>
+            }
+            else if (_catalogDiagnostics.IsReady)
+            {
+                <div class="portal-blazor-notice portal-blazor-notice-success">
+                    The catalog, WhatsApp phone connection, visibility, and cart are ready for a native catalog test.
+                </div>
+            }
+            else
+            {
+                <div class="portal-blazor-notice portal-blazor-notice-error">
+                    <p class="mb-2">Complete the following before sending a test catalog:</p>
+                    <ul class="mb-0">
+                        @foreach (var issue in _catalogDiagnostics.Issues)
+                        {
+                            <li>@issue</li>
+                        }
+                    </ul>
+                </div>
+            }
+
+            <form class="portal-blazor-form-grid" @onsubmit="SendTestCatalogAsync" @onsubmit:preventDefault>
+                <label class="portal-blazor-form-span-2">
+                    <span>Test WhatsApp number <span class="required-marker" aria-hidden="true">*</span></span>
+                    <input class="form-control" type="tel" autocomplete="tel" @bind="_testPhoneNumber" placeholder="For example, +919876543210" required />
+                </label>
+                <div class="portal-blazor-form-action">
+                    <button type="submit" class="btn btn-primary" disabled="@_sendingTestCatalog">
+                        @(_sendingTestCatalog ? "Sending..." : "Send test catalog")
+                    </button>
+                </div>
+            </form>
+        </section>
+
         <section class="portal-blazor-surface portal-blazor-form-surface">
             <div class="portal-blazor-surface-head">
                 <div>
@@ -227,11 +290,16 @@ else if (_restaurant is not null)
     private IReadOnlyCollection<MasterMenuItemResponse> _masterItems = Array.Empty<MasterMenuItemResponse>();
     private CategoryDraft _newCategory = new();
     private MenuItemDraft _newItem = new();
+    private WhatsAppCommerceDiagnostics? _catalogDiagnostics;
     private Guid? _businessId;
+    private bool _loadingCatalogDiagnostics;
     private bool _loading = true;
     private bool _messageIsError;
+    private bool _sendingTestCatalog;
+    private string? _catalogDiagnosticsError;
     private string? _error;
     private string? _message;
+    private string _testPhoneNumber = string.Empty;
 
     private bool CanManage { get; set; }
 
@@ -241,6 +309,8 @@ else if (_restaurant is not null)
     {
         _loading = true;
         _error = null;
+        _catalogDiagnostics = null;
+        _catalogDiagnosticsError = null;
 
         try
         {
@@ -279,6 +349,8 @@ else if (_restaurant is not null)
                 IsActive = true,
                 IsAvailable = true
             };
+
+            await LoadCatalogDiagnosticsAsync();
         }
         catch (Exception)
         {
@@ -287,6 +359,81 @@ else if (_restaurant is not null)
         finally
         {
             _loading = false;
+        }
+    }
+
+    private async Task LoadCatalogDiagnosticsAsync()
+    {
+        if (!CanManage || _businessId is null)
+        {
+            return;
+        }
+
+        _loadingCatalogDiagnostics = true;
+        _catalogDiagnosticsError = null;
+
+        try
+        {
+            _catalogDiagnostics = await WhatsAppCommerceService.ValidateCatalogConnectionAsync(_businessId.Value);
+        }
+        catch (Exception)
+        {
+            _catalogDiagnostics = null;
+            _catalogDiagnosticsError = "Catalog readiness could not be checked. Please try again.";
+        }
+        finally
+        {
+            _loadingCatalogDiagnostics = false;
+        }
+    }
+
+    private async Task SendTestCatalogAsync()
+    {
+        if (!EnsureCanManage())
+        {
+            return;
+        }
+
+        var testPhoneNumber = _testPhoneNumber.Trim();
+        if (string.IsNullOrWhiteSpace(testPhoneNumber))
+        {
+            SetMessage("Enter a WhatsApp number including its country code.", true);
+            return;
+        }
+
+        try
+        {
+            _sendingTestCatalog = true;
+            var result = await WhatsAppCatalogService.SendCatalogMessageAsync(
+                _businessId!.Value,
+                testPhoneNumber,
+                isTest: true);
+
+            if (!result.IsSuccess)
+            {
+                SetMessage(result.Error ?? "The test catalog could not be sent.", true);
+                return;
+            }
+
+            SetMessage(result.IsSkipped
+                ? "The test catalog request was skipped by the configured WhatsApp sender."
+                : $"Test catalog sent to {testPhoneNumber}.");
+        }
+        catch (ArgumentException exception)
+        {
+            SetMessage(exception.Message, true);
+        }
+        catch (InvalidOperationException exception)
+        {
+            SetMessage(exception.Message, true);
+        }
+        catch (Exception)
+        {
+            SetMessage("The test catalog could not be sent. Please try again.", true);
+        }
+        finally
+        {
+            _sendingTestCatalog = false;
         }
     }
 

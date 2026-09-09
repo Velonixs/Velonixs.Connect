@@ -2,18 +2,21 @@ using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using System.Diagnostics;
 using System.Text.Json;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Velonixs.Connect.Application.Abstractions;
 using Velonixs.Connect.Application.Models;
 using Velonixs.Connect.Infrastructure.Configuration;
+using Velonixs.Connect.Persistence.Persistence;
 
 namespace Velonixs.Connect.Infrastructure.Services;
 
 public sealed class WhatsAppCloudMessageSender(
     HttpClient httpClient,
     IOptions<WhatsAppOptions> options,
-    ILogger<WhatsAppCloudMessageSender> logger) : IWhatsAppMessageSender
+    ILogger<WhatsAppCloudMessageSender> logger,
+    RestaurantConnectDbContext dbContext) : IWhatsAppMessageSender
 {
     private readonly WhatsAppOptions _options = options.Value;
 
@@ -155,6 +158,61 @@ public sealed class WhatsAppCloudMessageSender(
         return await SendPayloadAsync(phoneNumberId, normalizedRecipientPhoneNumber, payload, bodyText, cancellationToken);
     }
 
+    public async Task<WhatsAppSendResult> SendCatalogMessageAsync(
+        string phoneNumberId,
+        string recipientPhoneNumber,
+        string bodyText,
+        string? thumbnailProductRetailerId = null,
+        string? footerText = null,
+        CancellationToken cancellationToken = default)
+    {
+        var normalizedRecipientPhoneNumber = NormalizeRecipientPhoneNumber(recipientPhoneNumber);
+        if (string.IsNullOrWhiteSpace(normalizedRecipientPhoneNumber))
+        {
+            logger.LogWarning("WhatsApp catalog-message send failed. Recipient phone number is empty.");
+            return new WhatsAppSendResult(false, false, Error: "Recipient phone number is empty.");
+        }
+
+        var action = new Dictionary<string, object?>
+        {
+            ["name"] = "catalog_message"
+        };
+        if (!string.IsNullOrWhiteSpace(thumbnailProductRetailerId))
+        {
+            action["parameters"] = new
+            {
+                thumbnail_product_retailer_id = thumbnailProductRetailerId.Trim()
+            };
+        }
+
+        var interactive = new Dictionary<string, object?>
+        {
+            ["type"] = "catalog_message",
+            ["body"] = new { text = bodyText },
+            ["action"] = action
+        };
+        if (!string.IsNullOrWhiteSpace(footerText))
+        {
+            interactive["footer"] = new { text = footerText };
+        }
+
+        var payload = new
+        {
+            messaging_product = "whatsapp",
+            recipient_type = "individual",
+            to = normalizedRecipientPhoneNumber,
+            type = "interactive",
+            interactive
+        };
+
+        return await SendPayloadAsync(
+            phoneNumberId,
+            normalizedRecipientPhoneNumber,
+            payload,
+            bodyText,
+            cancellationToken);
+    }
+
     public async Task<WhatsAppSendResult> SendMultiProductMessageAsync(
         string phoneNumberId,
         string recipientPhoneNumber,
@@ -248,7 +306,8 @@ public sealed class WhatsAppCloudMessageSender(
         string logMessage,
         CancellationToken cancellationToken)
     {
-        if (_options.DisableSending || string.IsNullOrWhiteSpace(_options.AccessToken))
+        var accessToken = await ResolveAccessTokenAsync(phoneNumberId, cancellationToken);
+        if (_options.DisableSending || string.IsNullOrWhiteSpace(accessToken))
         {
             logger.LogInformation(
                 "WhatsApp sending skipped because sending is disabled or credentials are missing.");
@@ -258,7 +317,7 @@ public sealed class WhatsAppCloudMessageSender(
 
         var requestUri = $"{_options.BaseUrl.TrimEnd('/')}/{_options.ApiVersion}/{phoneNumberId}/messages";
         using var request = new HttpRequestMessage(HttpMethod.Post, requestUri);
-        request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", _options.AccessToken);
+        request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", accessToken);
         request.Content = JsonContent.Create(payload);
 
         var stopwatch = Stopwatch.StartNew();
@@ -298,6 +357,19 @@ public sealed class WhatsAppCloudMessageSender(
         }
 
         return digits.Length == 10 ? $"91{digits}" : digits;
+    }
+
+    private async Task<string?> ResolveAccessTokenAsync(
+        string phoneNumberId,
+        CancellationToken cancellationToken)
+    {
+        var tenantToken = await dbContext.MetaCatalogSettings
+            .AsNoTracking()
+            .Where(setting => setting.IsEnabled && setting.PhoneNumberId == phoneNumberId)
+            .Select(setting => setting.AccessTokenEncrypted)
+            .FirstOrDefaultAsync(cancellationToken);
+
+        return string.IsNullOrWhiteSpace(tenantToken) ? _options.AccessToken : tenantToken;
     }
 
     private static string? ExtractProviderMessageId(string responseText)

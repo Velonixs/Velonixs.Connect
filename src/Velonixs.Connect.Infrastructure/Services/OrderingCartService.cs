@@ -14,6 +14,8 @@ public sealed class OrderingCartService
         ArgumentOutOfRangeException.ThrowIfNegativeOrZero(quantity);
 
         draft.CartId ??= Guid.NewGuid();
+        var effectivePrice = menuItem.DiscountPrice ?? menuItem.Price;
+        draft.Currency = menuItem.Currency;
 
         var existingItem = draft.Items.FirstOrDefault(x => x.MenuItemId == menuItem.Id);
         if (existingItem is null)
@@ -23,13 +25,17 @@ public sealed class OrderingCartService
                 MenuItemId = menuItem.Id,
                 ItemCode = menuItem.ItemCode,
                 ItemName = menuItem.Name,
-                UnitPrice = menuItem.Price,
+                ProductRetailerId = menuItem.ProductRetailerId,
+                UnitPrice = effectivePrice,
                 Quantity = quantity,
-                LineTotal = menuItem.Price * quantity
+                LineTotal = effectivePrice * quantity
             });
         }
         else
         {
+            existingItem.ItemName = menuItem.Name;
+            existingItem.ProductRetailerId = menuItem.ProductRetailerId;
+            existingItem.UnitPrice = effectivePrice;
             existingItem.Quantity += quantity;
             existingItem.LineTotal = existingItem.UnitPrice * existingItem.Quantity;
         }

@@ -177,13 +177,13 @@ public sealed partial class ConversationService(
         var normalized = text.ToLowerInvariant();
         var draft = ReadDraft(conversation);
 
-        if (message.OrderItems?.Count > 0)
+        if (string.Equals(message.MessageType, "order", StringComparison.OrdinalIgnoreCase))
         {
             return await AddCatalogOrderToCartAsync(
                 restaurant,
                 conversation,
                 draft,
-                message.OrderItems,
+                message,
                 cancellationToken);
         }
 
@@ -704,10 +704,15 @@ public sealed partial class ConversationService(
         string? prefix,
         CancellationToken cancellationToken)
     {
-        if (string.IsNullOrWhiteSpace(restaurant.WhatsAppCatalogId))
+        var catalogSetting = await dbContext.MetaCatalogSettings
+            .AsNoTracking()
+            .FirstOrDefaultAsync(setting => setting.BusinessId == restaurant.Id, cancellationToken);
+        if (catalogSetting is not { IsEnabled: true, IsCartEnabled: true } ||
+            string.IsNullOrWhiteSpace(catalogSetting.CatalogId) ||
+            !string.Equals(catalogSetting.CatalogId, restaurant.WhatsAppCatalogId, StringComparison.Ordinal))
         {
             logger.LogInformation(
-                "WhatsApp catalog menu skipped for restaurant {RestaurantId} because no catalog id is configured.",
+                "WhatsApp catalog menu skipped for restaurant {RestaurantId} because the catalog/cart connection is incomplete.",
                 restaurant.Id);
             return null;
         }
@@ -776,16 +781,6 @@ public sealed partial class ConversationService(
                     .ThenBy(item => item.Name)
                     .ToArray()))
             .ToArray();
-        var sections = WhatsAppOrderingMessageBuilder.BuildProductListSections(categoryGroups);
-
-        if (sections.Count == 0)
-        {
-            logger.LogInformation(
-                "WhatsApp catalog menu skipped for restaurant {RestaurantId} because no product-list sections could be built.",
-                restaurant.Id);
-            return null;
-        }
-
         draft.CurrentRestaurantId = restaurant.Id;
         draft.CurrentCategoryId = null;
         draft.CurrentMenuPage = 0;
@@ -801,85 +796,147 @@ public sealed partial class ConversationService(
         conversation.CurrentState = ConversationStates.ItemSelection;
 
         var body = string.IsNullOrWhiteSpace(prefix)
-            ? "Browse products, add items to your WhatsApp cart, then send the cart here."
-            : $"{prefix.Trim()}\n\nBrowse products, add items to your WhatsApp cart, then send the cart here.";
-        var footer = items.Length > WhatsAppOrderingMessageBuilder.ProductListItemLimit
-            ? "Showing first 30 products. Type an item name to search."
-            : "Only active and in-stock products are shown.";
+            ? $"Welcome to {restaurant.Name}!\n\nBrowse our restaurant menu and order directly from WhatsApp."
+            : $"{prefix.Trim()}\n\nBrowse our restaurant menu and order directly from WhatsApp.";
 
-        return OutgoingReply.ProductList(
-            restaurant.WhatsAppCatalogId,
-            "Menu",
+        return OutgoingReply.CatalogMessage(
             body,
-            sections,
-            footer);
+            items[0].ProductRetailerId!,
+            "Add products to the native cart and send the complete cart when ready.");
     }
 
     private async Task<OutgoingReply> AddCatalogOrderToCartAsync(
         Domain.Entities.Restaurant restaurant,
         Conversation conversation,
         PendingOrderDraft draft,
-        IReadOnlyCollection<IncomingWhatsAppOrderItem> orderItems,
+        IncomingWhatsAppMessage message,
         CancellationToken cancellationToken)
     {
+        var orderItems = message.OrderItems ?? Array.Empty<IncomingWhatsAppOrderItem>();
+        if (string.IsNullOrWhiteSpace(message.OrderCatalogId) ||
+            string.IsNullOrWhiteSpace(restaurant.WhatsAppCatalogId) ||
+            !string.Equals(message.OrderCatalogId.Trim(), restaurant.WhatsAppCatalogId, StringComparison.Ordinal))
+        {
+            return OutgoingReply.TextOnly(
+                "This cart does not belong to the restaurant catalog connected to this WhatsApp number. Please reopen the catalog and send the cart again.");
+        }
+
+        if (orderItems.Count == 0 ||
+            orderItems.Any(item => string.IsNullOrWhiteSpace(item.ProductRetailerId) || item.Quantity is <= 0 or > 100))
+        {
+            return OutgoingReply.TextOnly(
+                "I could not read every item quantity in your WhatsApp cart. Quantities must be between 1 and 100. Please update the cart and send it again.");
+        }
+
+        var groupedOrderItems = orderItems
+            .GroupBy(item => item.ProductRetailerId.Trim(), StringComparer.OrdinalIgnoreCase)
+            .Select(group => new
+            {
+                ProductRetailerId = group.Key,
+                Quantity = group.Sum(item => (long)item.Quantity),
+                SubmittedPrice = group.Select(item => item.ItemPrice).FirstOrDefault(price => price.HasValue),
+                SubmittedCurrency = group.Select(item => item.Currency).FirstOrDefault(currency => !string.IsNullOrWhiteSpace(currency))
+            })
+            .ToArray();
+        if (groupedOrderItems.Any(item => item.Quantity is <= 0 or > 100))
+        {
+            return OutgoingReply.TextOnly(
+                "A product quantity in your WhatsApp cart exceeds the maximum of 100. Please reduce it and send the cart again.");
+        }
+
         var productRetailerIds = orderItems
-            .Where(item => !string.IsNullOrWhiteSpace(item.ProductRetailerId) && item.Quantity > 0)
             .Select(item => item.ProductRetailerId.Trim())
             .Distinct(StringComparer.OrdinalIgnoreCase)
             .ToArray();
 
-        if (productRetailerIds.Length == 0)
-        {
-            return OutgoingReply.TextOnly(
-                "I could not read the items from your WhatsApp cart. Please open the menu and try again.");
-        }
-
         var menuItems = await dbContext.MenuItems
             .AsNoTracking()
             .Where(item => item.RestaurantId == restaurant.Id &&
-                           item.IsActive &&
-                           item.IsAvailable &&
-                           item.Category.IsActive &&
                            item.ProductRetailerId != null &&
-                           item.SyncStatus == "Synced" &&
-                           item.MetaProductId != null &&
-                           item.MetaProductId != string.Empty &&
                            productRetailerIds.Contains(item.ProductRetailerId))
+            .Include(item => item.Category)
             .ToArrayAsync(cancellationToken);
         var menuItemByRetailerId = menuItems
             .Where(item => !string.IsNullOrWhiteSpace(item.ProductRetailerId))
             .GroupBy(item => item.ProductRetailerId!, StringComparer.OrdinalIgnoreCase)
             .ToDictionary(group => group.Key, group => group.First(), StringComparer.OrdinalIgnoreCase);
-        var addedCount = 0;
 
-        foreach (var orderItem in orderItems.Where(item => item.Quantity > 0))
+        var unknownProducts = groupedOrderItems
+            .Where(item => !menuItemByRetailerId.ContainsKey(item.ProductRetailerId))
+            .Select(item => item.ProductRetailerId)
+            .ToArray();
+        if (unknownProducts.Length > 0)
         {
-            if (!menuItemByRetailerId.TryGetValue(orderItem.ProductRetailerId.Trim(), out var menuItem))
+            return OutgoingReply.TextOnly(
+                $"Some cart products are not recognized for this restaurant: {string.Join(", ", unknownProducts)}. Please reopen the catalog and send the cart again.");
+        }
+
+        var unavailableProducts = groupedOrderItems
+            .Select(item => menuItemByRetailerId[item.ProductRetailerId])
+            .Where(item => !item.IsActive || !item.IsAvailable || !item.Category.IsActive)
+            .Select(item => item.Name)
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToArray();
+        if (unavailableProducts.Length > 0)
+        {
+            return OutgoingReply.TextOnly(
+                $"Sorry, {string.Join(", ", unavailableProducts)} {(unavailableProducts.Length == 1 ? "is" : "are")} currently sold out or unavailable. Please update your cart and send the order again.");
+        }
+
+        var currencies = groupedOrderItems
+            .Select(item => menuItemByRetailerId[item.ProductRetailerId].Currency)
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToArray();
+        if (currencies.Length != 1)
+        {
+            return OutgoingReply.TextOnly(
+                "The cart contains products with incompatible currencies. Please contact the restaurant before ordering.");
+        }
+
+        // A native cart submission represents the complete cart. Replace any
+        // prior conversational draft instead of accidentally merging two carts.
+        draft.Items.Clear();
+        draft.CartId = Guid.NewGuid();
+        var priceChanges = new List<string>();
+
+        foreach (var orderItem in groupedOrderItems)
+        {
+            var menuItem = menuItemByRetailerId[orderItem.ProductRetailerId];
+            var authoritativePrice = menuItem.DiscountPrice ?? menuItem.Price;
+            var submittedCurrency = orderItem.SubmittedCurrency?.Trim();
+            if (orderItem.SubmittedPrice.HasValue &&
+                (orderItem.SubmittedPrice.Value != authoritativePrice ||
+                 (!string.IsNullOrWhiteSpace(submittedCurrency) &&
+                  !string.Equals(submittedCurrency, menuItem.Currency, StringComparison.OrdinalIgnoreCase))))
             {
-                continue;
+                priceChanges.Add($"{menuItem.Name}: now {menuItem.Currency} {authoritativePrice:0.##}");
             }
 
             cartService.AddOrUpdate(
                 draft,
                 menuItem,
-                Math.Clamp(orderItem.Quantity, 1, 100),
+                checked((int)orderItem.Quantity),
                 restaurant.CgstPercent,
                 restaurant.SgstPercent);
-            addedCount++;
-        }
-
-        if (addedCount == 0)
-        {
-            return OutgoingReply.TextOnly(
-                "Those catalog products are not available in this restaurant menu right now. Please browse the menu again.");
         }
 
         draft.CurrentRestaurantId = restaurant.Id;
         draft.CurrentStep = ConversationStates.CartReview;
+        draft.ExternalWhatsAppMessageId = string.IsNullOrWhiteSpace(message.WhatsAppMessageId)
+            ? null
+            : message.WhatsAppMessageId.Trim();
+        draft.CatalogId = message.OrderCatalogId.Trim();
         SaveDraft(conversation, draft);
         conversation.CurrentState = ConversationStates.CartReview;
 
-        return BuildCartReply(conversation, draft);
+        if (priceChanges.Count == 0)
+        {
+            return BuildCartReply(conversation, draft);
+        }
+
+        return OutgoingReply.ButtonReply(
+            $"A catalog price changed before your cart arrived. Velonixs recalculated the cart from the restaurant's current menu:\n- {string.Join("\n- ", priceChanges)}\n\n{MenuTextFormatter.BuildCartSummary(draft)}\n\nReview the updated total before checkout.",
+            WhatsAppOrderingMessageBuilder.BuildCartButtons());
     }
 
     private async Task<OutgoingReply> BuildCategoryReplyAsync(
@@ -1268,6 +1325,37 @@ public sealed partial class ConversationService(
             return "Your cart is currently empty.\n\nSelect an item from the menu to begin your order.";
         }
 
+        var revalidation = await RevalidateDraftAsync(restaurant, draft, cancellationToken);
+        if (revalidation.UnavailableItems.Count > 0)
+        {
+            ResetDraft(conversation);
+            return $"Sorry, {string.Join(", ", revalidation.UnavailableItems)} {(revalidation.UnavailableItems.Count == 1 ? "is" : "are")} now sold out or unavailable. Please update your cart and send the order again.";
+        }
+
+        if (revalidation.PriceChanges.Count > 0)
+        {
+            SaveDraft(conversation, draft);
+            conversation.CurrentState = ConversationStates.ConfirmationPending;
+            return $"A price changed while you were checking out:\n- {string.Join("\n- ", revalidation.PriceChanges)}\n\n{MenuTextFormatter.BuildFinalConfirmation(draft)}\n\nPlease review the new total and confirm again.";
+        }
+
+        if (!string.IsNullOrWhiteSpace(draft.ExternalWhatsAppMessageId))
+        {
+            var existingOrder = await dbContext.Orders
+                .AsNoTracking()
+                .FirstOrDefaultAsync(
+                    order => order.ExternalWhatsAppMessageId == draft.ExternalWhatsAppMessageId,
+                    cancellationToken);
+            if (existingOrder is not null)
+            {
+                ResetDraft(conversation);
+                return MenuTextFormatter.BuildOrderReceived(
+                    existingOrder.OrderNumber,
+                    existingOrder.CustomerName,
+                    restaurant.Name);
+            }
+        }
+
         var order = new Order
         {
             OrderNumber = await GenerateOrderNumberAsync(cancellationToken),
@@ -1277,13 +1365,17 @@ public sealed partial class ConversationService(
             CustomerPhone = customer.PhoneNumber,
             Address = draft.IsPickup ? "Pickup" : draft.Address ?? "Pickup",
             OrderStatus = OrderStatuses.PendingConfirmation,
-            Source = OrderSources.WhatsApp,
             SubTotalAmount = draft.SubTotalAmount,
             CgstPercent = draft.CgstPercent,
             CgstAmount = draft.CgstAmount,
             SgstPercent = draft.SgstPercent,
             SgstAmount = draft.SgstAmount,
-            TotalAmount = draft.TotalAmount
+            TotalAmount = draft.TotalAmount,
+            Currency = draft.Currency,
+            ExternalWhatsAppMessageId = draft.ExternalWhatsAppMessageId,
+            Source = string.IsNullOrWhiteSpace(draft.ExternalWhatsAppMessageId)
+                ? OrderSources.WhatsApp
+                : OrderSources.WhatsAppCatalog
         };
 
         foreach (var item in draft.Items)
@@ -1291,6 +1383,7 @@ public sealed partial class ConversationService(
             order.Items.Add(new OrderItem
             {
                 MenuItemId = item.MenuItemId,
+                ProductRetailerId = item.ProductRetailerId,
                 ItemName = item.ItemName,
                 UnitPrice = item.UnitPrice,
                 Quantity = item.Quantity,
@@ -1311,7 +1404,28 @@ public sealed partial class ConversationService(
         conversation.CurrentState = ConversationStates.Confirmed;
         conversation.IsActive = false;
         conversation.TempOrderJson = null;
-        await dbContext.SaveChangesAsync(cancellationToken);
+        try
+        {
+            await dbContext.SaveChangesAsync(cancellationToken);
+        }
+        catch (DbUpdateException) when (!string.IsNullOrWhiteSpace(order.ExternalWhatsAppMessageId))
+        {
+            dbContext.ChangeTracker.Clear();
+            var existingOrder = await dbContext.Orders
+                .AsNoTracking()
+                .FirstOrDefaultAsync(
+                    existing => existing.ExternalWhatsAppMessageId == order.ExternalWhatsAppMessageId,
+                    cancellationToken);
+            if (existingOrder is null)
+            {
+                throw;
+            }
+
+            return MenuTextFormatter.BuildOrderReceived(
+                existingOrder.OrderNumber,
+                existingOrder.CustomerName,
+                restaurant.Name);
+        }
 
         try
         {
@@ -1332,6 +1446,59 @@ public sealed partial class ConversationService(
             order.OrderNumber,
             order.CustomerName,
             restaurant.Name);
+    }
+
+    private async Task<CatalogDraftRevalidation> RevalidateDraftAsync(
+        Domain.Entities.Restaurant restaurant,
+        PendingOrderDraft draft,
+        CancellationToken cancellationToken)
+    {
+        var itemIds = draft.Items.Select(item => item.MenuItemId).Distinct().ToArray();
+        var currentItems = await dbContext.MenuItems
+            .AsNoTracking()
+            .Include(item => item.Category)
+            .Where(item => item.RestaurantId == restaurant.Id && itemIds.Contains(item.Id))
+            .ToArrayAsync(cancellationToken);
+        var currentById = currentItems.ToDictionary(item => item.Id);
+        var unavailable = new List<string>();
+        var priceChanges = new List<string>();
+
+        foreach (var draftItem in draft.Items)
+        {
+            if (!currentById.TryGetValue(draftItem.MenuItemId, out var currentItem))
+            {
+                unavailable.Add(draftItem.ItemName);
+                continue;
+            }
+
+            if (!currentItem.IsActive || !currentItem.IsAvailable || !currentItem.Category.IsActive)
+            {
+                unavailable.Add(currentItem.Name);
+                continue;
+            }
+
+            var currentPrice = currentItem.DiscountPrice ?? currentItem.Price;
+            if (draftItem.UnitPrice != currentPrice ||
+                !string.Equals(draft.Currency, currentItem.Currency, StringComparison.OrdinalIgnoreCase))
+            {
+                priceChanges.Add($"{currentItem.Name}: now {currentItem.Currency} {currentPrice:0.##}");
+            }
+
+            draftItem.ItemName = currentItem.Name;
+            draftItem.ProductRetailerId = currentItem.ProductRetailerId;
+            draftItem.UnitPrice = currentPrice;
+            draftItem.LineTotal = currentPrice * draftItem.Quantity;
+            draft.Currency = currentItem.Currency;
+        }
+
+        if (unavailable.Count == 0)
+        {
+            cartService.RecalculateTotals(draft, restaurant.CgstPercent, restaurant.SgstPercent);
+        }
+
+        return new CatalogDraftRevalidation(
+            unavailable.Distinct(StringComparer.OrdinalIgnoreCase).ToArray(),
+            priceChanges.Distinct(StringComparer.OrdinalIgnoreCase).ToArray());
     }
 
     private async Task<OutgoingReply> BuildFullMenuReplyAsync(
@@ -1430,6 +1597,33 @@ public sealed partial class ConversationService(
         OutgoingReply reply,
         CancellationToken cancellationToken)
     {
+        if (reply.IsCatalogMessage)
+        {
+            var catalogResult = await whatsAppMessageSender.SendCatalogMessageAsync(
+                restaurant.WhatsAppPhoneNumberId,
+                customer.PhoneNumber,
+                reply.Text,
+                reply.ThumbnailProductRetailerId,
+                reply.FooterText,
+                cancellationToken);
+
+            if (catalogResult.IsSuccess)
+            {
+                return catalogResult;
+            }
+
+            logger.LogWarning(
+                "WhatsApp catalog-message send failed for customer {CustomerId}. Falling back to text. Error={Error}",
+                customer.Id,
+                catalogResult.Error);
+
+            return await whatsAppMessageSender.SendTextMessageAsync(
+                restaurant.WhatsAppPhoneNumberId,
+                customer.PhoneNumber,
+                BuildFallbackText(reply),
+                cancellationToken);
+        }
+
         if (reply.ProductSections.Count > 0 && !string.IsNullOrWhiteSpace(reply.CatalogId))
         {
             var productResult = await whatsAppMessageSender.SendMultiProductMessageAsync(
@@ -1722,6 +1916,10 @@ public sealed partial class ConversationService(
     [GeneratedRegex(@"^(?<code>\d+)\s*(?:x|-)\s*(?<quantity>\d+)$", RegexOptions.IgnoreCase)]
     private static partial Regex LegacyOrderLineRegex();
 
+    private sealed record CatalogDraftRevalidation(
+        IReadOnlyCollection<string> UnavailableItems,
+        IReadOnlyCollection<string> PriceChanges);
+
     private sealed record OutgoingReply(
         string Text,
         IReadOnlyCollection<WhatsAppInteractiveListSection> Sections,
@@ -1730,7 +1928,9 @@ public sealed partial class ConversationService(
         string? ButtonText = null,
         string? FooterText = null,
         string? CatalogId = null,
-        string? HeaderText = null)
+        string? HeaderText = null,
+        bool IsCatalogMessage = false,
+        string? ThumbnailProductRetailerId = null)
     {
         public static OutgoingReply TextOnly(string text) =>
             new(
@@ -1777,5 +1977,18 @@ public sealed partial class ConversationService(
                 FooterText: footerText,
                 CatalogId: catalogId,
                 HeaderText: headerText);
+
+        public static OutgoingReply CatalogMessage(
+            string text,
+            string thumbnailProductRetailerId,
+            string? footerText = null) =>
+            new(
+                text,
+                Array.Empty<WhatsAppInteractiveListSection>(),
+                Array.Empty<WhatsAppReplyButton>(),
+                Array.Empty<WhatsAppProductListSection>(),
+                FooterText: footerText,
+                IsCatalogMessage: true,
+                ThumbnailProductRetailerId: thumbnailProductRetailerId);
     }
 }

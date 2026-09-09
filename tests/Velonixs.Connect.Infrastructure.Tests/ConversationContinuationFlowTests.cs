@@ -98,7 +98,7 @@ public sealed class ConversationContinuationFlowTests
     }
 
     [Fact]
-    public async Task Greeting_WithCatalogConfiguration_SendsProductList()
+    public async Task Greeting_WithCatalogConfiguration_SendsNativeCatalogMessage()
     {
         await using var dbContext = CreateDbContext();
         var restaurant = new Restaurant
@@ -118,7 +118,18 @@ public sealed class ConversationContinuationFlowTests
         item.MetaProductId = "meta-paneer-pizza";
         item.SyncStatus = "Synced";
 
-        dbContext.AddRange(restaurant, category, item);
+        dbContext.AddRange(
+            restaurant,
+            category,
+            item,
+            new MetaCatalogSetting
+            {
+                BusinessId = restaurant.Id,
+                CatalogId = "catalog-id",
+                PhoneNumberId = "phone-id",
+                IsEnabled = true,
+                IsCartEnabled = true
+            });
         await dbContext.SaveChangesAsync();
 
         var sender = new FakeMessageSender();
@@ -126,12 +137,10 @@ public sealed class ConversationContinuationFlowTests
 
         var greeting = await Send(service, "Hi");
 
-        Assert.Contains("Browse products", greeting.ReplyText);
-        Assert.Equal(1, sender.MultiProductSendCount);
-        Assert.Equal("catalog-id", sender.LastCatalogId);
-        var section = Assert.Single(sender.LastProductSections);
-        Assert.Equal("Pizza", section.Title);
-        Assert.Equal("paneer-pizza", section.Items.Single().ProductRetailerId);
+        Assert.Contains("Browse our restaurant menu", greeting.ReplyText);
+        Assert.Equal(1, sender.CatalogMessageSendCount);
+        Assert.Equal("paneer-pizza", sender.LastCatalogThumbnailProductRetailerId);
+        Assert.Equal(0, sender.MultiProductSendCount);
         Assert.Empty(sender.LastButtons);
         Assert.Empty(sender.LastSections);
     }
@@ -171,7 +180,9 @@ public sealed class ConversationContinuationFlowTests
                 Guid.NewGuid().ToString("N"),
                 "Customer",
                 DateTimeOffset.UtcNow,
-                new[] { new IncomingWhatsAppOrderItem("paneer-pizza", 3) }));
+                new[] { new IncomingWhatsAppOrderItem("paneer-pizza", 3) },
+                "catalog-id",
+                "order"));
 
         Assert.Contains("Paneer Pizza", result.ReplyText);
         Assert.Contains("Rs 747", result.ReplyText);
@@ -201,7 +212,18 @@ public sealed class ConversationContinuationFlowTests
         item.MetaProductId = "meta-paneer-pizza";
         item.SyncStatus = "Synced";
 
-        dbContext.AddRange(restaurant, category, item);
+        dbContext.AddRange(
+            restaurant,
+            category,
+            item,
+            new MetaCatalogSetting
+            {
+                BusinessId = restaurant.Id,
+                CatalogId = "catalog-id",
+                PhoneNumberId = "phone-id",
+                IsEnabled = true,
+                IsCartEnabled = true
+            });
         await dbContext.SaveChangesAsync();
 
         var service = CreateService(dbContext, new FakeMessageSender());
@@ -213,9 +235,11 @@ public sealed class ConversationContinuationFlowTests
                 Guid.NewGuid().ToString("N"),
                 "Customer",
                 DateTimeOffset.UtcNow,
-                new[] { new IncomingWhatsAppOrderItem("paneer-pizza", 1) }));
+                new[] { new IncomingWhatsAppOrderItem("paneer-pizza", 1) },
+                "catalog-id",
+                "order"));
 
-        Assert.Contains("not available", result.ReplyText, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("unavailable", result.ReplyText, StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]
@@ -692,8 +716,10 @@ public sealed class ConversationContinuationFlowTests
         public int InteractiveListSendCount { get; private set; }
         public int ReplyButtonSendCount { get; private set; }
         public int MultiProductSendCount { get; private set; }
+        public int CatalogMessageSendCount { get; private set; }
         public List<string> TextMessages { get; } = new();
         public string? LastCatalogId { get; private set; }
+        public string? LastCatalogThumbnailProductRetailerId { get; private set; }
         public string? LastButtonBodyText { get; private set; }
         public string? LastButtonText { get; private set; }
         public string? LastFooterText { get; private set; }
@@ -762,6 +788,26 @@ public sealed class ConversationContinuationFlowTests
             LastCatalogId = null;
             LastProductSections = Array.Empty<WhatsAppProductListSection>();
             LastSections = Array.Empty<WhatsAppInteractiveListSection>();
+            return Task.FromResult(new WhatsAppSendResult(true, false));
+        }
+
+        public Task<WhatsAppSendResult> SendCatalogMessageAsync(
+            string phoneNumberId,
+            string recipientPhoneNumber,
+            string bodyText,
+            string? thumbnailProductRetailerId = null,
+            string? footerText = null,
+            CancellationToken cancellationToken = default)
+        {
+            CatalogMessageSendCount++;
+            LastButtonBodyText = bodyText;
+            LastButtonText = null;
+            LastFooterText = footerText;
+            LastCatalogId = null;
+            LastCatalogThumbnailProductRetailerId = thumbnailProductRetailerId;
+            LastProductSections = Array.Empty<WhatsAppProductListSection>();
+            LastSections = Array.Empty<WhatsAppInteractiveListSection>();
+            LastButtons = Array.Empty<WhatsAppReplyButton>();
             return Task.FromResult(new WhatsAppSendResult(true, false));
         }
 

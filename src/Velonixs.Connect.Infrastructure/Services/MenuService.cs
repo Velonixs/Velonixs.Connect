@@ -320,6 +320,7 @@ public sealed class MenuService(
     public async Task<MenuItemResponse> CreateItemAsync(Guid restaurantId, CreateMenuItemRequest request, CancellationToken cancellationToken = default)
     {
         ValidateMenuItemRequest(restaurantId, request.CategoryId, request.ItemCode, request.Name, request.Price);
+        ValidateCatalogFields(request.Price, request.DiscountPrice, request.Currency, request.PreparationTimeMinutes);
         var category = await dbContext.MenuCategories
             .FirstAsync(x => x.RestaurantId == restaurantId && x.Id == request.CategoryId, cancellationToken);
         var name = request.Name.Trim();
@@ -349,8 +350,12 @@ public sealed class MenuService(
             Name = name,
             Description = description,
             Price = request.Price,
+            DiscountPrice = request.DiscountPrice,
+            Currency = NormalizeCurrency(request.Currency),
             ProductRetailerId = NormalizeOptional(request.ProductRetailerId),
             ImageUrl = NormalizeOptional(request.ImageUrl),
+            IsVegetarian = request.IsVegetarian,
+            PreparationTimeMinutes = request.PreparationTimeMinutes,
             IsAvailable = request.IsAvailable,
             IsActive = request.IsActive,
             Category = category
@@ -370,6 +375,7 @@ public sealed class MenuService(
     public async Task<MenuItemResponse?> UpdateItemAsync(Guid id, UpdateMenuItemRequest request, CancellationToken cancellationToken = default)
     {
         ValidateMenuItemRequest(Guid.Empty, request.CategoryId, request.ItemCode, request.Name, request.Price, requireBusinessId: false);
+        ValidateCatalogFields(request.Price, request.DiscountPrice, request.Currency, request.PreparationTimeMinutes);
         var item = await dbContext.MenuItems
             .Include(x => x.Category)
             .FirstOrDefaultAsync(x => x.Id == id, cancellationToken);
@@ -422,8 +428,13 @@ public sealed class MenuService(
         }
 
         item.Price = request.Price;
+        item.DiscountPrice = request.DiscountPrice;
+        item.Currency = NormalizeCurrency(request.Currency);
+        item.IsVegetarian = request.IsVegetarian;
+        item.PreparationTimeMinutes = request.PreparationTimeMinutes;
         item.IsAvailable = request.IsAvailable;
         item.IsActive = request.IsActive;
+        item.UpdatedAt = DateTimeOffset.UtcNow;
 
         await SaveChangesAndQueueProductsAsync(
             [new CatalogQueueRequest(item.RestaurantId, item.Id, item.IsActive ? "update" : "delete")],
@@ -452,6 +463,7 @@ public sealed class MenuService(
         }
 
         item.IsAvailable = isAvailable;
+        item.UpdatedAt = DateTimeOffset.UtcNow;
         await SaveChangesAndQueueProductsAsync(
             [new CatalogQueueRequest(item.RestaurantId, item.Id, item.IsActive ? "update" : "delete")],
             cancellationToken);
@@ -572,11 +584,23 @@ public sealed class MenuService(
             item.ProductRetailerId,
             item.ImageUrl,
             item.MetaProductId,
-            item.SyncStatus);
+            item.SyncStatus,
+            item.DiscountPrice,
+            item.Currency,
+            item.IsVegetarian,
+            item.PreparationTimeMinutes,
+            item.MetaCatalogId,
+            item.LastSyncedAt,
+            item.LastSyncError,
+            item.RetryCount,
+            item.CreatedAt,
+            item.UpdatedAt);
     }
 
     private static string? NormalizeOptional(string? value) =>
         string.IsNullOrWhiteSpace(value) ? null : value.Trim();
+
+    private static string NormalizeCurrency(string currency) => currency.Trim().ToUpperInvariant();
 
     private static string CreateGeneratedRetailerId(Guid restaurantId, Guid itemId) =>
         $"vxc-{restaurantId:N}-{itemId:N}";
@@ -681,6 +705,34 @@ public sealed class MenuService(
         if (price < 0)
         {
             throw new ArgumentException("Product price cannot be negative.", nameof(price));
+        }
+    }
+
+    private static void ValidateCatalogFields(
+        decimal price,
+        decimal? discountPrice,
+        string? currency,
+        int? preparationTimeMinutes)
+    {
+        if (discountPrice is < 0)
+        {
+            throw new ArgumentException("Discount price cannot be negative.", nameof(discountPrice));
+        }
+
+        if (discountPrice > price)
+        {
+            throw new ArgumentException("Discount price cannot exceed the regular price.", nameof(discountPrice));
+        }
+
+        var normalizedCurrency = currency?.Trim();
+        if (normalizedCurrency is null || normalizedCurrency.Length != 3 || !normalizedCurrency.All(char.IsAsciiLetter))
+        {
+            throw new ArgumentException("Currency must be a three-letter ISO 4217 code.", nameof(currency));
+        }
+
+        if (preparationTimeMinutes is <= 0 or > 1440)
+        {
+            throw new ArgumentException("Preparation time must be between 1 and 1,440 minutes.", nameof(preparationTimeMinutes));
         }
     }
 

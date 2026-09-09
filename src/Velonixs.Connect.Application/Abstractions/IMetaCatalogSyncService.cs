@@ -28,7 +28,10 @@ public sealed record MetaCatalogSettingsInput(
     string? AccessToken,
     string? WebhookVerifyToken,
     bool IsEnabled = true,
-    string SyncMode = "default");
+    string SyncMode = "default",
+    string? MetaBusinessId = null,
+    string? CredentialReference = null,
+    bool IsCartEnabled = true);
 
 public sealed record MetaCatalogSettingsSummary(
     Guid BusinessId,
@@ -36,7 +39,11 @@ public sealed record MetaCatalogSettingsSummary(
     string? CatalogId,
     string? PhoneNumberId,
     bool IsEnabled,
-    string SyncMode);
+    string SyncMode,
+    string? MetaBusinessId = null,
+    string? CredentialReference = null,
+    bool IsCartEnabled = true,
+    DateTimeOffset? LastSuccessfulSyncAt = null);
 
 public sealed record CatalogSyncQueueSummary(
     Guid Id,

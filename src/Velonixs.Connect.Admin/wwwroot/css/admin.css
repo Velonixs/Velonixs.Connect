@@ -1,15 +1,17 @@
 :root {
-    --bg: #f6f7f4;
+    --bg: #f4f8fc;
     --surface: #ffffff;
-    --surface-2: #eef3f0;
-    --text: #202620;
-    --muted: #647067;
-    --line: #d8ded8;
-    --brand: #0f6f4f;
-    --brand-dark: #0a513a;
-    --warn: #b44718;
-    --good: #0d7a48;
-    --shadow: 0 10px 30px rgba(32, 38, 32, 0.08);
+    --surface-2: #eaf3f8;
+    --text: #102d4e;
+    --muted: #597083;
+    --line: #d2e0ea;
+    --brand: #0b52a0;
+    --brand-dark: #063875;
+    --brand-teal: #087d78;
+    --brand-green: #208541;
+    --warn: #ad4d1b;
+    --good: #168240;
+    --shadow: 0 10px 30px rgba(8, 55, 113, 0.1);
 }
 
 * {
@@ -48,6 +50,18 @@ a {
     display: flex;
     gap: 12px;
     text-decoration: none;
+}
+
+.brand-logo {
+    background: #ffffff;
+    border: 1px solid rgba(11, 82, 160, 0.16);
+    border-radius: 12px;
+    display: block;
+    flex: 0 0 auto;
+    height: 38px;
+    object-fit: contain;
+    padding: 1px;
+    width: 54px;
 }
 
 .brand small,
@@ -466,9 +480,9 @@ html {
 
 body {
     background:
-        radial-gradient(circle at top left, rgba(15, 111, 79, 0.14), transparent 34rem),
-        radial-gradient(circle at top right, rgba(249, 180, 85, 0.16), transparent 30rem),
-        linear-gradient(180deg, #f9fbf7 0%, var(--bg) 42%, #eef4ef 100%);
+        radial-gradient(circle at top left, rgba(11, 82, 160, 0.16), transparent 34rem),
+        radial-gradient(circle at top right, rgba(91, 178, 47, 0.17), transparent 30rem),
+        linear-gradient(180deg, #f8fbff 0%, var(--bg) 42%, #eaf5f5 100%);
     min-height: 100vh;
 }
 
@@ -483,9 +497,13 @@ body {
 }
 
 .brand-mark {
-    background: linear-gradient(135deg, var(--brand), #13a06f);
+    background: linear-gradient(135deg, var(--brand), var(--brand-teal));
     border-radius: 14px;
-    box-shadow: 0 10px 22px rgba(15, 111, 79, 0.25);
+    box-shadow: 0 10px 22px rgba(11, 82, 160, 0.2);
+}
+
+.brand-logo {
+    box-shadow: 0 10px 22px rgba(11, 82, 160, 0.16);
 }
 
 .brand strong {
@@ -503,7 +521,7 @@ body {
 }
 
 .nav-link:hover {
-    background: rgba(15, 111, 79, 0.08);
+    background: rgba(11, 82, 160, 0.08);
     color: var(--brand-dark);
 }
 
@@ -531,9 +549,9 @@ h2 {
 .detail-block,
 .panel-form,
 .card {
-    border-color: rgba(15, 111, 79, 0.12) !important;
+    border-color: rgba(11, 82, 160, 0.12) !important;
     border-radius: 22px !important;
-    box-shadow: 0 18px 45px rgba(32, 38, 32, 0.08) !important;
+    box-shadow: 0 18px 45px rgba(8, 55, 113, 0.09) !important;
 }
 
 .metric {
@@ -546,7 +564,7 @@ h2 {
 }
 
 .metric::after {
-    background: rgba(15, 111, 79, 0.08);
+    background: rgba(8, 125, 120, 0.1);
     border-radius: 999px;
     content: "";
     height: 82px;
@@ -567,7 +585,7 @@ h2 {
 }
 
 .section-heading {
-    border-bottom: 1px solid rgba(15, 111, 79, 0.09);
+    border-bottom: 1px solid rgba(11, 82, 160, 0.1);
     margin-bottom: 18px;
     padding-bottom: 12px;
 }
@@ -579,10 +597,10 @@ h2 {
 .button,
 .btn-success,
 .btn-primary {
-    background: linear-gradient(135deg, var(--brand), #13a06f) !important;
+    background: linear-gradient(135deg, var(--brand), var(--brand-teal)) !important;
     border: 0 !important;
     border-radius: 999px !important;
-    box-shadow: 0 10px 22px rgba(15, 111, 79, 0.18);
+    box-shadow: 0 10px 22px rgba(11, 82, 160, 0.2);
     font-weight: 700;
 }
 
@@ -864,9 +882,9 @@ tbody tr:hover {
         white-space: nowrap;
     }
 
-    .brand-mark {
-        height: 34px;
-        width: 34px;
+    .brand-logo {
+        height: 32px;
+        width: 46px;
     }
 
     h1 {

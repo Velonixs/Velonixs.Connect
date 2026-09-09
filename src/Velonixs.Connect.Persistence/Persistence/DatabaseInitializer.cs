@@ -36,6 +36,11 @@ public sealed class DatabaseInitializer(
         await EncryptExistingSensitiveDataAsync(cancellationToken);
         await SeedRolesAsync();
         await SeedDefaultAdminAsync(cancellationToken);
+
+        if (_options.SeedDemoData)
+        {
+            await GrantDefaultAdminDemoPortalAccessAsync(cancellationToken);
+        }
     }
 
     private async Task EncryptExistingSensitiveDataAsync(CancellationToken cancellationToken)
@@ -163,6 +168,68 @@ public sealed class DatabaseInitializer(
         await userManager.AddToRoleAsync(user, AppRoles.PlatformAdmin);
 
         logger.LogInformation("Seeded default admin user '{Email}'.", email);
+    }
+
+    private async Task GrantDefaultAdminDemoPortalAccessAsync(CancellationToken cancellationToken)
+    {
+        if (string.IsNullOrWhiteSpace(_identitySeedOptions.DefaultAdminEmail))
+        {
+            return;
+        }
+
+        var email = _identitySeedOptions.DefaultAdminEmail.Trim();
+        var user = await userManager.FindByEmailAsync(email);
+
+        if (user is null)
+        {
+            return;
+        }
+
+        var demoPhoneNumberId = string.IsNullOrWhiteSpace(_options.DemoWhatsAppPhoneNumberId)
+            ? "1196816620181240"
+            : _options.DemoWhatsAppPhoneNumberId;
+        var demoRestaurant = await dbContext.Restaurants.SingleOrDefaultAsync(
+            x => x.WhatsAppPhoneNumberId == demoPhoneNumberId,
+            cancellationToken);
+
+        if (demoRestaurant is null)
+        {
+            return;
+        }
+
+        if (user.BusinessId != demoRestaurant.Id)
+        {
+            user.BusinessId = demoRestaurant.Id;
+            var updateResult = await userManager.UpdateAsync(user);
+
+            if (!updateResult.Succeeded)
+            {
+                logger.LogWarning(
+                    "Default admin user '{Email}' could not be assigned to the demo business. Errors={Errors}",
+                    email,
+                    string.Join("; ", updateResult.Errors.Select(x => x.Description)));
+                return;
+            }
+        }
+
+        if (!await userManager.IsInRoleAsync(user, AppRoles.BusinessOwner))
+        {
+            var roleResult = await userManager.AddToRoleAsync(user, AppRoles.BusinessOwner);
+
+            if (!roleResult.Succeeded)
+            {
+                logger.LogWarning(
+                    "Default admin user '{Email}' could not be granted demo portal access. Errors={Errors}",
+                    email,
+                    string.Join("; ", roleResult.Errors.Select(x => x.Description)));
+                return;
+            }
+        }
+
+        logger.LogInformation(
+            "Granted default admin user '{Email}' BusinessOwner access to demo business '{BusinessName}'.",
+            email,
+            demoRestaurant.Name);
     }
 
     private async Task SeedDemoDataAsync(CancellationToken cancellationToken)

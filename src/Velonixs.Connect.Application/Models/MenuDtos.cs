@@ -36,7 +36,17 @@ public sealed record MenuItemResponse(
     string? ProductRetailerId = null,
     string? ImageUrl = null,
     string? MetaProductId = null,
-    string SyncStatus = "NotQueued")
+    string SyncStatus = "NotQueued",
+    decimal? DiscountPrice = null,
+    string Currency = "INR",
+    bool IsVegetarian = false,
+    int? PreparationTimeMinutes = null,
+    string? MetaCatalogId = null,
+    DateTimeOffset? LastSyncedAt = null,
+    string? LastSyncError = null,
+    int RetryCount = 0,
+    DateTimeOffset? CreatedAt = null,
+    DateTimeOffset? UpdatedAt = null)
 {
     public Guid BusinessId => RestaurantId;
     public int ProductCode => ItemCode;
@@ -58,7 +68,11 @@ public sealed record CreateMenuItemRequest(
     bool IsAvailable = true,
     bool IsActive = true,
     string? ProductRetailerId = null,
-    string? ImageUrl = null);
+    string? ImageUrl = null,
+    decimal? DiscountPrice = null,
+    string Currency = "INR",
+    bool IsVegetarian = false,
+    int? PreparationTimeMinutes = null);
 
 public sealed record UpdateMenuItemRequest(
     Guid CategoryId,
@@ -70,7 +84,11 @@ public sealed record UpdateMenuItemRequest(
     bool IsAvailable,
     bool IsActive,
     string? ProductRetailerId = null,
-    string? ImageUrl = null);
+    string? ImageUrl = null,
+    decimal? DiscountPrice = null,
+    string Currency = "INR",
+    bool IsVegetarian = false,
+    int? PreparationTimeMinutes = null);
 
 public sealed record UpdateMenuCategoryRequest(
     string Name,

@@ -185,8 +185,14 @@ public sealed class RestaurantConnectDbContext(
             entity.Property(x => x.Description).HasMaxLength(1000);
             entity.Property(x => x.ProductRetailerId).HasMaxLength(200);
             entity.Property(x => x.ImageUrl).HasMaxLength(1000);
+            entity.Property(x => x.Currency).HasMaxLength(3).IsRequired().HasDefaultValue("INR");
+            entity.Property(x => x.DiscountPrice).HasPrecision(18, 2);
+            entity.Property(x => x.MetaCatalogId).HasMaxLength(100);
             entity.Property(x => x.MetaProductId).HasMaxLength(200);
             entity.Property(x => x.SyncStatus).HasMaxLength(20).IsRequired().HasDefaultValue("NotQueued");
+            entity.Property(x => x.LastSyncError).HasMaxLength(1000);
+            entity.Property(x => x.CreatedAt).HasDefaultValueSql("SYSUTCDATETIME()");
+            entity.Property(x => x.UpdatedAt).HasDefaultValueSql("SYSUTCDATETIME()");
             entity.Property(x => x.Price).HasPrecision(18, 2);
 
             entity.HasIndex(x => new { x.RestaurantId, x.ItemCode }).IsUnique();
@@ -275,9 +281,14 @@ public sealed class RestaurantConnectDbContext(
             entity.Property(x => x.SgstPercent).HasPrecision(5, 2);
             entity.Property(x => x.SgstAmount).HasPrecision(18, 2);
             entity.Property(x => x.TotalAmount).HasPrecision(18, 2);
+            entity.Property(x => x.Currency).HasMaxLength(3).IsRequired().HasDefaultValue("INR");
             entity.Property(x => x.Source).HasMaxLength(30).IsRequired();
+            entity.Property(x => x.ExternalWhatsAppMessageId).HasMaxLength(512);
 
             entity.HasIndex(x => x.OrderNumber).IsUnique();
+            entity.HasIndex(x => x.ExternalWhatsAppMessageId)
+                .IsUnique()
+                .HasFilter("[ExternalWhatsAppMessageId] IS NOT NULL");
             entity.HasOne(x => x.Restaurant)
                 .WithMany(x => x.Orders)
                 .HasForeignKey(x => x.RestaurantId)
@@ -319,6 +330,8 @@ public sealed class RestaurantConnectDbContext(
             entity.HasKey(x => x.Id);
 
             entity.Property(x => x.ItemName).HasMaxLength(200).IsRequired();
+            entity.Property(x => x.ProductRetailerId).HasMaxLength(200);
+            entity.Property(x => x.CustomerInstructions).HasMaxLength(1000);
             entity.Property(x => x.UnitPrice).HasPrecision(18, 2);
             entity.Property(x => x.LineTotal).HasPrecision(18, 2);
 
@@ -370,13 +383,16 @@ public sealed class RestaurantConnectDbContext(
             entity.ToTable("MetaCatalogSetting");
             entity.HasKey(x => x.Id);
             entity.HasIndex(x => x.BusinessId).IsUnique();
+            entity.Property(x => x.MetaBusinessId).HasMaxLength(100);
             entity.Property(x => x.WabaId).HasMaxLength(100);
             entity.Property(x => x.CatalogId).HasMaxLength(100);
             entity.Property(x => x.PhoneNumberId).HasMaxLength(100);
+            entity.Property(x => x.CredentialReference).HasMaxLength(500);
             entity.Property(x => x.AccessTokenEncrypted).HasColumnType("nvarchar(max)").HasConversion(nullableEncryptedStringConverter);
             entity.Property(x => x.WebhookVerifyTokenEncrypted).HasColumnType("nvarchar(max)").HasConversion(nullableEncryptedStringConverter);
             entity.Property(x => x.SyncMode).HasMaxLength(50).IsRequired();
             entity.Property(x => x.ReconciliationRequired).HasDefaultValue(false);
+            entity.Property(x => x.IsCartEnabled).HasDefaultValue(true);
         });
     }
 

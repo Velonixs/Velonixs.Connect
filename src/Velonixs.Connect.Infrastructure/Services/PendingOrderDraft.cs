@@ -18,12 +18,15 @@ public sealed class PendingOrderDraft
     public int CategoryPage { get; set; }
     public int ItemPage { get; set; }
     public string? CheckoutState { get; set; }
+    public string? ExternalWhatsAppMessageId { get; set; }
+    public string? CatalogId { get; set; }
     public decimal SubTotalAmount { get; set; }
     public decimal CgstPercent { get; set; }
     public decimal CgstAmount { get; set; }
     public decimal SgstPercent { get; set; }
     public decimal SgstAmount { get; set; }
     public decimal TotalAmount { get; set; }
+    public string Currency { get; set; } = "INR";
     public List<PendingOrderItemDraft> Items { get; set; } = new();
 }
 
@@ -32,6 +35,7 @@ public sealed class PendingOrderItemDraft
     public Guid MenuItemId { get; set; }
     public int ItemCode { get; set; }
     public string ItemName { get; set; } = string.Empty;
+    public string? ProductRetailerId { get; set; }
     public decimal UnitPrice { get; set; }
     public int Quantity { get; set; }
     public decimal LineTotal { get; set; }

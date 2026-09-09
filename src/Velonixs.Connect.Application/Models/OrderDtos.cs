@@ -17,7 +17,9 @@ public sealed record OrderSummaryResponse(
     decimal SgstAmount,
     decimal TotalAmount,
     string Source,
-    DateTimeOffset CreatedAt);
+    DateTimeOffset CreatedAt,
+    string Currency = "INR",
+    string? ExternalWhatsAppMessageId = null);
 
 public sealed record OrderDetailResponse(
     Guid Id,
@@ -40,7 +42,9 @@ public sealed record OrderDetailResponse(
     DateTimeOffset CreatedAt,
     IReadOnlyCollection<OrderItemResponse> Items,
     IReadOnlyCollection<OrderStatusHistoryResponse> StatusHistory,
-    IReadOnlyCollection<MessageLogResponse> Messages);
+    IReadOnlyCollection<MessageLogResponse> Messages,
+    string Currency = "INR",
+    string? ExternalWhatsAppMessageId = null);
 
 public sealed record OrderItemResponse(
     Guid Id,
@@ -48,7 +52,9 @@ public sealed record OrderItemResponse(
     string ItemName,
     decimal UnitPrice,
     int Quantity,
-    decimal LineTotal);
+    decimal LineTotal,
+    string? ProductRetailerId = null,
+    string? CustomerInstructions = null);
 
 public sealed record MessageLogResponse(
     Guid Id,

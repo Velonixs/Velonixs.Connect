@@ -167,6 +167,70 @@ public sealed class OrderService(
             notificationMessage is null ? Array.Empty<MessageLogResponse>() : [notificationMessage]);
     }
 
+    public async Task<OrderDetailResponse?> SetPreparationTimeAsync(
+        Guid id,
+        int estimatedMinutes,
+        string? updatedBy = null,
+        CancellationToken cancellationToken = default)
+    {
+        if (estimatedMinutes is <= 0 or > 1440)
+        {
+            throw new InvalidOperationException("Estimated preparation time must be between 1 and 1,440 minutes.");
+        }
+
+        var order = await dbContext.Orders
+            .Include(x => x.Items)
+            .Include(x => x.Restaurant)
+            .Include(x => x.Customer)
+            .Include(x => x.StatusHistory)
+            .FirstOrDefaultAsync(x => x.Id == id, cancellationToken);
+        if (order is null)
+        {
+            return null;
+        }
+
+        if (order.OrderStatus == OrderStatuses.PendingConfirmation)
+        {
+            return await UpdateStatusAsync(
+                id,
+                new UpdateOrderStatusRequest(
+                    OrderStatuses.Confirmed,
+                    "Order accepted.",
+                    updatedBy,
+                    estimatedMinutes),
+                cancellationToken);
+        }
+
+        if (order.OrderStatus is not (OrderStatuses.Confirmed or OrderStatuses.Preparing))
+        {
+            throw new InvalidOperationException(
+                $"Preparation time cannot be changed while the order is {order.OrderStatus}.");
+        }
+
+        if (order.EstimatedMinutes == estimatedMinutes)
+        {
+            return ToDetailResponse(order, Array.Empty<MessageLogResponse>());
+        }
+
+        order.EstimatedMinutes = estimatedMinutes;
+        dbContext.OrderStatusHistory.Add(new OrderStatusHistory
+        {
+            OrderId = order.Id,
+            PreviousStatus = order.OrderStatus,
+            NewStatus = order.OrderStatus,
+            Comment = $"Preparation time set to {estimatedMinutes} minutes.",
+            UpdatedBy = string.IsNullOrWhiteSpace(updatedBy) ? "System" : updatedBy.Trim(),
+            UpdatedAtUtc = DateTimeOffset.UtcNow
+        });
+        await dbContext.SaveChangesAsync(cancellationToken);
+
+        var notification = await NotifyCustomerAsync(
+            order,
+            $"Your order #{order.OrderNumber} has an estimated preparation time of {estimatedMinutes} minutes.",
+            cancellationToken);
+        return ToDetailResponse(order, [notification]);
+    }
+
     private static OrderSummaryResponse ToSummaryResponse(Domain.Entities.Order order)
     {
         return new OrderSummaryResponse(
@@ -186,7 +250,9 @@ public sealed class OrderService(
             order.SgstAmount,
             order.TotalAmount,
             order.Source,
-            order.CreatedAt);
+            order.CreatedAt,
+            order.Currency,
+            order.ExternalWhatsAppMessageId);
     }
 
     private static OrderDetailResponse ToDetailResponse(
@@ -218,7 +284,9 @@ public sealed class OrderService(
                 x.ItemName,
                 x.UnitPrice,
                 x.Quantity,
-                x.LineTotal)).ToArray(),
+                x.LineTotal,
+                x.ProductRetailerId,
+                x.CustomerInstructions)).ToArray(),
             order.StatusHistory
                 .OrderByDescending(x => x.UpdatedAtUtc)
                 .Select(x => new OrderStatusHistoryResponse(
@@ -229,7 +297,9 @@ public sealed class OrderService(
                     x.UpdatedBy,
                     x.UpdatedAtUtc))
                 .ToArray(),
-            messages);
+            messages,
+            order.Currency,
+            order.ExternalWhatsAppMessageId);
     }
 
     private static string NormalizeStatus(string status)

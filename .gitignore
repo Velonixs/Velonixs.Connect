@@ -6,6 +6,9 @@
 # dotenv files
 .env
 
+# Local MCP/Node tooling must not be checked in with the .NET application.
+.tools/
+
 # User-specific files
 *.rsuser
 *.suo

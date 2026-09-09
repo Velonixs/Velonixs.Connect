@@ -1,6 +1,8 @@
 @page "/portal/blazor"
 @page "/portal/blazor/dashboard"
 @attribute [Authorize(Roles = AppRoles.PortalRoles)]
+@implements IAsyncDisposable
+@using Velonixs.Connect.Domain.Entities
 @inject IRestaurantService RestaurantService
 @inject IMenuService MenuService
 @inject IOrderService OrderService
@@ -32,6 +34,32 @@ else if (_restaurant is not null)
         </div>
         <button class="btn btn-outline-primary" @onclick="LoadAsync">Refresh</button>
     </header>
+
+    @if (_newCatalogOrderIds.Count > 0)
+    {
+        <section class="portal-blazor-catalog-order-alert" role="alert" aria-live="assertive">
+            <div>
+                <p class="portal-blazor-eyebrow">New WhatsApp catalog order</p>
+                <strong>@_newCatalogOrderIds.Count new order@(_newCatalogOrderIds.Count == 1 ? string.Empty : "s") need@(_newCatalogOrderIds.Count == 1 ? "s" : string.Empty) confirmation.</strong>
+                <span>Open the order queue to accept with a preparation time or reject with a reason.</span>
+            </div>
+            <div class="portal-blazor-catalog-order-actions">
+                <a class="btn btn-primary btn-sm" href="/portal/blazor/orders">Review orders</a>
+                <button class="btn btn-outline-secondary btn-sm" type="button" @onclick="DismissCatalogOrderAlert">Dismiss</button>
+            </div>
+        </section>
+    }
+    else
+    {
+        <p class="portal-blazor-live-status">
+            <span class="portal-blazor-live-indicator" aria-hidden="true"></span>
+            WhatsApp catalog orders are checked every 20 seconds. Last checked @LastOrderRefreshLabel.
+            @if (_liveRefreshFailed)
+            {
+                <span>Live updates are temporarily unavailable; use Refresh to try again.</span>
+            }
+        </p>
+    }
 
     <section class="portal-blazor-metrics" aria-label="Business metrics">
         <article class="portal-blazor-metric portal-blazor-metric-urgent">
@@ -90,6 +118,10 @@ else if (_restaurant is not null)
                             <td>
                                 <strong>@order.CustomerName</strong>
                                 <small>@order.CustomerPhone</small>
+                                @if (IsWhatsAppCatalogOrder(order))
+                                {
+                                    <span class="portal-blazor-order-source">WhatsApp catalog</span>
+                                }
                             </td>
                             <td><span class="portal-blazor-status">@FormatStatus(order.OrderStatus)</span></td>
                             <td>@order.CreatedAt.LocalDateTime.ToString("dd MMM, HH:mm")</td>
@@ -104,37 +136,68 @@ else if (_restaurant is not null)
 }
 
 @code {
+    private static readonly TimeSpan OrderRefreshInterval = TimeSpan.FromSeconds(20);
+
     [CascadingParameter]
     private Task<AuthenticationState>? AuthenticationStateTask { get; set; }
 
+    private readonly CancellationTokenSource _orderRefreshCancellation = new();
+    private readonly SemaphoreSlim _orderRefreshGate = new(1, 1);
+    private readonly HashSet<Guid> _seenPendingCatalogOrderIds = [];
+    private readonly HashSet<Guid> _newCatalogOrderIds = [];
     private RestaurantResponse? _restaurant;
     private IReadOnlyCollection<OrderSummaryResponse> _recentOrders = Array.Empty<OrderSummaryResponse>();
+    private Guid? _businessId;
+    private Task? _orderRefreshLoop;
     private bool _loading = true;
+    private bool _initialOrdersLoaded;
+    private bool _liveRefreshFailed;
     private string? _error;
     private int _pendingCount;
     private int _todayOrderCount;
     private int _availableItemCount;
     private decimal _todayRevenue;
+    private DateTimeOffset? _lastOrderRefreshAt;
+
+    private string LastOrderRefreshLabel => _lastOrderRefreshAt is { } refreshedAt
+        ? refreshedAt.LocalDateTime.ToString("HH:mm:ss")
+        : "starting";
 
     protected override async Task OnInitializedAsync() => await LoadAsync();
 
+    protected override Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            _orderRefreshLoop = RefreshOrderQueueLoopAsync(_orderRefreshCancellation.Token);
+        }
+
+        return Task.CompletedTask;
+    }
+
     private async Task LoadAsync()
     {
-        _loading = true;
-        _error = null;
+        await _orderRefreshGate.WaitAsync();
 
         try
         {
+            _loading = true;
+            _error = null;
             var businessId = await GetBusinessIdAsync();
             if (businessId is null)
             {
+                _businessId = null;
+                _initialOrdersLoaded = false;
                 _error = "Your account is missing its business assignment. Please contact your administrator.";
                 return;
             }
 
+            _businessId = businessId;
             _restaurant = await RestaurantService.GetRestaurantAsync(businessId.Value);
             if (_restaurant is null)
             {
+                _businessId = null;
+                _initialOrdersLoaded = false;
                 _error = "The business linked to your account could not be found.";
                 return;
             }
@@ -143,15 +206,12 @@ else if (_restaurant is not null)
             // sequential rather than issuing parallel database operations from one Blazor circuit.
             var orders = await OrderService.GetRestaurantOrdersAsync(businessId.Value);
             var menu = await MenuService.GetMenuAsync(businessId.Value);
-            var today = DateTime.UtcNow.Date;
 
-            _recentOrders = orders.Take(8).ToArray();
-            _pendingCount = orders.Count(order => string.Equals(order.OrderStatus, "PendingConfirmation", StringComparison.OrdinalIgnoreCase));
-            _todayOrderCount = orders.Count(order => order.CreatedAt.UtcDateTime.Date == today);
-            _todayRevenue = orders
-                .Where(order => order.CreatedAt.UtcDateTime.Date == today)
-                .Sum(order => order.TotalAmount);
+            ApplyOrderQueue(orders, announceNewCatalogOrders: _initialOrdersLoaded);
+            _initialOrdersLoaded = true;
             _availableItemCount = menu?.Items.Count(item => item.IsActive && item.IsAvailable) ?? 0;
+            _lastOrderRefreshAt = DateTimeOffset.UtcNow;
+            _liveRefreshFailed = false;
         }
         catch (Exception)
         {
@@ -160,8 +220,111 @@ else if (_restaurant is not null)
         finally
         {
             _loading = false;
+            _orderRefreshGate.Release();
         }
     }
+
+    private async Task RefreshOrderQueueLoopAsync(CancellationToken cancellationToken)
+    {
+        using var timer = new PeriodicTimer(OrderRefreshInterval);
+
+        try
+        {
+            while (await timer.WaitForNextTickAsync(cancellationToken))
+            {
+                await InvokeAsync(async () =>
+                {
+                    await RefreshOrderQueueAsync(cancellationToken);
+                    StateHasChanged();
+                });
+            }
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            // The component was removed from its interactive circuit.
+        }
+        catch (ObjectDisposedException)
+        {
+            // The interactive circuit ended while the refresh was being scheduled.
+        }
+    }
+
+    private async Task RefreshOrderQueueAsync(CancellationToken cancellationToken)
+    {
+        if (!_initialOrdersLoaded || _businessId is null)
+        {
+            return;
+        }
+
+        try
+        {
+            await _orderRefreshGate.WaitAsync(cancellationToken);
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            return;
+        }
+
+        try
+        {
+            var orders = await OrderService.GetRestaurantOrdersAsync(_businessId.Value, cancellationToken);
+            ApplyOrderQueue(orders, announceNewCatalogOrders: true);
+            _lastOrderRefreshAt = DateTimeOffset.UtcNow;
+            _liveRefreshFailed = false;
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            // The component is shutting down; do not surface a stale error.
+        }
+        catch (Exception)
+        {
+            // Keep the most recently rendered queue available and make the fallback explicit.
+            _liveRefreshFailed = true;
+        }
+        finally
+        {
+            _orderRefreshGate.Release();
+        }
+    }
+
+    private void ApplyOrderQueue(
+        IReadOnlyCollection<OrderSummaryResponse> orders,
+        bool announceNewCatalogOrders)
+    {
+        var today = DateTime.UtcNow.Date;
+        var pendingCatalogOrderIds = orders
+            .Where(IsPendingWhatsAppCatalogOrder)
+            .Select(order => order.Id)
+            .ToHashSet();
+
+        if (announceNewCatalogOrders)
+        {
+            foreach (var orderId in pendingCatalogOrderIds.Where(orderId => !_seenPendingCatalogOrderIds.Contains(orderId)))
+            {
+                _newCatalogOrderIds.Add(orderId);
+            }
+        }
+
+        _seenPendingCatalogOrderIds.UnionWith(pendingCatalogOrderIds);
+        _newCatalogOrderIds.IntersectWith(pendingCatalogOrderIds);
+
+        _recentOrders = orders.Take(8).ToArray();
+        _pendingCount = orders.Count(order =>
+            string.Equals(order.OrderStatus, OrderStatuses.PendingConfirmation, StringComparison.OrdinalIgnoreCase));
+        _todayOrderCount = orders.Count(order => order.CreatedAt.UtcDateTime.Date == today);
+        _todayRevenue = orders
+            .Where(order => order.CreatedAt.UtcDateTime.Date == today)
+            .Sum(order => order.TotalAmount);
+    }
+
+    private void DismissCatalogOrderAlert() => _newCatalogOrderIds.Clear();
+
+    private static bool IsPendingWhatsAppCatalogOrder(OrderSummaryResponse order) =>
+        IsWhatsAppCatalogOrder(order) &&
+        string.Equals(order.OrderStatus, OrderStatuses.PendingConfirmation, StringComparison.OrdinalIgnoreCase);
+
+    private static bool IsWhatsAppCatalogOrder(OrderSummaryResponse order) =>
+        string.Equals(order.Source, OrderSources.WhatsAppCatalog, StringComparison.OrdinalIgnoreCase);
 
     private async Task<Guid?> GetBusinessIdAsync()
     {
@@ -177,4 +340,23 @@ else if (_restaurant is not null)
         string.IsNullOrWhiteSpace(status)
             ? "Unknown"
             : System.Text.RegularExpressions.Regex.Replace(status, "(?<!^)([A-Z])", " $1");
+
+    public async ValueTask DisposeAsync()
+    {
+        _orderRefreshCancellation.Cancel();
+
+        if (_orderRefreshLoop is not null)
+        {
+            try
+            {
+                await _orderRefreshLoop;
+            }
+            catch (OperationCanceledException)
+            {
+                // Expected when the component is disposed.
+            }
+        }
+
+        _orderRefreshCancellation.Dispose();
+    }
 }

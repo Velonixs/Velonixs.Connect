@@ -60,6 +60,7 @@ public static class DependencyInjection
             configuration.GetSection("MetaCatalog").Bind(options);
 
             options.GraphApiBaseUrl = PreferConfiguredSecret(configuration["META_CATALOG_GRAPH_API_BASE_URL"], options.GraphApiBaseUrl) ?? options.GraphApiBaseUrl;
+            options.GraphApiVersion = PreferConfiguredSecret(configuration["META_CATALOG_GRAPH_API_VERSION"], options.GraphApiVersion) ?? options.GraphApiVersion;
             options.Currency = PreferConfiguredSecret(configuration["META_CATALOG_CURRENCY"], options.Currency) ?? options.Currency;
 
             if (bool.TryParse(configuration["META_CATALOG_DISABLE_SENDING"], out var disableSending))
@@ -110,6 +111,7 @@ public static class DependencyInjection
         services.AddScoped<IRestaurantService, RestaurantService>();
         services.AddScoped<IBusinessService, BusinessService>();
         services.AddScoped<IMenuService, MenuService>();
+        services.AddScoped<IMetaCatalogService, MetaCatalogService>();
         services.AddScoped<ICatalogService, CatalogService>();
         services.AddScoped<IOrderService, OrderService>();
         services.AddScoped<MenuSearchService>();
@@ -117,6 +119,7 @@ public static class DependencyInjection
         services.AddScoped<OrderingCartService>();
         services.AddScoped<IConversationService, ConversationService>();
         services.AddScoped<INotificationService, NotificationService>();
+        services.AddScoped<IWhatsAppCatalogService, WhatsAppCatalogService>();
         services.AddScoped<IAuthTokenService, AuthTokenService>();
         services.AddScoped<IPlatformAdministrationService, PlatformAdministrationService>();
         services.AddHttpClient<IWhatsAppMessageSender, WhatsAppCloudMessageSender>(client =>
@@ -127,6 +130,10 @@ public static class DependencyInjection
         services.AddHttpClient<IMetaCatalogSyncService, MetaCatalogSyncService>(client =>
         {
             client.Timeout = TimeSpan.FromSeconds(30);
+        });
+        services.AddHttpClient<IWhatsAppCommerceService, WhatsAppCommerceService>(client =>
+        {
+            client.Timeout = TimeSpan.FromSeconds(15);
         });
 
         return services;

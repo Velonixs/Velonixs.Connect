@@ -1,5 +1,6 @@
 @page "/portal/blazor/orders"
 @attribute [Authorize(Roles = AppRoles.PortalRoles)]
+@using Velonixs.Connect.Domain.Entities
 @inject IRestaurantService RestaurantService
 @inject IOrderService OrderService
 
@@ -71,6 +72,10 @@ else if (_restaurant is not null)
                             <div>
                                 <p class="portal-blazor-order-number">@order.OrderNumber</p>
                                 <h3>@order.CustomerName</h3>
+                                @if (IsWhatsAppCatalogOrder(order))
+                                {
+                                    <span class="portal-blazor-order-source">WhatsApp catalog order</span>
+                                }
                                 <span>@order.CustomerPhone · @order.CreatedAt.LocalDateTime.ToString("dd MMM yyyy, HH:mm")</span>
                             </div>
                             <div class="portal-blazor-order-total">
@@ -81,7 +86,7 @@ else if (_restaurant is not null)
 
                         <div class="portal-blazor-order-meta">
                             <span><strong>Address:</strong> @order.Address</span>
-                            <span><strong>Source:</strong> @order.Source</span>
+                            <span><strong>Source:</strong> @(IsWhatsAppCatalogOrder(order) ? "WhatsApp catalog" : order.Source)</span>
                             @if (order.EstimatedMinutes is not null)
                             {
                                 <span><strong>Estimate:</strong> @order.EstimatedMinutes min</span>
@@ -95,6 +100,13 @@ else if (_restaurant is not null)
 
                         @if (allowedStatuses.Count > 0)
                         {
+                            @if (IsWhatsAppCatalogOrder(order) &&
+                                 string.Equals(order.OrderStatus, OrderStatuses.PendingConfirmation, StringComparison.OrdinalIgnoreCase))
+                            {
+                                <p class="portal-blazor-catalog-order-guidance">
+                                    This catalog cart is awaiting your response. Confirm it with a preparation time or reject it with a reason; the customer receives the update on WhatsApp.
+                                </p>
+                            }
                             <div class="portal-blazor-order-update">
                                 <label>
                                     <span>Move to</span>
@@ -302,6 +314,9 @@ else if (_restaurant is not null)
             "Handled" => ["Delivered", "Cancelled"],
             _ => Array.Empty<string>()
         };
+
+    private static bool IsWhatsAppCatalogOrder(OrderSummaryResponse order) =>
+        string.Equals(order.Source, OrderSources.WhatsAppCatalog, StringComparison.OrdinalIgnoreCase);
 
     private void SetMessage(string message, bool isError = false)
     {

@@ -2,6 +2,7 @@
 @attribute [Authorize(Roles = AppRoles.PlatformAdmin)]
 @inject IRestaurantService RestaurantService
 @inject IMetaCatalogSyncService MetaSyncService
+@inject IMetaCatalogService MetaCatalogService
 @inject Microsoft.Extensions.Options.IOptions<Velonixs.Connect.Infrastructure.Configuration.MetaCatalogOptions> MetaCatalogOptions
 
 <header class="page-head">
@@ -24,9 +25,11 @@
     <div class="surface-title"><h2>Meta Settings</h2></div>
     <div class="form-grid-compact">
         <label>WABA ID (reference) <input @bind="_settings.WabaId" /></label>
-        <label>Catalog ID <input @bind="_settings.CatalogId" /></label>
+        <label>Meta Business ID <input @bind="_settings.MetaBusinessId" placeholder="Business Manager ID" /></label>
+        <label>Catalog ID <input @bind="_settings.CatalogId" placeholder="Created here or entered for an existing catalog" /></label>
         <label>Meta Phone Number ID (must match Business Settings) <input @bind="_settings.PhoneNumberId" /></label>
         <label>Access Token <input type="password" @bind="_settings.AccessToken" placeholder="Leave blank to keep existing" /></label>
+        <label>Credential reference <input @bind="_settings.CredentialReference" placeholder="For example, Key Vault secret name" /></label>
         <label>Sync Mode
             <select @bind="_settings.SyncMode">
                 <option value="default">Default</option>
@@ -35,8 +38,32 @@
             </select>
         </label>
         <label>Enabled <input type="checkbox" @bind="_settings.IsEnabled" /></label>
+        <label>Cart enabled <input type="checkbox" @bind="_settings.IsCartEnabled" /></label>
         <label><span>&nbsp;</span><button class="btn btn-primary" @onclick="SaveSettingsAsync">Save settings</button></label>
     </div>
+    <p class="text-muted mb-0">
+        Access tokens are write-only and encrypted at rest. Use a credential reference when the token is managed outside this application. To create a new catalog here, first save the Meta business ID, WABA ID, phone number ID, and access token with the connection disabled.
+        @if (_settings.LastSuccessfulSyncAt is not null)
+        {
+            <span> Last successful remote sync: @_settings.LastSuccessfulSyncAt.Value.ToLocalTime().ToString("dd MMM yyyy, hh:mm tt").</span>
+        }
+    </p>
+</section>
+
+<section class="work-surface mb-3">
+    <div class="surface-title"><h2>Create and connect Meta catalog</h2></div>
+    <div class="form-grid-compact">
+        <label>Catalog name <input @bind="_catalogName" placeholder="Restaurant catalog" /></label>
+        <label><span>&nbsp;</span><button class="btn btn-outline-primary" @onclick="CreateCatalogAsync" disabled="@(_creatingCatalog || MetaCatalogOptions.Value.DisableSending)">@(_creatingCatalog ? "Creating..." : "Create catalog in Meta")</button></label>
+    </div>
+    @if (MetaCatalogOptions.Value.DisableSending)
+    {
+        <p class="text-muted mb-0">Catalog creation is disabled in this environment. Enable live Meta sending on the API host to use it.</p>
+    }
+    else
+    {
+        <p class="text-muted mb-0">This creates a commerce catalog, attaches it to the configured WABA, saves its ID, enables the connection, and queues the products managed in this admin application.</p>
+    }
 </section>
 
 <section class="work-surface mb-3">
@@ -115,6 +142,8 @@
     private IReadOnlyCollection<CatalogSyncQueueSummary> _queue = Array.Empty<CatalogSyncQueueSummary>();
     private IReadOnlyCollection<CatalogSyncLogSummary> _logs = Array.Empty<CatalogSyncLogSummary>();
     private string? _message;
+    private string? _catalogName;
+    private bool _creatingCatalog;
 
     protected override async Task OnParametersSetAsync()
     {
@@ -134,6 +163,7 @@
 
         var settings = await MetaSyncService.GetSettingsAsync(BusinessId);
         _settings = SettingsEditor.From(settings);
+        _catalogName ??= $"{_restaurant.Name} catalog";
         _queue = await MetaSyncService.GetQueueAsync(BusinessId);
         _logs = await MetaSyncService.GetLogsAsync(BusinessId);
     }
@@ -151,7 +181,10 @@
                     _settings.AccessToken,
                     null,
                     _settings.IsEnabled,
-                    _settings.SyncMode));
+                    _settings.SyncMode,
+                    _settings.MetaBusinessId,
+                    _settings.CredentialReference,
+                    _settings.IsCartEnabled));
             _message = "Meta catalog settings saved.";
             await LoadAsync();
         }
@@ -168,6 +201,53 @@
             ? "No products were queued. Check that the Meta connection is enabled and configured."
             : $"Queued {count} product synchronization event(s).";
         await LoadAsync();
+    }
+
+    private async Task CreateCatalogAsync()
+    {
+        if (MetaCatalogOptions.Value.DisableSending)
+        {
+            _message = "Catalog creation is disabled in this environment.";
+            return;
+        }
+
+        try
+        {
+            _creatingCatalog = true;
+
+            // Save the integration credentials first without enabling a
+            // connection that has no catalog yet. The create operation then
+            // stores the returned Meta catalog ID without any copy/paste.
+            await MetaSyncService.SaveSettingsAsync(
+                BusinessId,
+                new MetaCatalogSettingsInput(
+                    _settings.WabaId,
+                    null,
+                    _settings.PhoneNumberId,
+                    _settings.AccessToken,
+                    null,
+                    IsEnabled: false,
+                    SyncMode: _settings.SyncMode,
+                    MetaBusinessId: _settings.MetaBusinessId,
+                    CredentialReference: _settings.CredentialReference,
+                    IsCartEnabled: _settings.IsCartEnabled));
+
+            var catalogId = await MetaCatalogService.CreateCatalogAsync(
+                BusinessId,
+                string.IsNullOrWhiteSpace(_catalogName) ? $"{_restaurant?.Name} catalog" : _catalogName);
+            _settings.CatalogId = catalogId;
+            _settings.IsEnabled = true;
+            await SaveSettingsAsync();
+            _message = $"Catalog {catalogId} was created, attached to WhatsApp, and queued for product sync.";
+        }
+        catch (Exception ex) when (ex is InvalidOperationException or ArgumentException or KeyNotFoundException)
+        {
+            _message = ex.Message;
+        }
+        finally
+        {
+            _creatingCatalog = false;
+        }
     }
 
     private async Task ProcessAsync()
@@ -191,16 +271,24 @@
         public string? CatalogId { get; set; }
         public string? PhoneNumberId { get; set; }
         public string? AccessToken { get; set; }
-        public bool IsEnabled { get; set; } = true;
+        public string? MetaBusinessId { get; set; }
+        public string? CredentialReference { get; set; }
+        public bool IsEnabled { get; set; }
+        public bool IsCartEnabled { get; set; } = true;
         public string SyncMode { get; set; } = "default";
+        public DateTimeOffset? LastSuccessfulSyncAt { get; set; }
 
         public static SettingsEditor From(MetaCatalogSettingsSummary? settings) => new()
         {
             WabaId = settings?.WabaId,
             CatalogId = settings?.CatalogId,
             PhoneNumberId = settings?.PhoneNumberId,
+            MetaBusinessId = settings?.MetaBusinessId,
+            CredentialReference = settings?.CredentialReference,
             IsEnabled = settings?.IsEnabled ?? true,
-            SyncMode = settings?.SyncMode ?? "default"
+            IsCartEnabled = settings?.IsCartEnabled ?? true,
+            SyncMode = settings?.SyncMode ?? "default",
+            LastSuccessfulSyncAt = settings?.LastSuccessfulSyncAt
         };
     }
 }

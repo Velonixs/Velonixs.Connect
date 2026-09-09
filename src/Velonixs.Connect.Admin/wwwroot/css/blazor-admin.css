@@ -1,7 +1,7 @@
 body {
     margin: 0;
-    background: #f7f8fa;
-    color: #172033;
+    background: #f4f8fc;
+    color: #102d4e;
     font-family: Inter, Segoe UI, Arial, sans-serif;
 }
 
@@ -12,7 +12,7 @@ body {
 }
 
 .blazor-sidebar {
-    background: #101827;
+    background: linear-gradient(165deg, #062f68 0%, #0b52a0 54%, #087d78 100%);
     color: #fff;
     padding: 24px;
 }
@@ -26,14 +26,26 @@ body {
     margin-bottom: 28px;
 }
 
-.blazor-brand span {
-    display: grid;
-    place-items: center;
-    width: 38px;
-    height: 38px;
-    border-radius: 8px;
-    background: #22c55e;
-    font-weight: 800;
+.blazor-brand-logo {
+    background: #fff;
+    border-radius: 12px;
+    box-shadow: 0 8px 20px rgba(2, 25, 62, 0.22);
+    flex: 0 0 auto;
+    height: 44px;
+    object-fit: contain;
+    padding: 1px;
+    width: 60px;
+}
+
+.blazor-brand strong,
+.blazor-brand small {
+    display: block;
+}
+
+.blazor-brand small {
+    color: rgba(255, 255, 255, 0.72);
+    font-size: 11px;
+    margin-top: 3px;
 }
 
 .blazor-sidebar nav {
@@ -42,7 +54,7 @@ body {
 }
 
 .blazor-sidebar nav a {
-    color: #cbd5e1;
+    color: rgba(255, 255, 255, 0.8);
     text-decoration: none;
     padding: 10px 12px;
     border-radius: 8px;
@@ -50,7 +62,7 @@ body {
 
 .blazor-sidebar nav a:hover,
 .blazor-sidebar nav button:hover {
-    background: #1e293b;
+    background: rgba(255, 255, 255, 0.15);
     color: #fff;
 }
 
@@ -62,7 +74,7 @@ body {
     width: 100%;
     border: 0;
     background: transparent;
-    color: #cbd5e1;
+    color: rgba(255, 255, 255, 0.8);
     text-align: left;
     padding: 10px 12px;
     border-radius: 8px;

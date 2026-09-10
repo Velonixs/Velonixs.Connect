@@ -9,7 +9,7 @@
         <p>@_restaurant?.Name</p>
         <h1>Products & Categories</h1>
     </div>
-    <div class="toolbar">
+    <div class="toolbar page-head-actions">
         <a href="/admin/blazor">Dashboard</a>
         <a href="/admin/blazor/sync/@BusinessId">Catalog Sync</a>
     </div>
@@ -19,11 +19,15 @@
     <div class="surface-title">
         <h2>Add Category</h2>
     </div>
-    <form class="form-grid-compact" @onsubmit="CreateCategoryAsync" @onsubmit:preventDefault>
-        <label>Name <span class="required-marker" aria-hidden="true">*</span><input @bind="_newCategory.Name" required /></label>
-        <label>Display Order <input type="number" @bind="_newCategory.DisplayOrder" /></label>
-        <label>Active <input type="checkbox" @bind="_newCategory.IsActive" /></label>
-        <label><span>&nbsp;</span><button type="submit" class="btn btn-primary">Add category</button></label>
+    <form class="portal-form" @onsubmit="CreateCategoryAsync" @onsubmit:preventDefault>
+        <div class="portal-form-grid portal-form-grid--three">
+            <label><span class="field-label">Name <span class="required-marker" aria-hidden="true">*</span></span><input @bind="_newCategory.Name" required /></label>
+            <label><span class="field-label">Display order</span><input type="number" @bind="_newCategory.DisplayOrder" /></label>
+            <label class="check-field"><input type="checkbox" @bind="_newCategory.IsActive" /><span>Active</span></label>
+        </div>
+        <div class="form-actions">
+            <button type="submit" class="btn btn-primary">Add category</button>
+        </div>
     </form>
 </section>
 
@@ -32,19 +36,21 @@
         <h2>Categories</h2>
     </div>
     <div class="table-responsive">
-        <table class="table align-middle">
-            <thead><tr><th>Name</th><th>Order</th><th>Active</th><th></th></tr></thead>
+        <table class="table align-middle categories-table">
+            <thead><tr><th>Name</th><th>Order</th><th class="portal-active-heading">Active</th><th class="portal-actions-heading">Actions</th></tr></thead>
             <tbody>
             @foreach (var category in _categories)
             {
                 <tr>
                     <td><input class="inline-input" @bind="category.Name" /></td>
                     <td><input class="inline-input" type="number" @bind="category.DisplayOrder" /></td>
-                    <td><input type="checkbox" @bind="category.IsActive" /></td>
-                    <td class="action-row">
-                        <button @onclick="() => SaveCategoryAsync(category)">Save</button>
-                        <button @onclick="() => DeactivateCategoryAsync(category)">Deactivate</button>
-                        <button @onclick="() => DeleteCategoryAsync(category)">Delete</button>
+                    <td class="portal-active-cell"><input type="checkbox" @bind="category.IsActive" /></td>
+                    <td class="portal-actions-cell">
+                        <div class="action-row">
+                            <button class="action-primary" @onclick="() => SaveCategoryAsync(category)">Save</button>
+                            <button @onclick="() => DeactivateCategoryAsync(category)">Deactivate</button>
+                            <button class="action-danger" @onclick="() => DeleteCategoryAsync(category)">Delete</button>
+                        </div>
                     </td>
                 </tr>
             }
@@ -57,24 +63,32 @@
     <div class="surface-title">
         <h2>Add Product</h2>
     </div>
-    <form class="form-grid-compact" @onsubmit="CreateProductAsync" @onsubmit:preventDefault>
-        <label>Category <span class="required-marker" aria-hidden="true">*</span>
-            <select @bind="_newProduct.CategoryId" required>
-                @foreach (var category in _categories.Where(x => x.IsActive))
-                {
-                    <option value="@category.Id">@category.Name</option>
-                }
-            </select>
-        </label>
-        <label>Code <span class="required-marker" aria-hidden="true">*</span><input type="number" min="1" @bind="_newProduct.ItemCode" required /></label>
-        <label>Name <span class="required-marker" aria-hidden="true">*</span><input @bind="_newProduct.Name" required /></label>
-        <label>Price <span class="required-marker" aria-hidden="true">*</span><input type="number" min="0" step="0.01" @bind="_newProduct.Price" required /></label>
-        <label>SKU <input @bind="_newProduct.ProductRetailerId" /></label>
-        <label>Image URL <input @bind="_newProduct.ImageUrl" /> <small>Required for Meta sync (public HTTPS).</small></label>
-        <label>Description <input @bind="_newProduct.Description" /></label>
-        <label>Available <input type="checkbox" @bind="_newProduct.IsAvailable" /></label>
-        <label>Active <input type="checkbox" @bind="_newProduct.IsActive" /></label>
-        <label><span>&nbsp;</span><button type="submit" class="btn btn-primary">Add product</button></label>
+    <form class="portal-form" @onsubmit="CreateProductAsync" @onsubmit:preventDefault>
+        <div class="portal-form-grid portal-form-grid--three">
+            <label><span class="field-label">Category <span class="required-marker" aria-hidden="true">*</span></span>
+                <select @bind="_newProduct.CategoryId" required>
+                    @foreach (var category in _categories.Where(x => x.IsActive))
+                    {
+                        <option value="@category.Id">@category.Name</option>
+                    }
+                </select>
+            </label>
+            <label><span class="field-label">Code <span class="required-marker" aria-hidden="true">*</span></span><input type="number" min="1" @bind="_newProduct.ItemCode" required /></label>
+            <label><span class="field-label">Name <span class="required-marker" aria-hidden="true">*</span></span><input @bind="_newProduct.Name" required /></label>
+            <label><span class="field-label">Price <span class="required-marker" aria-hidden="true">*</span></span><input type="number" min="0" step="0.01" @bind="_newProduct.Price" required /></label>
+            <label><span class="field-label">SKU</span><input @bind="_newProduct.ProductRetailerId" /></label>
+            <label><span class="field-label">Image URL</span><input @bind="_newProduct.ImageUrl" /><small class="portal-field-help">Required for Meta sync (public HTTPS).</small></label>
+            <label class="portal-form-field--span-two"><span class="field-label">Description</span><input @bind="_newProduct.Description" /></label>
+        </div>
+        <div class="portal-form-footer">
+            <div class="portal-check-group">
+                <label class="check-field"><input type="checkbox" @bind="_newProduct.IsAvailable" /><span>Available</span></label>
+                <label class="check-field"><input type="checkbox" @bind="_newProduct.IsActive" /><span>Active</span></label>
+            </div>
+            <div class="form-actions">
+                <button type="submit" class="btn btn-primary">Add product</button>
+            </div>
+        </div>
     </form>
 </section>
 
@@ -83,7 +97,7 @@
         <h2>Products</h2>
     </div>
     <div class="table-responsive">
-        <table class="table align-middle">
+        <table class="table align-middle products-table">
             <thead>
                 <tr>
                     <th>Code</th>
@@ -93,7 +107,7 @@
                     <th>SKU</th>
                     <th>Image</th>
                     <th>Status</th>
-                    <th></th>
+                    <th class="portal-actions-heading">Actions</th>
                 </tr>
             </thead>
             <tbody>
@@ -114,12 +128,14 @@
                     <td><input class="inline-input" @bind="item.ProductRetailerId" disabled="@item.IsSkuLocked" /></td>
                     <td><input class="inline-input" @bind="item.ImageUrl" /></td>
                     <td><span class="status-pill">@item.SyncStatus</span></td>
-                    <td class="action-row">
-                        <label><input type="checkbox" @bind="item.IsAvailable" /> Stock</label>
-                        <label><input type="checkbox" @bind="item.IsActive" /> Active</label>
-                        <button @onclick="() => SaveProductAsync(item)">Save</button>
-                        <button @onclick="() => QueueProductAsync(item)">Sync</button>
-                        <button @onclick="() => DeactivateProductAsync(item)">Deactivate</button>
+                    <td class="portal-actions-cell">
+                        <div class="action-row">
+                            <label class="compact-check"><input type="checkbox" @bind="item.IsAvailable" /> Stock</label>
+                            <label class="compact-check"><input type="checkbox" @bind="item.IsActive" /> Active</label>
+                            <button class="action-primary" @onclick="() => SaveProductAsync(item)">Save</button>
+                            <button class="action-catalog" @onclick="() => QueueProductAsync(item)">Sync</button>
+                            <button @onclick="() => DeactivateProductAsync(item)">Deactivate</button>
+                        </div>
                     </td>
                 </tr>
             }

@@ -10,7 +10,7 @@
         <p>@_restaurant?.Name</p>
         <h1>Catalog sync</h1>
     </div>
-    <div class="toolbar">
+    <div class="toolbar page-head-actions">
         <a href="/admin/blazor">Dashboard</a>
         <a href="/admin/blazor/products/@BusinessId">Products</a>
     </div>
@@ -25,24 +25,28 @@
     <div class="surface-title">
         <h2>Meta connection</h2>
     </div>
-    <div class="form-grid-compact">
-        <label>WABA ID (reference) <input @bind="_settings.WabaId" /></label>
-        <label>Meta Business ID <input @bind="_settings.MetaBusinessId" placeholder="Business Manager ID" /></label>
-        <label>Catalog ID <input @bind="_settings.CatalogId" placeholder="Created here or entered for an existing catalog" /></label>
-        <label>Meta Phone Number ID (must match Business Settings) <input @bind="_settings.PhoneNumberId" /></label>
-        <label>Access Token <input type="password" @bind="_settings.AccessToken" placeholder="Leave blank to keep existing" /></label>
-        <label>Credential reference <input @bind="_settings.CredentialReference" placeholder="For example, Key Vault secret name" /></label>
-        <label>Sync Mode
-            <select @bind="_settings.SyncMode">
-                <option value="default">Default</option>
-                <option value="manual">Manual</option>
-                <option value="automatic">Automatic</option>
-            </select>
-        </label>
-        <label>Enabled <input type="checkbox" @bind="_settings.IsEnabled" /></label>
-        <label>Cart enabled <input type="checkbox" @bind="_settings.IsCartEnabled" /></label>
-        <div class="field-action"><button class="btn btn-primary" @onclick="SaveSettingsAsync">Save connection</button></div>
-    </div>
+    <form class="portal-form" @onsubmit="SaveSettingsAsync" @onsubmit:preventDefault>
+        <div class="portal-form-grid portal-form-grid--three">
+            <label><span class="field-label">WABA ID (reference)</span><input @bind="_settings.WabaId" /></label>
+            <label><span class="field-label">Meta Business ID</span><input @bind="_settings.MetaBusinessId" placeholder="Business Manager ID" /></label>
+            <label><span class="field-label">Catalog ID</span><input @bind="_settings.CatalogId" placeholder="Created here or entered for an existing catalog" /></label>
+            <label><span class="field-label">Meta Phone Number ID</span><input @bind="_settings.PhoneNumberId" /></label>
+            <label><span class="field-label">Access token</span><input type="password" @bind="_settings.AccessToken" placeholder="Leave blank to keep existing" /></label>
+            <label><span class="field-label">Credential reference</span><input @bind="_settings.CredentialReference" placeholder="For example, Key Vault secret name" /></label>
+            <label><span class="field-label">Sync mode</span>
+                <select @bind="_settings.SyncMode">
+                    <option value="default">Default</option>
+                    <option value="manual">Manual</option>
+                    <option value="automatic">Automatic</option>
+                </select>
+            </label>
+            <label class="check-field"><input type="checkbox" @bind="_settings.IsEnabled" /><span>Connection enabled</span></label>
+            <label class="check-field"><input type="checkbox" @bind="_settings.IsCartEnabled" /><span>Cart enabled</span></label>
+        </div>
+        <div class="form-actions">
+            <button type="submit" class="btn btn-primary">Save connection</button>
+        </div>
+    </form>
     <p class="text-muted mb-0">
         Access tokens are write-only and encrypted. Save this connection before creating a catalog.
         @if (_settings.LastSuccessfulSyncAt is not null)
@@ -56,10 +60,14 @@
     <div class="surface-title">
         <h2>Create or connect catalog</h2>
     </div>
-    <div class="form-grid-compact">
-        <label>Catalog name <input @bind="_catalogName" placeholder="Restaurant catalog" /></label>
-        <div class="field-action"><button class="btn btn-outline-primary" @onclick="CreateCatalogAsync" disabled="@(_creatingCatalog || MetaCatalogOptions.Value.DisableSending)">@(_creatingCatalog ? "Creating..." : "Create and connect catalog")</button></div>
-    </div>
+    <form class="portal-form" @onsubmit="CreateCatalogAsync" @onsubmit:preventDefault>
+        <div class="portal-form-grid portal-form-grid--two">
+            <label><span class="field-label">Catalog name</span><input @bind="_catalogName" placeholder="Restaurant catalog" /></label>
+        </div>
+        <div class="form-actions">
+            <button type="submit" class="btn btn-outline-primary" disabled="@(_creatingCatalog || MetaCatalogOptions.Value.DisableSending)">@(_creatingCatalog ? "Creating..." : "Create and connect catalog")</button>
+        </div>
+    </form>
     @if (MetaCatalogOptions.Value.DisableSending)
     {
         <p class="text-muted mb-0">Catalog creation is disabled in this environment. Enable live Meta sending on the API host to use it.</p>
@@ -87,8 +95,8 @@
 <section class="work-surface mb-3">
     <div class="surface-title"><h2>Queue</h2></div>
     <div class="table-responsive">
-        <table class="table align-middle">
-            <thead><tr><th>Product</th><th>Event</th><th>Status</th><th>Retries</th><th>Next</th><th>Error</th><th></th></tr></thead>
+        <table class="table align-middle sync-queue-table">
+            <thead><tr><th>Product</th><th>Event</th><th>Status</th><th>Retries</th><th>Next</th><th>Error</th><th class="portal-actions-heading">Actions</th></tr></thead>
             <tbody>
             @foreach (var item in _queue)
             {
@@ -99,10 +107,10 @@
                     <td>@item.RetryCount</td>
                     <td>@(item.NextAttemptAt?.ToLocalTime().ToString("dd MMM, hh:mm tt") ?? "-")</td>
                     <td>@item.LastError</td>
-                    <td>
+                    <td class="portal-actions-cell">
                         @if (item.Status == "Failed")
                         {
-                            <button @onclick="() => RetryAsync(item.Id)">Retry</button>
+                            <div class="action-row"><button class="action-primary" @onclick="() => RetryAsync(item.Id)">Retry</button></div>
                         }
                         else if (item.Status == "Waiting")
                         {
@@ -119,7 +127,7 @@
 <section class="work-surface">
     <div class="surface-title"><h2>Logs</h2></div>
     <div class="table-responsive">
-        <table class="table align-middle">
+        <table class="table align-middle sync-logs-table">
             <thead><tr><th>Time</th><th>Product</th><th>Event</th><th>Status</th><th>HTTP</th><th>Error</th></tr></thead>
             <tbody>
             @foreach (var log in _logs)

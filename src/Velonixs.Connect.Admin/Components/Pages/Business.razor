@@ -10,7 +10,7 @@
         <p>@_restaurant?.Name</p>
         <h1>Business Settings</h1>
     </div>
-    <div class="toolbar">
+    <div class="toolbar page-head-actions">
         <a href="/admin/blazor">Dashboard</a>
         <a href="/admin/blazor/products/@BusinessId">Products</a>
         <a href="/admin/blazor/orders/@BusinessId">Orders</a>
@@ -33,51 +33,72 @@
 
 <section class="work-surface mb-3">
     <div class="surface-title">
-        <h2>Business Profile</h2>
+        <h2>Business profile</h2>
     </div>
-    <form class="form-grid-compact" @onsubmit="SaveBusinessAsync" @onsubmit:preventDefault>
-        <label>Name <span class="required-marker" aria-hidden="true">*</span><input @bind="_editor.Name" required /></label>
-        <label>Type
-            <select @bind="_editor.BusinessType">
-                @foreach (var type in BusinessTypes.All)
-                {
-                    <option value="@type">@type</option>
-                }
-            </select>
-        </label>
-        <label>WhatsApp Phone ID <span class="required-marker" aria-hidden="true">*</span><input @bind="_editor.WhatsAppPhoneNumberId" required /></label>
-        <label>Business Phone <input @bind="_editor.BusinessPhone" /></label>
-        <label>Notification Email <input type="email" @bind="_editor.NotificationEmail" /></label>
-        <label>Staff WhatsApp <input @bind="_editor.StaffWhatsAppNumber" /></label>
-        <label>Catalog ID <input value="@CatalogIdDisplay" readonly /></label>
-        <label>Meta Catalog <a href="/admin/blazor/sync/@BusinessId">Manage settings and sync</a></label>
-        <label>Address <input @bind="_editor.Address" /></label>
-        <label>CGST % <input type="number" step="0.01" min="0" max="100" @bind="_editor.CgstPercent" /></label>
-        <label>SGST % <input type="number" step="0.01" min="0" max="100" @bind="_editor.SgstPercent" /></label>
-        <label>Active <input type="checkbox" @bind="_editor.IsActive" /></label>
-        <label><span>&nbsp;</span><button type="submit" class="btn btn-primary">Save business</button></label>
+    <form class="portal-form" @onsubmit="SaveBusinessAsync" @onsubmit:preventDefault>
+        <section class="portal-form-section">
+            <h3>Business details</h3>
+            <div class="portal-form-grid portal-form-grid--three">
+                <label><span class="field-label">Name <span class="required-marker" aria-hidden="true">*</span></span><input @bind="_editor.Name" required /></label>
+                <label><span class="field-label">Type</span>
+                    <select @bind="_editor.BusinessType">
+                        @foreach (var type in BusinessTypes.All)
+                        {
+                            <option value="@type">@type</option>
+                        }
+                    </select>
+                </label>
+                <label><span class="field-label">Business phone</span><input @bind="_editor.BusinessPhone" /></label>
+                <label><span class="field-label">Address</span><input @bind="_editor.Address" /></label>
+            </div>
+        </section>
+        <section class="portal-form-section">
+            <h3>WhatsApp and notifications</h3>
+            <div class="portal-form-grid portal-form-grid--three">
+                <label><span class="field-label">WhatsApp Phone ID <span class="required-marker" aria-hidden="true">*</span></span><input @bind="_editor.WhatsAppPhoneNumberId" required /></label>
+                <label><span class="field-label">Staff WhatsApp</span><input @bind="_editor.StaffWhatsAppNumber" /></label>
+                <label><span class="field-label">Notification email</span><input type="email" @bind="_editor.NotificationEmail" /></label>
+                <label><span class="field-label">Catalog ID</span><input value="@CatalogIdDisplay" readonly /></label>
+                <label><span class="field-label">Meta catalog</span><a class="portal-field-link" href="/admin/blazor/sync/@BusinessId">Manage catalog sync</a></label>
+            </div>
+        </section>
+        <section class="portal-form-section">
+            <h3>Tax and status</h3>
+            <div class="portal-form-grid portal-form-grid--three">
+                <label><span class="field-label">CGST %</span><input type="number" step="0.01" min="0" max="100" @bind="_editor.CgstPercent" /></label>
+                <label><span class="field-label">SGST %</span><input type="number" step="0.01" min="0" max="100" @bind="_editor.SgstPercent" /></label>
+                <label class="check-field"><input type="checkbox" @bind="_editor.IsActive" /><span>Business is active</span></label>
+            </div>
+        </section>
+        <div class="form-actions">
+            <button type="submit" class="btn btn-primary">Save business</button>
+        </div>
     </form>
 </section>
 
 <section class="work-surface mb-3">
     <div class="surface-title">
-        <h2>Create Owner Account</h2>
+        <h2>Create owner account</h2>
     </div>
-    <form class="form-grid-compact" @onsubmit="CreateOwnerAsync" @onsubmit:preventDefault>
-        <label>Name <span class="required-marker" aria-hidden="true">*</span><input @bind="_newOwner.DisplayName" required /></label>
-        <label>Email <span class="required-marker" aria-hidden="true">*</span><input type="email" @bind="_newOwner.Email" required /></label>
-        <label>Password <span class="required-marker" aria-hidden="true">*</span><input type="password" @bind="_newOwner.Password" required /></label>
-        <label><span>&nbsp;</span><button type="submit" class="btn btn-primary">Create owner</button></label>
+    <form class="portal-form" @onsubmit="CreateOwnerAsync" @onsubmit:preventDefault>
+        <div class="portal-form-grid portal-form-grid--three">
+            <label><span class="field-label">Name <span class="required-marker" aria-hidden="true">*</span></span><input @bind="_newOwner.DisplayName" required /></label>
+            <label><span class="field-label">Email <span class="required-marker" aria-hidden="true">*</span></span><input type="email" @bind="_newOwner.Email" required /></label>
+            <label><span class="field-label">Temporary password <span class="required-marker" aria-hidden="true">*</span></span><input type="password" @bind="_newOwner.Password" required /></label>
+        </div>
+        <div class="form-actions">
+            <button type="submit" class="btn btn-primary">Create owner</button>
+        </div>
     </form>
 </section>
 
 <section class="work-surface">
     <div class="surface-title">
-        <h2>Business Users</h2>
+        <h2>Business users</h2>
     </div>
     <div class="table-responsive">
-        <table class="table align-middle">
-            <thead><tr><th>Name</th><th>Email</th><th>Role</th><th>Status</th><th>Temporary Password</th><th></th></tr></thead>
+        <table class="table align-middle business-users-table">
+            <thead><tr><th>Name</th><th>Email</th><th>Role</th><th>Status</th><th>Temporary password</th><th class="portal-actions-heading">Actions</th></tr></thead>
             <tbody>
             @foreach (var user in _users)
             {
@@ -87,8 +108,10 @@
                     <td>@user.Role</td>
                     <td><span class="status-pill">@(user.IsActive ? "Active" : "Inactive")</span></td>
                     <td><input class="inline-input" type="password" @bind="user.NewPassword" /></td>
-                    <td class="action-row">
-                        <button @onclick="() => ResetPasswordAsync(user)">Reset password</button>
+                    <td class="portal-actions-cell">
+                        <div class="action-row">
+                            <button class="action-primary" @onclick="() => ResetPasswordAsync(user)">Reset password</button>
+                        </div>
                     </td>
                 </tr>
             }

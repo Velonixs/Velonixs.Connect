@@ -8,15 +8,18 @@
         <p>@_restaurant?.Name</p>
         <h1>Orders</h1>
     </div>
-    <div class="toolbar">
+    <div class="toolbar page-head-actions">
         <a href="/admin/blazor">Dashboard</a>
         <a href="/admin/blazor/products/@BusinessId">Products</a>
     </div>
 </header>
 
 <section class="work-surface">
+    <div class="surface-title">
+        <h2>Order list</h2>
+    </div>
     <div class="table-responsive">
-        <table class="table align-middle">
+        <table class="table align-middle orders-table">
             <thead>
                 <tr>
                     <th>Order</th>
@@ -24,7 +27,7 @@
                     <th>Amount</th>
                     <th>Status</th>
                     <th>Created</th>
-                    <th></th>
+                    <th class="portal-actions-heading">Actions</th>
                 </tr>
             </thead>
             <tbody>
@@ -43,9 +46,11 @@
                         </select>
                     </td>
                     <td>@order.CreatedAt.ToLocalTime().ToString("dd MMM yyyy, hh:mm tt")</td>
-                    <td class="action-row">
-                        <input class="inline-input" placeholder="Comment" @bind="order.Comment" />
-                        <button @onclick="() => UpdateStatusAsync(order)">Save status</button>
+                    <td class="portal-actions-cell">
+                        <div class="action-row">
+                            <input class="inline-input" placeholder="Comment" @bind="order.Comment" />
+                            <button class="action-primary" @onclick="() => UpdateStatusAsync(order)">Save status</button>
+                        </div>
                     </td>
                 </tr>
             }

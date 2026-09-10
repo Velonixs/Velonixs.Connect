@@ -633,6 +633,132 @@ body {
     margin-left: auto;
 }
 
+.portal-form {
+    display: grid;
+    gap: 16px;
+    max-width: 1120px;
+}
+
+.portal-form-section {
+    padding: 0 0 20px;
+}
+
+.portal-form-section + .portal-form-section {
+    border-top: 1px solid #e5edf4;
+    padding-top: 20px;
+}
+
+.portal-form-section h3 {
+    color: #17456f;
+    font-size: 16px;
+    font-weight: 750;
+    line-height: 1.25;
+    margin: 0 0 14px;
+}
+
+.portal-form-grid {
+    display: grid;
+    gap: 16px;
+}
+
+.portal-form-grid--two {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.portal-form-grid--three {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.portal-form-grid label {
+    color: #39536f;
+    display: grid;
+    font-size: 12px;
+    font-weight: 700;
+    gap: 7px;
+    min-width: 0;
+}
+
+.portal-form-grid input,
+.portal-form-grid select {
+    border: 1px solid #c9d8e6;
+    border-radius: 8px;
+    color: var(--admin-ink);
+    min-height: 42px;
+    padding: 9px 11px;
+    width: 100%;
+}
+
+.portal-form-grid input:focus,
+.portal-form-grid select:focus {
+    border-color: #2187c9;
+    box-shadow: 0 0 0 3px rgba(33, 135, 201, 0.13);
+    outline: 0;
+}
+
+.portal-form-grid .portal-field-link {
+    align-items: center;
+    border: 1px solid #c9d8e6;
+    border-radius: 8px;
+    color: #0968ae;
+    display: inline-flex;
+    font-weight: 650;
+    min-height: 42px;
+    padding: 9px 11px;
+    text-decoration: none;
+}
+
+.portal-form-grid .portal-field-link:hover {
+    background: var(--admin-soft-blue);
+    border-color: #90bcdf;
+}
+
+.portal-form-field--span-two {
+    grid-column: span 2;
+}
+
+.portal-field-help {
+    color: var(--admin-muted);
+    font-size: 11px;
+    font-weight: 500;
+    line-height: 1.35;
+}
+
+.portal-form-grid .check-field {
+    align-self: end;
+    min-height: 42px;
+}
+
+.portal-form-footer {
+    align-items: center;
+    display: flex;
+    gap: 16px;
+    justify-content: space-between;
+}
+
+.portal-form-footer .form-actions {
+    margin-left: auto;
+}
+
+.portal-check-group {
+    align-items: center;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 16px;
+}
+
+.compact-check {
+    align-items: center;
+    color: #39536f;
+    display: inline-flex;
+    font-size: 12px;
+    font-weight: 650;
+    gap: 6px;
+    min-height: 36px;
+    white-space: nowrap;
+}
+
+.compact-check input { accent-color: var(--admin-teal); }
+
 .gst-defaults-form {
     display: grid;
     gap: 16px;
@@ -852,6 +978,32 @@ body {
     justify-content: flex-end;
 }
 
+.portal-active-heading,
+.portal-active-cell {
+    text-align: center;
+}
+
+.portal-actions-heading,
+.portal-actions-cell {
+    min-width: 180px;
+    text-align: right;
+}
+
+.portal-actions-cell .action-row {
+    justify-content: flex-end;
+}
+
+.orders-table { min-width: 1040px; }
+.customers-table { min-width: 850px; }
+.business-users-table { min-width: 920px; }
+.categories-table { min-width: 760px; }
+.products-table { min-width: 1500px; }
+.sync-queue-table { min-width: 1050px; }
+.sync-logs-table { min-width: 960px; }
+
+.orders-table .action-row .inline-input { min-width: 190px; }
+.products-table .portal-actions-cell { min-width: 360px; }
+
 .action-row .action-primary { border-color: #90bcdf; color: #0968ae; }
 .action-row .action-catalog { border-color: #8cd0c7; color: #087b71; }
 .action-row .action-danger { border-color: #efb8b8; color: #b63c3c; }
@@ -925,9 +1077,13 @@ body {
 
 @media (max-width: 768px) {
     .business-form-grid--two,
-    .business-form-grid--three {
+    .business-form-grid--three,
+    .portal-form-grid--two,
+    .portal-form-grid--three {
         grid-template-columns: 1fr;
     }
+
+    .portal-form-field--span-two { grid-column: auto; }
 
 }
 
@@ -956,6 +1112,8 @@ body {
     .form-actions .btn { width: 100%; }
     .master-catalog-form-footer { align-items: stretch; flex-direction: column; }
     .master-catalog-form-footer .form-actions { margin-left: 0; width: 100%; }
+    .portal-form-footer { align-items: stretch; flex-direction: column; }
+    .portal-form-footer .form-actions { margin-left: 0; width: 100%; }
     .page-head-actions { width: 100%; }
     .page-head-actions a { flex: 1 1 auto; }
 }

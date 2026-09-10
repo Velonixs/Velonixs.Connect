@@ -8,15 +8,18 @@
         <p>@_restaurant?.Name</p>
         <h1>Customers</h1>
     </div>
-    <div class="toolbar">
+    <div class="toolbar page-head-actions">
         <a href="/admin/blazor">Dashboard</a>
         <a href="/admin/blazor/orders/@BusinessId">Orders</a>
     </div>
 </header>
 
 <section class="work-surface">
+    <div class="surface-title">
+        <h2>Customer list</h2>
+    </div>
     <div class="table-responsive">
-        <table class="table align-middle">
+        <table class="table align-middle customers-table">
             <thead><tr><th>Name</th><th>Phone</th><th>Orders</th><th>Last Address</th><th>Last Active</th></tr></thead>
             <tbody>
             @foreach (var customer in _customers)

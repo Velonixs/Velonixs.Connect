@@ -22,9 +22,8 @@
         <h2>Add category</h2>
     </div>
     <form class="master-catalog-form" @onsubmit="CreateCategoryAsync" @onsubmit:preventDefault>
-        <div class="business-form-grid business-form-grid--three">
+        <div class="business-form-grid business-form-grid--two">
             <label><span class="field-label">Name <span class="required-marker" aria-hidden="true">*</span></span><input @bind="_newCategory.Name" required /></label>
-            <label><span class="field-label">Display order</span><input type="number" @bind="_newCategory.DisplayOrder" /></label>
             <label class="check-field"><input type="checkbox" @bind="_newCategory.IsActive" /><span>Active</span></label>
         </div>
         <div class="form-actions master-catalog-form-actions">
@@ -39,13 +38,12 @@
     </div>
     <div class="table-responsive">
         <table class="table align-middle master-catalog-table master-category-table">
-            <thead><tr><th>Name</th><th>Order</th><th class="catalog-active-heading">Active</th><th class="catalog-actions-heading">Actions</th></tr></thead>
+            <thead><tr><th>Name</th><th class="catalog-active-heading">Active</th><th class="catalog-actions-heading">Actions</th></tr></thead>
             <tbody>
             @foreach (var category in _categories)
             {
                 <tr>
                     <td><input class="inline-input" @bind="category.Name" /></td>
-                    <td><input class="inline-input" type="number" @bind="category.DisplayOrder" /></td>
                     <td class="catalog-active-cell"><input type="checkbox" @bind="category.IsActive" /></td>
                     <td class="catalog-actions-cell">
                         <div class="action-row">
@@ -153,7 +151,8 @@
 
         try
         {
-            await MenuService.CreateMasterCategoryAsync(new CreateMasterMenuCategoryRequest(_newCategory.Name, _newCategory.DisplayOrder, _newCategory.IsActive));
+            await MenuService.CreateMasterCategoryAsync(
+                new CreateMasterMenuCategoryRequest(_newCategory.Name, IsActive: _newCategory.IsActive));
             _newCategory = new MasterCategoryEditor { IsActive = true };
             _message = "Master category added.";
             await LoadAsync();

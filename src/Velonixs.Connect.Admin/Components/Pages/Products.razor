@@ -74,19 +74,29 @@
     <form class="portal-form" @onsubmit="CreateProductAsync" @onsubmit:preventDefault>
         <div class="portal-form-grid portal-form-grid--three">
             <label><span class="field-label">Category <span class="required-marker" aria-hidden="true">*</span></span>
-                <select @bind="_newProduct.CategoryId" required>
+                <select @bind="_newProduct.CategoryId" @bind:after="ResetNewProductMasterItem" required>
                     @foreach (var category in _categories.Where(x => x.IsActive))
                     {
                         <option value="@category.Id">@category.Name</option>
                     }
                 </select>
             </label>
+            <label><span class="field-label">Master item <span class="required-marker" aria-hidden="true">*</span></span>
+                <select @bind="_newProduct.MasterMenuItemId" @bind:after="ApplySelectedMasterItem" required>
+                    <option value="@Guid.Empty" disabled>Select a master item</option>
+                    @foreach (var item in GetMasterItemsForCategory(_newProduct.CategoryId))
+                    {
+                        <option value="@item.Id">@item.Name</option>
+                    }
+                </select>
+                <small class="portal-field-help">Products are defined in the master catalog.</small>
+            </label>
             <label><span class="field-label">Code <span class="required-marker" aria-hidden="true">*</span></span><input type="number" min="1" @bind="_newProduct.ItemCode" required /></label>
-            <label><span class="field-label">Name <span class="required-marker" aria-hidden="true">*</span></span><input @bind="_newProduct.Name" required /></label>
+            <label><span class="field-label">Name</span><input @bind="_newProduct.Name" readonly /></label>
             <label><span class="field-label">Price <span class="required-marker" aria-hidden="true">*</span></span><input type="number" min="0" step="0.01" @bind="_newProduct.Price" required /></label>
             <label><span class="field-label">SKU</span><input @bind="_newProduct.ProductRetailerId" /></label>
             <label><span class="field-label">Image URL</span><input @bind="_newProduct.ImageUrl" /><small class="portal-field-help">Required for Meta sync (public HTTPS).</small></label>
-            <label class="portal-form-field--span-two"><span class="field-label">Description</span><input @bind="_newProduct.Description" /></label>
+            <label class="portal-form-field--span-two"><span class="field-label">Description</span><input @bind="_newProduct.Description" readonly /></label>
             <label><span class="field-label">Menu type</span>
                 <select @bind="_newProduct.IsVegetarian">
                     <option value="true">Vegetarian</option>
@@ -172,6 +182,7 @@
     private readonly List<CategoryEditor> _categories = new();
     private readonly List<ProductEditor> _products = new();
     private IReadOnlyCollection<MasterMenuCategoryResponse> _masterCategories = Array.Empty<MasterMenuCategoryResponse>();
+    private IReadOnlyCollection<MasterMenuItemResponse> _masterItems = Array.Empty<MasterMenuItemResponse>();
     private CategoryEditor _newCategory = new();
     private ProductEditor _newProduct = new() { IsActive = true, IsAvailable = true };
 
@@ -188,6 +199,7 @@
         _categories.Clear();
         _products.Clear();
         _masterCategories = masterCatalog.Categories;
+        _masterItems = masterCatalog.Items;
 
         if (menu is not null)
         {
@@ -254,13 +266,15 @@
 
     private async Task CreateProductAsync()
     {
-        if (_newProduct.CategoryId != Guid.Empty && !string.IsNullOrWhiteSpace(_newProduct.Name))
+        var masterItem = GetMasterItemsForCategory(_newProduct.CategoryId)
+            .FirstOrDefault(item => item.Id == _newProduct.MasterMenuItemId);
+        if (masterItem is not null)
         {
             var item = await MenuService.CreateItemAsync(
                 BusinessId,
                 new CreateMenuItemRequest(
                     _newProduct.CategoryId,
-                    null,
+                    masterItem.Id,
                     _newProduct.ItemCode,
                     _newProduct.Name,
                     _newProduct.Description,
@@ -272,6 +286,37 @@
                     IsVegetarian: _newProduct.IsVegetarian));
             await LoadAsync();
         }
+    }
+
+    private IEnumerable<MasterMenuItemResponse> GetMasterItemsForCategory(Guid restaurantCategoryId)
+    {
+        var masterCategoryId = _categories
+            .FirstOrDefault(category => category.Id == restaurantCategoryId)
+            ?.MasterCategoryId;
+
+        return masterCategoryId is Guid id
+            ? _masterItems.Where(item => item.IsActive && item.MasterCategoryId == id)
+            : Enumerable.Empty<MasterMenuItemResponse>();
+    }
+
+    private void ResetNewProductMasterItem()
+    {
+        _newProduct.MasterMenuItemId = Guid.Empty;
+        _newProduct.Name = string.Empty;
+        _newProduct.Description = null;
+    }
+
+    private void ApplySelectedMasterItem()
+    {
+        var masterItem = GetMasterItemsForCategory(_newProduct.CategoryId)
+            .FirstOrDefault(item => item.Id == _newProduct.MasterMenuItemId);
+        if (masterItem is null)
+        {
+            return;
+        }
+
+        _newProduct.Name = masterItem.Name;
+        _newProduct.Description = masterItem.Description;
     }
 
     private async Task SaveProductAsync(ProductEditor item)
@@ -331,6 +376,7 @@
     {
         public Guid Id { get; set; }
         public Guid CategoryId { get; set; }
+        public Guid MasterMenuItemId { get; set; }
         public int ItemCode { get; set; }
         public string Name { get; set; } = string.Empty;
         public string? Description { get; set; }

@@ -960,7 +960,7 @@ body {
     justify-content: flex-end;
 }
 
-.master-category-table { min-width: 720px; }
+.master-category-table { min-width: 580px; }
 .master-item-table { min-width: 1020px; }
 
 .catalog-active-heading,

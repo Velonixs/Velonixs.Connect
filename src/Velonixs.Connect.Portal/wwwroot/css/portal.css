@@ -471,6 +471,50 @@ body {
     box-shadow: 0 10px 30px rgba(20, 32, 38, 0.06);
 }
 
+.portal-classic-header {
+    min-height: 78px;
+    padding-block: 10px;
+    position: sticky;
+}
+
+.portal-classic-header .container-fluid {
+    position: relative;
+    z-index: 1;
+}
+
+.portal-classic-header .brand span {
+    display: none;
+}
+
+.portal-classic-header .brand-logo {
+    height: 56px;
+    width: 72px;
+}
+
+.portal-classic-title {
+    color: var(--brand-dark);
+    display: grid;
+    gap: 2px;
+    left: 50%;
+    position: absolute;
+    text-align: center;
+    top: 50%;
+    transform: translate(-50%, -50%);
+    z-index: 0;
+}
+
+.portal-classic-title strong {
+    font-size: clamp(17px, 2vw, 22px);
+    letter-spacing: -0.02em;
+    line-height: 1.15;
+}
+
+.portal-classic-title span {
+    color: var(--muted);
+    font-size: 12px;
+    font-weight: 650;
+}
+
 .navbar-brand.brand {
     min-width: 0;
 }
@@ -752,6 +796,13 @@ tbody tr:hover {
 }
 
 @media (max-width: 992px) {
+    .portal-classic-title {
+        left: auto;
+        margin-left: 82px;
+        text-align: left;
+        transform: translateY(-50%);
+    }
+
     .navbar-collapse {
         background: rgba(255, 255, 255, 0.96);
         border: 1px solid rgba(23, 107, 135, 0.1);
@@ -883,6 +934,15 @@ tbody tr:hover {
 }
 
 @media (max-width: 480px) {
+    .portal-classic-title {
+        display: none;
+    }
+
+    .portal-classic-header .brand-logo {
+        height: 46px;
+        width: 58px;
+    }
+
     .brand span:last-child {
         max-width: 190px;
         overflow: hidden;

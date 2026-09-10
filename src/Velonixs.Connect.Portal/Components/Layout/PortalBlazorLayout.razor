@@ -1,7 +1,19 @@
 @inherits LayoutComponentBase
 @inject NavigationManager Navigation
 
-<div class="portal-blazor-shell">
+<div class="portal-application">
+    <header class="portal-application-header">
+        <a class="portal-header-logo" href="/portal/blazor" aria-label="Velonixs Business Portal home">
+            <img class="portal-header-logo-image" src="/images/velonixs-logo.jpg" alt="Velonixs Systems Private Limited logo" />
+        </a>
+        <div class="portal-application-title">
+            <strong>Velonixs Systems Private Limited</strong>
+            <span>Business Portal <span aria-hidden="true">&middot;</span> Restaurant team</span>
+        </div>
+        <div aria-hidden="true"></div>
+    </header>
+
+    <div class="portal-blazor-shell">
     <aside class="portal-blazor-sidebar">
         <a class="portal-blazor-brand" href="/portal/blazor">
             <img class="portal-blazor-logo" src="/images/velonixs-logo.jpg" alt="Velonixs Systems Private Limited logo" />
@@ -11,6 +23,7 @@
             </span>
         </a>
 
+        <p class="portal-blazor-nav-label">Business workspace</p>
         <nav class="portal-blazor-nav" aria-label="Business portal">
             <a class="@NavClass("/portal/blazor")" href="/portal/blazor">Dashboard</a>
             <a class="@NavClass("/portal/blazor/menu")" href="/portal/blazor/menu">Menu</a>
@@ -37,6 +50,7 @@
     <main class="portal-blazor-main">
         @Body
     </main>
+    </div>
 </div>
 
 @code {

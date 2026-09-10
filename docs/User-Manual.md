@@ -7,7 +7,7 @@ The primary workspaces are:
 - **Admin Blazor:** `http://localhost:5080/admin/blazor`
 - **Business Portal Blazor:** `http://localhost:5090/portal/blazor`
 
-> Important: Velonixs Connect can synchronize products to an **existing** Meta catalog. It does not create a Meta Business account, WhatsApp Business Account, phone number, or catalog for you. Provision those assets in Meta first.
+> Important: Velonixs Connect creates and manages the **commerce catalog** from Admin Blazor, then attaches it to the selected WhatsApp Business Account. A Meta Business account, WhatsApp Business Account (WABA), registered phone number, and appropriately-permitted Meta access token must still exist before the catalog can be created.
 
 ## 1. Prerequisites and local setup
 
@@ -135,26 +135,29 @@ Confirming an order requires a ready-time of 1-1,440 minutes. Rejecting it requi
 
 ## 5. WhatsApp catalog and Meta synchronization
 
-### Configure the customer catalog
+### Create and publish the customer catalog from Admin
 
-Before enabling live sync, create the Meta catalog and collect its Catalog ID, WABA ID, phone number ID, and a token that can manage catalog items. In Admin Blazor:
+Use the Admin application as the restaurant menu and catalog source of truth. Do not add or maintain restaurant products manually in Meta. Before starting, have the Meta Business ID, WABA ID, the restaurant's WhatsApp Phone Number ID, and a long-lived Meta access token with catalog and WhatsApp asset permissions.
 
-1. Open the business **Settings** and ensure the business WhatsApp Phone Number ID is correct. This ID routes customer messages to the business.
-2. Open **Catalog Sync**.
-3. Enter the Meta WABA ID (reference), **existing Catalog ID**, the Meta phone number ID that exactly matches the business routing ID, and an access token.
-4. Select a sync mode and save. Enabling sync requires a Catalog ID and access token.
+1. On **Dashboard**, select **Add business** and enter the restaurant's details. The **WhatsApp Phone Number ID** must be the ID for the actual business number, not the display phone number. Create the business and owner account.
+2. In the new business row, select **Products**. Create the menu categories first, then add each product with its name, price, availability, a stable SKU/retailer ID, and a public non-loopback HTTPS image URL. The image is mandatory for live Meta synchronization.
+3. Select **Catalog sync** for that business. Under **Connect Meta**, enter the Meta Business ID, WABA ID, the same Meta phone number ID saved for the business, and the access token. Leave **Catalog ID** blank, choose **Default** or **Automatic**, keep the connection disabled, then select **Save connection**.
+4. Under **Create or connect a Meta catalog**, enter a catalog name and select **Create and connect catalog**. Velonixs creates the commerce catalog in Meta, attaches it to the WABA, saves the returned Catalog ID automatically, enables the connection, and queues the locally managed products. No manual catalog-ID copy/paste is required.
+5. Under **Publish menu to Meta**, select **Queue menu for sync**. The API worker processes the queue automatically; use **Process pending** only when the Admin host is also configured for live sending. Wait for every active product to show **Synced** in the queue. Correct failed rows and use **Retry**.
+6. In Meta, configure the WhatsApp webhook callback only: `https://<your-domain>/api/webhooks/whatsapp`. Subscribe to `messages` and use the API's `WhatsApp__VerifyToken`. Do not use Meta as the place to edit this restaurant's menu.
+7. After at least one product is **Synced**, send **Hi** to the restaurant's configured WhatsApp number. The customer receives WhatsApp's native **View catalog** card, selects multiple products and quantities, and submits the cart.
 
-The Catalog ID is also copied to the business's WhatsApp Catalog ID. Customer product-list messages use that ID only for products whose sync status is **Synced** and whose returned Meta product ID has been recorded; product retailer IDs must match the retailer IDs in the Meta catalog. Catalog credentials and queue controls are limited to `PlatformAdmin`; business users manage local products through the Portal.
+If the catalog was already created outside Velonixs, enter its catalog ID in step 3 instead, enable the connection, and then queue the menu. The Catalog ID is also copied to the business's WhatsApp Catalog ID. A native WhatsApp catalog message is sent only when the catalog is enabled, cart is enabled, and at least one active, available product has a retailer ID, Meta product ID, and **Synced** status. Catalog credentials and queue controls are limited to `PlatformAdmin`; business users manage local products through the Portal.
 
 Webhook verification and Cloud-message delivery use the API-wide `WhatsApp` configuration, not a per-business catalog form. Configure its verify token and app secret in the API host as shown below.
 
-If you change a business's Catalog ID, Velonixs clears every recorded Meta product ID and removes those products from WhatsApp product-list messages until the new catalog is synchronized. In Default/Automatic mode it queues that reconciliation automatically; if the host stops immediately after the settings save, the API worker detects the resulting `NotQueued` products and resumes that reconciliation on its next pass. In Manual mode choose **Sync all** after saving. Cleanup of items in the old external Meta catalog remains an operator task because its credentials/catalog context were replaced.
+If you change a business's Catalog ID, Velonixs clears every recorded Meta product ID and withholds the native catalog message until the new catalog is synchronized. In Default/Automatic mode it queues that reconciliation automatically; if the host stops immediately after the settings save, the API worker detects the resulting `NotQueued` products and resumes that reconciliation on its next pass. In Manual mode choose **Queue menu for sync** after saving. Cleanup of items in the old external Meta catalog remains an operator task because its credentials/catalog context were replaced.
 
 ### Sync modes and queue
 
 - **Default** and **Automatic:** creating, editing, or deactivating a product queues its catalog event while the business connection is enabled. Changes made while sync is unavailable are marked for reconciliation; after a connection is re-enabled, the API worker resumes paused work and queues those marked products without resetting unrelated failed items.
-- **Manual:** product changes do not auto-queue. Switching into Manual cancels outstanding automatic snapshots and marks their affected products for explicit reconciliation, so use a product's **Sync** button or **Sync all** to queue the current state deliberately.
-- **Sync all:** queues updates for active products and delete events for inactive products, reconciling changes made while sync was disabled or manual.
+- **Manual:** product changes do not auto-queue. Switching into Manual cancels outstanding automatic snapshots and marks their affected products for explicit reconciliation, so use a product's **Sync** button or **Queue menu for sync** to queue the current state deliberately.
+- **Queue menu for sync:** queues updates for active products and delete events for inactive products, reconciling changes made while sync was disabled or manual.
 - **Process pending:** normal production processing is owned by the API worker (every 60 seconds by default). The Admin button is available only when that Admin host is itself configured for live sending.
 
 The queue coalesces outstanding work for a product and serializes an in-flight event before a later create/update/delete event for the same SKU. It records `Pending`, `Waiting`, `Processing`, `Paused`, `Synced`, `Simulated`, `Cancelled`, or `Failed` outcomes, retry count, next attempt, and the latest error. Failed entries can be retried from the screen; normal retries use backoff and the default maximum is five attempts.
@@ -167,9 +170,9 @@ Meta catalog sending is disabled by default. Keep this setting on while validati
 META_CATALOG_DISABLE_SENDING=true
 ```
 
-With dry run enabled, queue items complete as **Simulated** and no HTTP request is sent to Meta. You must still save a Catalog ID and non-empty access token before enabling the business connection. A simulated result does not add products to Meta.
+With dry run enabled, queue items complete as **Simulated** and no HTTP request is sent to Meta. The Admin catalog-creation action is disabled in this mode, so turn on live catalog sending before selecting **Create and connect catalog**. A simulated result does not add products to Meta.
 
-After checking the outgoing catalog details and preparing the target catalog, set the API environment setting to `META_CATALOG_DISABLE_SENDING=false` and restart the API. The next API queue pass automatically replays prior **Simulated** work in product order. The service upserts create/update events by product retailer ID and records Meta's returned product ID; it uses that recorded ID for later deletions. Check the queue and logs for **Synced** or **Failed** results; do not treat a local product record or dry-run result as proof that a remote Meta product exists.
+To create the catalog from the Admin UI, set `MetaCatalog__DisableSending=false` on both the **Admin host** (which performs the creation) and the **API host** (which owns the background synchronization worker), then restart them. The next API queue pass automatically replays prior **Simulated** work in product order. The service upserts create/update events by product retailer ID and records Meta's returned product ID; it uses that recorded ID for later deletions. Check the queue and logs for **Synced** or **Failed** results; do not treat a local product record or dry-run result as proof that a remote Meta product exists.
 
 For real WhatsApp customer messaging, configure the API separately with:
 
@@ -197,10 +200,10 @@ Use the same `WhatsApp__VerifyToken` in Meta during verification. Configure `Wha
 When a customer sends `Hi`, `Menu`, or `Order`:
 
 1. The application identifies the active business from the webhook phone-number ID.
-2. If that business has a WhatsApp Catalog ID and eligible active, in-stock products in active categories with retailer IDs that are confirmed **Synced** to Meta, it sends a WhatsApp product list. The list contains up to 30 products across up to 10 sections.
-3. If no catalog list is configured/eligible, it falls back to a numbered, paged menu (six products per page). Customers can also search by item name or use `Order: 1 x 2, 4 x 1`.
-4. A customer may send a WhatsApp catalog cart. The application accepts only retailer IDs that map to confirmed-synced, active, available local products in active categories, then shows the cart.
-5. The customer selects quantity (buttons offer 1-3; typed quantities from 1-100 are accepted), reviews the cart, chooses delivery or pickup, gives a name/address when needed, and replies **Yes** to confirm.
+2. If that business has an enabled WhatsApp Catalog ID, an enabled cart, and eligible active, in-stock products in active categories that are confirmed **Synced** to Meta, it sends WhatsApp's native **View catalog** message.
+3. The customer opens the native catalog, selects one or more products, changes quantities in the WhatsApp cart, and submits the complete cart.
+4. The submitted catalog cart is accepted only when its catalog and retailer IDs map to confirmed-synced, active, available local products in active categories. Velonixs recalculates prices from its local menu rather than trusting the submitted price.
+5. The customer reviews the recalculated cart, chooses delivery or pickup, gives a name/address when needed, and replies **Yes** to confirm.
 6. The system creates a `PendingConfirmation` WhatsApp order, stores the current tax values with it, and notifies configured staff by email and/or WhatsApp when sending is enabled.
 
 Customers can cancel, ask for the business address, or ask to connect to staff. Staff-handover requests notify the configured notification email when SMTP is enabled.

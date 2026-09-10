@@ -8,7 +8,7 @@
 <header class="page-head">
     <div>
         <p>@_restaurant?.Name</p>
-        <h1>Catalog Sync</h1>
+        <h1>Catalog sync</h1>
     </div>
     <div class="toolbar">
         <a href="/admin/blazor">Dashboard</a>
@@ -22,7 +22,9 @@
 }
 
 <section class="work-surface mb-3">
-    <div class="surface-title"><h2>Meta Settings</h2></div>
+    <div class="surface-title">
+        <h2>Meta connection</h2>
+    </div>
     <div class="form-grid-compact">
         <label>WABA ID (reference) <input @bind="_settings.WabaId" /></label>
         <label>Meta Business ID <input @bind="_settings.MetaBusinessId" placeholder="Business Manager ID" /></label>
@@ -39,10 +41,10 @@
         </label>
         <label>Enabled <input type="checkbox" @bind="_settings.IsEnabled" /></label>
         <label>Cart enabled <input type="checkbox" @bind="_settings.IsCartEnabled" /></label>
-        <label><span>&nbsp;</span><button class="btn btn-primary" @onclick="SaveSettingsAsync">Save settings</button></label>
+        <div class="field-action"><button class="btn btn-primary" @onclick="SaveSettingsAsync">Save connection</button></div>
     </div>
     <p class="text-muted mb-0">
-        Access tokens are write-only and encrypted at rest. Use a credential reference when the token is managed outside this application. To create a new catalog here, first save the Meta business ID, WABA ID, phone number ID, and access token with the connection disabled.
+        Access tokens are write-only and encrypted. Save this connection before creating a catalog.
         @if (_settings.LastSuccessfulSyncAt is not null)
         {
             <span> Last successful remote sync: @_settings.LastSuccessfulSyncAt.Value.ToLocalTime().ToString("dd MMM yyyy, hh:mm tt").</span>
@@ -51,10 +53,12 @@
 </section>
 
 <section class="work-surface mb-3">
-    <div class="surface-title"><h2>Create and connect Meta catalog</h2></div>
+    <div class="surface-title">
+        <h2>Create or connect catalog</h2>
+    </div>
     <div class="form-grid-compact">
         <label>Catalog name <input @bind="_catalogName" placeholder="Restaurant catalog" /></label>
-        <label><span>&nbsp;</span><button class="btn btn-outline-primary" @onclick="CreateCatalogAsync" disabled="@(_creatingCatalog || MetaCatalogOptions.Value.DisableSending)">@(_creatingCatalog ? "Creating..." : "Create catalog in Meta")</button></label>
+        <div class="field-action"><button class="btn btn-outline-primary" @onclick="CreateCatalogAsync" disabled="@(_creatingCatalog || MetaCatalogOptions.Value.DisableSending)">@(_creatingCatalog ? "Creating..." : "Create and connect catalog")</button></div>
     </div>
     @if (MetaCatalogOptions.Value.DisableSending)
     {
@@ -62,15 +66,15 @@
     }
     else
     {
-        <p class="text-muted mb-0">This creates a commerce catalog, attaches it to the configured WABA, saves its ID, enables the connection, and queues the products managed in this admin application.</p>
+        <p class="text-muted mb-0">Creates the catalog, connects it to WhatsApp, and queues local products.</p>
     }
 </section>
 
 <section class="work-surface mb-3">
     <div class="surface-title">
-        <h2>Actions</h2>
+        <h2>Publish menu</h2>
         <div class="toolbar">
-            <button @onclick="QueueAllAsync">Sync all</button>
+            <button class="btn btn-primary" @onclick="QueueAllAsync">Queue menu for sync</button>
             <button @onclick="ProcessAsync" disabled="@MetaCatalogOptions.Value.DisableSending">Process pending</button>
         </div>
     </div>

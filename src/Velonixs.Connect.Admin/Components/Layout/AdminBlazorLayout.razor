@@ -4,16 +4,21 @@
     <aside class="blazor-sidebar">
         <a class="blazor-brand" href="/admin/blazor">
             <img class="blazor-brand-logo" src="/images/velonixs-logo.jpg" alt="Velonixs Systems Private Limited logo" />
-            <span><strong>Velonixs</strong><small>Admin Portal</small></span>
+            <span><strong>Velonixs</strong><small>Commerce control</small></span>
         </a>
+        <p class="blazor-nav-label">Workspace</p>
         <nav>
-            <a href="/admin/blazor">Dashboard</a>
-            <a href="/admin/blazor/master-catalog">Master Catalog</a>
+            <NavLink href="/admin/blazor" Match="NavLinkMatch.All">Dashboard</NavLink>
+            <NavLink href="/admin/blazor/master-catalog">Master catalog</NavLink>
             <form method="post" action="/admin/logout">
                 <AntiforgeryToken />
                 <button type="submit">Sign out</button>
             </form>
         </nav>
+        <div class="blazor-sidebar-footer">
+            <span class="blazor-sidebar-dot" aria-hidden="true"></span>
+            <span>Platform administrator</span>
+        </div>
     </aside>
     <main class="blazor-main">
         @Body

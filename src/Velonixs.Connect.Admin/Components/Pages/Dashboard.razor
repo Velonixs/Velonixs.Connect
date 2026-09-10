@@ -4,19 +4,23 @@
 @inject IPlatformAdministrationService PlatformAdministrationService
 @inject NavigationManager Navigation
 
-<header class="page-head">
+<header class="page-head dashboard-head">
     <div>
-        <p>Blazor Admin</p>
+        <p>Platform admin</p>
         <h1>Dashboard</h1>
+    </div>
+    <div class="toolbar page-head-actions">
+        <a href="/admin/blazor/master-catalog">Master catalog</a>
+        <a class="btn btn-primary" href="#business-onboarding">Add business</a>
     </div>
 </header>
 
 <section class="metric-grid">
     <article><span>Businesses</span><strong>@_businesses.Count</strong></article>
-    <article><span>Active Products</span><strong>@_activeProducts</strong></article>
-    <article><span>Pending Sync</span><strong>@_pendingSync</strong></article>
-    <article><span>Today's Orders</span><strong>@_todaysOrders</strong></article>
-    <article><span>Total Revenue</span><strong>Rs @_revenue.ToString("0.##")</strong></article>
+    <article><span>Active products</span><strong>@_activeProducts</strong></article>
+    <article><span>Pending sync</span><strong>@_pendingSync</strong></article>
+    <article><span>Today's orders</span><strong>@_todaysOrders</strong></article>
+    <article><span>Total revenue</span><strong>Rs @_revenue.ToString("0.##")</strong></article>
 </section>
 
 @if (!string.IsNullOrWhiteSpace(_message))
@@ -26,42 +30,65 @@
 
 <section class="work-surface mb-3">
     <div class="surface-title">
-        <h2>Platform GST Defaults</h2>
+        <h2>GST defaults</h2>
     </div>
-    <div class="form-grid-compact">
-        <label>CGST % <input type="number" step="0.01" min="0" max="100" @bind="_tax.CgstPercent" /></label>
-        <label>SGST % <input type="number" step="0.01" min="0" max="100" @bind="_tax.SgstPercent" /></label>
-        <label><span>&nbsp;</span><button class="btn btn-primary" @onclick="SaveTaxAsync">Save defaults</button></label>
-    </div>
+    <form class="gst-defaults-form" @onsubmit="SaveTaxAsync" @onsubmit:preventDefault>
+        <div class="business-form-grid business-form-grid--two">
+            <label><span class="field-label">CGST %</span><input type="number" step="0.01" min="0" max="100" @bind="_tax.CgstPercent" /></label>
+            <label><span class="field-label">SGST %</span><input type="number" step="0.01" min="0" max="100" @bind="_tax.SgstPercent" /></label>
+        </div>
+        <div class="form-actions gst-defaults-actions">
+            <button type="submit" class="btn btn-primary">Save defaults</button>
+        </div>
+    </form>
 </section>
 
-<section class="work-surface mb-3">
+<section id="business-onboarding" class="work-surface onboarding-surface mb-3">
     <div class="surface-title">
-        <h2>Create Business</h2>
+        <h2>Create business</h2>
     </div>
-    <form class="form-grid-compact" @onsubmit="CreateBusinessAsync" @onsubmit:preventDefault>
-        <label>Name <span class="required-marker" aria-hidden="true">*</span><input @bind="_newBusiness.Name" required /></label>
-        <label>Type <span class="required-marker" aria-hidden="true">*</span>
-            <select @bind="_newBusiness.BusinessType">
-                @foreach (var type in BusinessTypes.All)
-                {
-                    <option value="@type">@type</option>
-                }
-            </select>
-        </label>
-        <label>WhatsApp Phone ID <span class="required-marker" aria-hidden="true">*</span><input @bind="_newBusiness.WhatsAppPhoneNumberId" required /></label>
-        <label>Business Phone <input @bind="_newBusiness.BusinessPhone" /></label>
-        <label>Notification Email <input @bind="_newBusiness.NotificationEmail" /></label>
-        <label>Staff WhatsApp <input @bind="_newBusiness.StaffWhatsAppNumber" /></label>
-        <label>Meta Catalog <span>Configure it from Catalog Sync after the business is created.</span></label>
-        <label>Address <input @bind="_newBusiness.Address" /></label>
-        <label>CGST % <input type="number" step="0.01" min="0" max="100" @bind="_newBusiness.CgstPercent" /></label>
-        <label>SGST % <input type="number" step="0.01" min="0" max="100" @bind="_newBusiness.SgstPercent" /></label>
-        <label>Owner Name <span class="required-marker" aria-hidden="true">*</span><input @bind="_newBusiness.OwnerName" required /></label>
-        <label>Owner Email <span class="required-marker" aria-hidden="true">*</span><input type="email" @bind="_newBusiness.OwnerEmail" required /></label>
-        <label>Owner Password <span class="required-marker" aria-hidden="true">*</span><input type="password" @bind="_newBusiness.OwnerPassword" required /></label>
-        <label>Active <input type="checkbox" @bind="_newBusiness.IsActive" /></label>
-        <label><span>&nbsp;</span><button type="submit" class="btn btn-primary">Create business</button></label>
+    <form class="business-create-form" @onsubmit="CreateBusinessAsync" @onsubmit:preventDefault>
+        <section class="business-form-section">
+            <h3>Business details</h3>
+            <div class="business-form-grid business-form-grid--two">
+                <label><span class="field-label">Name <span class="required-marker" aria-hidden="true">*</span></span><input @bind="_newBusiness.Name" required /></label>
+                <label><span class="field-label">Type <span class="required-marker" aria-hidden="true">*</span></span>
+                    <select @bind="_newBusiness.BusinessType">
+                        @foreach (var type in BusinessTypes.All)
+                        {
+                            <option value="@type">@type</option>
+                        }
+                    </select>
+                </label>
+                <label><span class="field-label">Business phone</span><input @bind="_newBusiness.BusinessPhone" /></label>
+                <label><span class="field-label">Address</span><input @bind="_newBusiness.Address" /></label>
+            </div>
+        </section>
+
+        <section class="business-form-section">
+            <h3>WhatsApp and notifications</h3>
+            <div class="business-form-grid business-form-grid--three">
+                <label><span class="field-label">WhatsApp Phone Number ID <span class="required-marker" aria-hidden="true">*</span></span><input @bind="_newBusiness.WhatsAppPhoneNumberId" required /></label>
+                <label><span class="field-label">Staff WhatsApp number</span><input @bind="_newBusiness.StaffWhatsAppNumber" /></label>
+                <label><span class="field-label">Notification email</span><input type="email" @bind="_newBusiness.NotificationEmail" /></label>
+                <label><span class="field-label">CGST %</span><input type="number" step="0.01" min="0" max="100" @bind="_newBusiness.CgstPercent" /></label>
+                <label><span class="field-label">SGST %</span><input type="number" step="0.01" min="0" max="100" @bind="_newBusiness.SgstPercent" /></label>
+                <label class="check-field"><input type="checkbox" @bind="_newBusiness.IsActive" /> <span>Business is active</span></label>
+            </div>
+        </section>
+
+        <section class="business-form-section">
+            <h3>Owner access</h3>
+            <div class="business-form-grid business-form-grid--three">
+                <label><span class="field-label">Owner name <span class="required-marker" aria-hidden="true">*</span></span><input @bind="_newBusiness.OwnerName" required /></label>
+                <label><span class="field-label">Owner email <span class="required-marker" aria-hidden="true">*</span></span><input type="email" @bind="_newBusiness.OwnerEmail" required /></label>
+                <label><span class="field-label">Temporary password <span class="required-marker" aria-hidden="true">*</span></span><input type="password" @bind="_newBusiness.OwnerPassword" required /></label>
+            </div>
+        </section>
+
+        <div class="form-actions">
+            <button type="submit" class="btn btn-primary">Create business and continue</button>
+        </div>
     </form>
 </section>
 
@@ -70,7 +97,7 @@
         <h2>Businesses</h2>
     </div>
     <div class="table-responsive">
-        <table class="table align-middle">
+        <table class="table align-middle businesses-table">
             <thead>
                 <tr>
                     <th>Name</th>
@@ -78,7 +105,7 @@
                     <th>Status</th>
                     <th>Products</th>
                     <th>Orders</th>
-                    <th></th>
+                    <th class="business-actions-heading">Actions</th>
                 </tr>
             </thead>
             <tbody>
@@ -90,12 +117,14 @@
                     <td><span class="status-pill">@((business.IsActive) ? "Active" : "Inactive")</span></td>
                     <td>@business.ActiveProductCount</td>
                     <td>@business.OrderCount</td>
-                    <td class="action-row">
-                        <a href="/admin/blazor/businesses/@business.BusinessId">Settings</a>
-                        <a href="/admin/blazor/products/@business.BusinessId">Products</a>
-                        <a href="/admin/blazor/orders/@business.BusinessId">Orders</a>
-                        <a href="/admin/blazor/customers/@business.BusinessId">Customers</a>
-                        <a href="/admin/blazor/sync/@business.BusinessId">Sync</a>
+                    <td class="business-actions">
+                        <div class="action-row">
+                            <a href="/admin/blazor/businesses/@business.BusinessId">Settings</a>
+                            <a class="action-primary" href="/admin/blazor/products/@business.BusinessId">Products</a>
+                            <a href="/admin/blazor/orders/@business.BusinessId">Orders</a>
+                            <a href="/admin/blazor/customers/@business.BusinessId">Customers</a>
+                            <a class="action-catalog" href="/admin/blazor/sync/@business.BusinessId">Catalog sync</a>
+                        </div>
                     </td>
                 </tr>
             }

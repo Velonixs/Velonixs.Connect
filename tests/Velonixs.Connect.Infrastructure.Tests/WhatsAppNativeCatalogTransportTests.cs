@@ -76,6 +76,32 @@ public sealed class WhatsAppNativeCatalogTransportTests
     }
 
     [Fact]
+    public async Task SendCatalogMessageAsync_ReturnsFailureWhenLiveSendingHasNoAccessToken()
+    {
+        await using var dbContext = MetaCatalogTestSupport.CreateDbContext();
+        var handler = new RecordingHttpMessageHandler();
+        var sender = new WhatsAppCloudMessageSender(
+            new HttpClient(handler),
+            Options.Create(new WhatsAppOptions
+            {
+                BaseUrl = "https://graph.example.test",
+                DisableSending = false
+            }),
+            NullLogger<WhatsAppCloudMessageSender>.Instance,
+            dbContext);
+
+        var result = await sender.SendCatalogMessageAsync(
+            "phone-number-id",
+            "919876543210",
+            "Browse today's menu.");
+
+        Assert.False(result.IsSuccess);
+        Assert.False(result.IsSkipped);
+        Assert.Equal("No WhatsApp access token is configured for this phone number.", result.Error);
+        Assert.Empty(handler.Requests);
+    }
+
+    [Fact]
     public async Task Receive_MapsEveryNativeOrderLineIncludingQuantitiesAndSubmittedPrices()
     {
         var conversationService = new CapturingConversationService();

@@ -21,7 +21,15 @@
     </div>
     <form class="portal-form" @onsubmit="CreateCategoryAsync" @onsubmit:preventDefault>
         <div class="portal-form-grid portal-form-grid--three">
-            <label><span class="field-label">Name <span class="required-marker" aria-hidden="true">*</span></span><input @bind="_newCategory.Name" required /></label>
+            <label><span class="field-label">Master category <span class="required-marker" aria-hidden="true">*</span></span>
+                <select @bind="_newCategory.MasterCategoryId" required>
+                    <option value="@Guid.Empty" disabled>Select a master category</option>
+                    @foreach (var category in _masterCategories.Where(category => category.IsActive))
+                    {
+                        <option value="@category.Id">@category.Name</option>
+                    }
+                </select>
+            </label>
             <label><span class="field-label">Display order</span><input type="number" @bind="_newCategory.DisplayOrder" /></label>
             <label class="check-field"><input type="checkbox" @bind="_newCategory.IsActive" /><span>Active</span></label>
         </div>
@@ -37,12 +45,12 @@
     </div>
     <div class="table-responsive">
         <table class="table align-middle categories-table">
-            <thead><tr><th>Name</th><th>Order</th><th class="portal-active-heading">Active</th><th class="portal-actions-heading">Actions</th></tr></thead>
+            <thead><tr><th>Master category</th><th>Order</th><th class="portal-active-heading">Active</th><th class="portal-actions-heading">Actions</th></tr></thead>
             <tbody>
             @foreach (var category in _categories)
             {
                 <tr>
-                    <td><input class="inline-input" @bind="category.Name" /></td>
+                    <td>@GetMasterCategoryName(category)</td>
                     <td><input class="inline-input" type="number" @bind="category.DisplayOrder" /></td>
                     <td class="portal-active-cell"><input type="checkbox" @bind="category.IsActive" /></td>
                     <td class="portal-actions-cell">
@@ -79,6 +87,12 @@
             <label><span class="field-label">SKU</span><input @bind="_newProduct.ProductRetailerId" /></label>
             <label><span class="field-label">Image URL</span><input @bind="_newProduct.ImageUrl" /><small class="portal-field-help">Required for Meta sync (public HTTPS).</small></label>
             <label class="portal-form-field--span-two"><span class="field-label">Description</span><input @bind="_newProduct.Description" /></label>
+            <label><span class="field-label">Menu type</span>
+                <select @bind="_newProduct.IsVegetarian">
+                    <option value="true">Vegetarian</option>
+                    <option value="false">Non-vegetarian</option>
+                </select>
+            </label>
         </div>
         <div class="portal-form-footer">
             <div class="portal-check-group">
@@ -103,6 +117,7 @@
                     <th>Code</th>
                     <th>Category</th>
                     <th>Name</th>
+                    <th>Type</th>
                     <th>Price</th>
                     <th>SKU</th>
                     <th>Image</th>
@@ -124,6 +139,12 @@
                         </select>
                     </td>
                     <td><input class="inline-input" @bind="item.Name" /></td>
+                    <td>
+                        <select class="inline-input" @bind="item.IsVegetarian">
+                            <option value="true">Vegetarian</option>
+                            <option value="false">Non-vegetarian</option>
+                        </select>
+                    </td>
                     <td><input class="inline-input" type="number" step="0.01" @bind="item.Price" /></td>
                     <td><input class="inline-input" @bind="item.ProductRetailerId" disabled="@item.IsSkuLocked" /></td>
                     <td><input class="inline-input" @bind="item.ImageUrl" /></td>
@@ -150,6 +171,7 @@
     private RestaurantResponse? _restaurant;
     private readonly List<CategoryEditor> _categories = new();
     private readonly List<ProductEditor> _products = new();
+    private IReadOnlyCollection<MasterMenuCategoryResponse> _masterCategories = Array.Empty<MasterMenuCategoryResponse>();
     private CategoryEditor _newCategory = new();
     private ProductEditor _newProduct = new() { IsActive = true, IsAvailable = true };
 
@@ -162,8 +184,10 @@
     {
         _restaurant = await RestaurantService.GetRestaurantAsync(BusinessId);
         var menu = await MenuService.GetMenuAsync(BusinessId);
+        var masterCatalog = await MenuService.GetMasterCatalogAsync();
         _categories.Clear();
         _products.Clear();
+        _masterCategories = masterCatalog.Categories;
 
         if (menu is not null)
         {
@@ -178,13 +202,27 @@
             IsActive = true,
             IsAvailable = true
         };
+
+        if (_newCategory.MasterCategoryId == Guid.Empty ||
+            !_masterCategories.Any(category => category.Id == _newCategory.MasterCategoryId && category.IsActive))
+        {
+            _newCategory.MasterCategoryId = _masterCategories.FirstOrDefault(category => category.IsActive)?.Id ?? Guid.Empty;
+        }
     }
 
     private async Task CreateCategoryAsync()
     {
-        if (!string.IsNullOrWhiteSpace(_newCategory.Name))
+        var masterCategory = _masterCategories.FirstOrDefault(category =>
+            category.Id == _newCategory.MasterCategoryId && category.IsActive);
+        if (masterCategory is not null)
         {
-            await MenuService.CreateCategoryAsync(BusinessId, new CreateMenuCategoryRequest(_newCategory.Name, _newCategory.DisplayOrder, _newCategory.IsActive));
+            await MenuService.CreateCategoryAsync(
+                BusinessId,
+                new CreateMenuCategoryRequest(
+                    masterCategory.Name,
+                    _newCategory.DisplayOrder,
+                    _newCategory.IsActive,
+                    masterCategory.Id));
             _newCategory = new CategoryEditor { IsActive = true };
             await LoadAsync();
         }
@@ -230,7 +268,8 @@
                     _newProduct.IsAvailable,
                     _newProduct.IsActive,
                     _newProduct.ProductRetailerId,
-                    _newProduct.ImageUrl));
+                    _newProduct.ImageUrl,
+                    IsVegetarian: _newProduct.IsVegetarian));
             await LoadAsync();
         }
     }
@@ -239,7 +278,18 @@
     {
         await MenuService.UpdateItemAsync(
             item.Id,
-            new UpdateMenuItemRequest(item.CategoryId, null, item.ItemCode, item.Name, item.Description, item.Price, item.IsAvailable, item.IsActive, item.ProductRetailerId, item.ImageUrl));
+            new UpdateMenuItemRequest(
+                item.CategoryId,
+                null,
+                item.ItemCode,
+                item.Name,
+                item.Description,
+                item.Price,
+                item.IsAvailable,
+                item.IsActive,
+                item.ProductRetailerId,
+                item.ImageUrl,
+                IsVegetarian: item.IsVegetarian));
         await LoadAsync();
     }
 
@@ -255,9 +305,14 @@
         await LoadAsync();
     }
 
+    private string GetMasterCategoryName(CategoryEditor category) =>
+        _masterCategories.FirstOrDefault(master => master.Id == category.MasterCategoryId)?.Name
+        ?? category.Name;
+
     private sealed class CategoryEditor
     {
         public Guid Id { get; set; }
+        public Guid? MasterCategoryId { get; set; }
         public string Name { get; set; } = string.Empty;
         public int DisplayOrder { get; set; }
         public bool IsActive { get; set; } = true;
@@ -265,6 +320,7 @@
         public static CategoryEditor From(MenuCategoryResponse category) => new()
         {
             Id = category.Id,
+            MasterCategoryId = category.MasterCategoryId,
             Name = category.Name,
             DisplayOrder = category.DisplayOrder,
             IsActive = category.IsActive
@@ -283,6 +339,7 @@
         public string? ImageUrl { get; set; }
         public string? MetaProductId { get; set; }
         public string SyncStatus { get; set; } = "NotQueued";
+        public bool IsVegetarian { get; set; }
         public bool IsAvailable { get; set; } = true;
         public bool IsActive { get; set; } = true;
         public bool IsSkuLocked => !string.IsNullOrWhiteSpace(ProductRetailerId);
@@ -299,6 +356,7 @@
             ImageUrl = item.ImageUrl,
             MetaProductId = item.MetaProductId,
             SyncStatus = item.SyncStatus,
+            IsVegetarian = item.IsVegetarian,
             IsAvailable = item.IsAvailable,
             IsActive = item.IsActive
         };

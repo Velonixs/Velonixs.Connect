@@ -307,12 +307,24 @@ public sealed class WhatsAppCloudMessageSender(
         CancellationToken cancellationToken)
     {
         var accessToken = await ResolveAccessTokenAsync(phoneNumberId, cancellationToken);
-        if (_options.DisableSending || string.IsNullOrWhiteSpace(accessToken))
+        if (_options.DisableSending)
         {
             logger.LogInformation(
-                "WhatsApp sending skipped because sending is disabled or credentials are missing.");
+                "WhatsApp sending skipped because sending is disabled.");
 
             return new WhatsAppSendResult(true, true);
+        }
+
+        if (string.IsNullOrWhiteSpace(accessToken))
+        {
+            logger.LogWarning(
+                "WhatsApp send failed because no access token is configured for phone number {PhoneNumberId}.",
+                phoneNumberId);
+
+            return new WhatsAppSendResult(
+                false,
+                false,
+                Error: "No WhatsApp access token is configured for this phone number.");
         }
 
         var requestUri = $"{_options.BaseUrl.TrimEnd('/')}/{_options.ApiVersion}/{phoneNumberId}/messages";

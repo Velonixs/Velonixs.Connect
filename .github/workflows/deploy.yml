@@ -3,7 +3,7 @@ name: Build and Deploy Velonixs Connect
 on:
   push:
     branches:
-      - master  # Updated from main to track your master branch
+      - rajesh/Extended-Catelog  # Updated from main to track your master branch
 
 permissions:
   id-token: write

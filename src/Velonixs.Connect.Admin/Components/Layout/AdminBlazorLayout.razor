@@ -1,11 +1,18 @@
 @inherits LayoutComponentBase
 
-<div class="blazor-shell">
-    <aside class="blazor-sidebar">
-        <a class="blazor-brand" href="/admin/blazor">
-            <img class="blazor-brand-logo" src="/images/velonixs-logo.jpg" alt="Velonixs Systems Private Limited logo" />
-            <span><strong>Velonixs</strong><small>Commerce control</small></span>
+<div class="admin-application">
+    <header class="admin-application-header">
+        <a class="admin-header-logo" href="/admin/blazor" aria-label="Velonixs Admin Portal home">
+            <img class="admin-header-logo-image" src="/images/velonixs-logo.jpg" alt="Velonixs Systems Private Limited logo" />
         </a>
+        <div class="admin-application-title">
+            <strong>Velonixs Systems Private Limited</strong>
+            <p>Admin Portal <span aria-hidden="true">&middot;</span> <span class="admin-application-role">Platform administrator</span></p>
+        </div>
+        <span class="admin-header-spacer" aria-hidden="true"></span>
+    </header>
+    <div class="blazor-shell">
+        <aside class="blazor-sidebar">
         <p class="blazor-nav-label">Workspace</p>
         <nav>
             <NavLink href="/admin/blazor" Match="NavLinkMatch.All">Dashboard</NavLink>
@@ -15,12 +22,9 @@
                 <button type="submit">Sign out</button>
             </form>
         </nav>
-        <div class="blazor-sidebar-footer">
-            <span class="blazor-sidebar-dot" aria-hidden="true"></span>
-            <span>Platform administrator</span>
-        </div>
-    </aside>
-    <main class="blazor-main">
-        @Body
-    </main>
+        </aside>
+        <main class="blazor-main">
+            @Body
+        </main>
+    </div>
 </div>

@@ -5,8 +5,70 @@ body {
     font-family: Inter, Segoe UI, Arial, sans-serif;
 }
 
-.blazor-shell {
+.admin-application {
     min-height: 100vh;
+}
+
+.admin-application-header {
+    --admin-header-height: 78px;
+    align-items: center;
+    background: rgba(255, 255, 255, 0.96);
+    border-bottom: 1px solid #dce7f1;
+    box-shadow: 0 4px 16px rgba(11, 51, 94, 0.05);
+    display: grid;
+    gap: 16px;
+    grid-template-columns: 1fr auto 1fr;
+    min-height: var(--admin-header-height);
+    padding: 10px 24px;
+    position: sticky;
+    top: 0;
+    z-index: 30;
+}
+
+.admin-header-logo {
+    justify-self: start;
+}
+
+.admin-header-logo-image {
+    background: #fff;
+    border: 1px solid rgba(8, 47, 99, 0.14);
+    border-radius: 12px;
+    box-shadow: 0 8px 18px rgba(8, 47, 99, 0.12);
+    display: block;
+    height: 52px;
+    object-fit: contain;
+    padding: 2px;
+    width: 70px;
+}
+
+.admin-application-title {
+    color: var(--admin-navy, #082f63);
+    justify-self: center;
+    text-align: center;
+}
+
+.admin-application-title strong {
+    display: block;
+    font-size: 20px;
+    font-weight: 760;
+    letter-spacing: -0.02em;
+    line-height: 1.15;
+}
+
+.admin-application-title p {
+    color: #5d7189;
+    font-size: 12px;
+    line-height: 1.3;
+    margin: 4px 0 0;
+}
+
+.admin-application-role {
+    color: #75879c;
+    font-size: 11px;
+}
+
+.blazor-shell {
+    min-height: calc(100vh - 78px);
     display: grid;
     grid-template-columns: 260px 1fr;
 }
@@ -15,37 +77,6 @@ body {
     background: linear-gradient(165deg, #062f68 0%, #0b52a0 54%, #087d78 100%);
     color: #fff;
     padding: 24px;
-}
-
-.blazor-brand {
-    display: flex;
-    align-items: center;
-    gap: 12px;
-    color: #fff;
-    text-decoration: none;
-    margin-bottom: 28px;
-}
-
-.blazor-brand-logo {
-    background: #fff;
-    border-radius: 12px;
-    box-shadow: 0 8px 20px rgba(2, 25, 62, 0.22);
-    flex: 0 0 auto;
-    height: 44px;
-    object-fit: contain;
-    padding: 1px;
-    width: 60px;
-}
-
-.blazor-brand strong,
-.blazor-brand small {
-    display: block;
-}
-
-.blazor-brand small {
-    color: rgba(255, 255, 255, 0.72);
-    font-size: 11px;
-    margin-top: 3px;
 }
 
 .blazor-sidebar nav {
@@ -270,38 +301,10 @@ body {
     box-shadow: 12px 0 30px rgba(5, 39, 81, 0.1);
     display: flex;
     flex-direction: column;
-    min-height: 100vh;
+    min-height: calc(100vh - 78px);
     padding: 26px 18px;
     position: sticky;
-    top: 0;
-}
-
-.blazor-brand {
-    border-bottom: 1px solid rgba(255, 255, 255, 0.14);
-    gap: 13px;
-    margin: 0 6px 24px;
-    padding: 0 0 22px;
-}
-
-.blazor-brand-logo {
-    border-radius: 14px;
-    box-shadow: 0 10px 22px rgba(0, 18, 52, 0.25);
-    height: 48px;
-    padding: 2px;
-    width: 64px;
-}
-
-.blazor-brand strong {
-    font-size: 17px;
-    letter-spacing: -0.01em;
-}
-
-.blazor-brand small {
-    color: rgba(235, 252, 255, 0.72);
-    font-size: 11px;
-    letter-spacing: 0.04em;
-    margin-top: 4px;
-    text-transform: uppercase;
+    top: 78px;
 }
 
 .blazor-nav-label {
@@ -344,25 +347,6 @@ body {
 
 .blazor-sidebar nav button {
     font-family: inherit;
-}
-
-.blazor-sidebar-footer {
-    align-items: center;
-    border-top: 1px solid rgba(255, 255, 255, 0.14);
-    color: rgba(238, 253, 255, 0.66);
-    display: flex;
-    font-size: 12px;
-    gap: 8px;
-    margin: auto 6px 0;
-    padding: 20px 6px 0;
-}
-
-.blazor-sidebar-dot {
-    background: #76cf5f;
-    border-radius: 50%;
-    box-shadow: 0 0 0 4px rgba(118, 207, 95, 0.16);
-    height: 7px;
-    width: 7px;
 }
 
 .blazor-main {
@@ -628,6 +612,27 @@ body {
     grid-template-columns: repeat(3, minmax(0, 1fr));
 }
 
+.master-catalog-form {
+    display: grid;
+    gap: 16px;
+    max-width: 1120px;
+}
+
+.master-catalog-form-actions {
+    justify-content: flex-end;
+}
+
+.master-catalog-form-footer {
+    align-items: center;
+    display: flex;
+    gap: 16px;
+    justify-content: space-between;
+}
+
+.master-catalog-form-footer .form-actions {
+    margin-left: auto;
+}
+
 .gst-defaults-form {
     display: grid;
     gap: 16px;
@@ -829,8 +834,27 @@ body {
     justify-content: flex-end;
 }
 
+.master-category-table { min-width: 720px; }
+.master-item-table { min-width: 1020px; }
+
+.catalog-active-heading,
+.catalog-active-cell {
+    text-align: center;
+}
+
+.catalog-actions-heading,
+.catalog-actions-cell {
+    min-width: 180px;
+    text-align: right;
+}
+
+.catalog-actions-cell .action-row {
+    justify-content: flex-end;
+}
+
 .action-row .action-primary { border-color: #90bcdf; color: #0968ae; }
 .action-row .action-catalog { border-color: #8cd0c7; color: #087b71; }
+.action-row .action-danger { border-color: #efb8b8; color: #b63c3c; }
 
 .notice {
     background: var(--admin-soft-blue);
@@ -883,12 +907,15 @@ body {
 }
 
 @media (max-width: 900px) {
+    .admin-application-header {
+        position: static;
+    }
+
     .blazor-sidebar {
         min-height: auto;
         position: static;
     }
 
-    .blazor-sidebar-footer { display: none; }
     .blazor-main { padding: 26px 18px 36px; }
     .page-head { align-items: flex-start; flex-direction: column; }
     .page-head-actions { justify-content: flex-start; }
@@ -905,10 +932,30 @@ body {
 }
 
 @media (max-width: 600px) {
+    .admin-application-header {
+        grid-template-columns: auto minmax(0, 1fr);
+        padding: 10px 16px;
+    }
+
+    .admin-header-logo-image {
+        height: 44px;
+        width: 58px;
+    }
+
+    .admin-application-title {
+        justify-self: start;
+        text-align: left;
+    }
+
+    .admin-application-title strong { font-size: 15px; }
+    .admin-application-title p { font-size: 11px; }
+    .admin-header-spacer { display: none; }
     .catalog-journey { grid-template-columns: 1fr; }
 
     .form-actions { align-items: stretch; flex-direction: column; }
     .form-actions .btn { width: 100%; }
+    .master-catalog-form-footer { align-items: stretch; flex-direction: column; }
+    .master-catalog-form-footer .form-actions { margin-left: 0; width: 100%; }
     .page-head-actions { width: 100%; }
     .page-head-actions a { flex: 1 1 auto; }
 }

@@ -2,12 +2,12 @@
 @attribute [Authorize(Roles = AppRoles.PlatformAdmin)]
 @inject IMenuService MenuService
 
-<header class="page-head">
+<header class="page-head catalog-page-head">
     <div>
-        <p>Platform Catalog</p>
-        <h1>Master Catalog</h1>
+        <p>Platform catalog</p>
+        <h1>Master catalog</h1>
     </div>
-    <div class="toolbar">
+    <div class="toolbar page-head-actions">
         <a href="/admin/blazor">Dashboard</a>
     </div>
 </header>
@@ -19,13 +19,17 @@
 
 <section class="work-surface mb-3">
     <div class="surface-title">
-        <h2>Add Master Category</h2>
+        <h2>Add category</h2>
     </div>
-    <form class="form-grid-compact" @onsubmit="CreateCategoryAsync" @onsubmit:preventDefault>
-        <label>Name <span class="required-marker" aria-hidden="true">*</span><input @bind="_newCategory.Name" required /></label>
-        <label>Display Order <input type="number" @bind="_newCategory.DisplayOrder" /></label>
-        <label>Active <input type="checkbox" @bind="_newCategory.IsActive" /></label>
-        <label><span>&nbsp;</span><button type="submit" class="btn btn-primary">Add category</button></label>
+    <form class="master-catalog-form" @onsubmit="CreateCategoryAsync" @onsubmit:preventDefault>
+        <div class="business-form-grid business-form-grid--three">
+            <label><span class="field-label">Name <span class="required-marker" aria-hidden="true">*</span></span><input @bind="_newCategory.Name" required /></label>
+            <label><span class="field-label">Display order</span><input type="number" @bind="_newCategory.DisplayOrder" /></label>
+            <label class="check-field"><input type="checkbox" @bind="_newCategory.IsActive" /><span>Active</span></label>
+        </div>
+        <div class="form-actions master-catalog-form-actions">
+            <button type="submit" class="btn btn-primary">Add category</button>
+        </div>
     </form>
 </section>
 
@@ -34,18 +38,20 @@
         <h2>Master Categories</h2>
     </div>
     <div class="table-responsive">
-        <table class="table align-middle">
-            <thead><tr><th>Name</th><th>Order</th><th>Active</th><th></th></tr></thead>
+        <table class="table align-middle master-catalog-table master-category-table">
+            <thead><tr><th>Name</th><th>Order</th><th class="catalog-active-heading">Active</th><th class="catalog-actions-heading">Actions</th></tr></thead>
             <tbody>
             @foreach (var category in _categories)
             {
                 <tr>
                     <td><input class="inline-input" @bind="category.Name" /></td>
                     <td><input class="inline-input" type="number" @bind="category.DisplayOrder" /></td>
-                    <td><input type="checkbox" @bind="category.IsActive" /></td>
-                    <td class="action-row">
-                        <button @onclick="() => SaveCategoryAsync(category)">Save</button>
-                        <button @onclick="() => DeleteCategoryAsync(category)">Delete</button>
+                    <td class="catalog-active-cell"><input type="checkbox" @bind="category.IsActive" /></td>
+                    <td class="catalog-actions-cell">
+                        <div class="action-row">
+                            <button class="action-primary" @onclick="() => SaveCategoryAsync(category)">Save</button>
+                            <button class="action-danger" @onclick="() => DeleteCategoryAsync(category)">Delete</button>
+                        </div>
                     </td>
                 </tr>
             }
@@ -56,21 +62,27 @@
 
 <section class="work-surface mb-3">
     <div class="surface-title">
-        <h2>Add Master Item</h2>
+        <h2>Add item</h2>
     </div>
-    <form class="form-grid-compact" @onsubmit="CreateItemAsync" @onsubmit:preventDefault>
-        <label>Category <span class="required-marker" aria-hidden="true">*</span>
-            <select @bind="_newItem.MasterCategoryId" required>
-                @foreach (var category in _categories.Where(x => x.IsActive))
-                {
-                    <option value="@category.Id">@category.Name</option>
-                }
-            </select>
-        </label>
-        <label>Name <span class="required-marker" aria-hidden="true">*</span><input @bind="_newItem.Name" required /></label>
-        <label>Description <input @bind="_newItem.Description" /></label>
-        <label>Active <input type="checkbox" @bind="_newItem.IsActive" /></label>
-        <label><span>&nbsp;</span><button type="submit" class="btn btn-primary">Add item</button></label>
+    <form class="master-catalog-form" @onsubmit="CreateItemAsync" @onsubmit:preventDefault>
+        <div class="business-form-grid business-form-grid--three">
+            <label><span class="field-label">Category <span class="required-marker" aria-hidden="true">*</span></span>
+                <select @bind="_newItem.MasterCategoryId" required>
+                    @foreach (var category in _categories.Where(x => x.IsActive))
+                    {
+                        <option value="@category.Id">@category.Name</option>
+                    }
+                </select>
+            </label>
+            <label><span class="field-label">Name <span class="required-marker" aria-hidden="true">*</span></span><input @bind="_newItem.Name" required /></label>
+            <label><span class="field-label">Description</span><input @bind="_newItem.Description" /></label>
+        </div>
+        <div class="master-catalog-form-footer">
+            <label class="check-field"><input type="checkbox" @bind="_newItem.IsActive" /><span>Active</span></label>
+            <div class="form-actions">
+                <button type="submit" class="btn btn-primary">Add item</button>
+            </div>
+        </div>
     </form>
 </section>
 
@@ -79,8 +91,8 @@
         <h2>Master Items</h2>
     </div>
     <div class="table-responsive">
-        <table class="table align-middle">
-            <thead><tr><th>Category</th><th>Name</th><th>Description</th><th>Active</th><th></th></tr></thead>
+        <table class="table align-middle master-catalog-table master-item-table">
+            <thead><tr><th>Category</th><th>Name</th><th>Description</th><th class="catalog-active-heading">Active</th><th class="catalog-actions-heading">Actions</th></tr></thead>
             <tbody>
             @foreach (var item in _items)
             {
@@ -95,10 +107,12 @@
                     </td>
                     <td><input class="inline-input" @bind="item.Name" /></td>
                     <td><input class="inline-input" @bind="item.Description" /></td>
-                    <td><input type="checkbox" @bind="item.IsActive" /></td>
-                    <td class="action-row">
-                        <button @onclick="() => SaveItemAsync(item)">Save</button>
-                        <button @onclick="() => DeleteItemAsync(item)">Delete</button>
+                    <td class="catalog-active-cell"><input type="checkbox" @bind="item.IsActive" /></td>
+                    <td class="catalog-actions-cell">
+                        <div class="action-row">
+                            <button class="action-primary" @onclick="() => SaveItemAsync(item)">Save</button>
+                            <button class="action-danger" @onclick="() => DeleteItemAsync(item)">Delete</button>
+                        </div>
                     </td>
                 </tr>
             }

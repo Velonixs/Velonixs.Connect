@@ -8,6 +8,7 @@
     <div>
         <p>@_restaurant?.Name</p>
         <h1>Products & Categories</h1>
+        <span class="page-description">Build the sellable catalog and control product availability.</span>
     </div>
     <div class="toolbar page-head-actions">
         <a href="/admin/blazor">Dashboard</a>
@@ -17,7 +18,7 @@
 
 <section class="work-surface mb-3">
     <div class="surface-title">
-        <h2>Add Category</h2>
+        <h2>Add category</h2>
     </div>
     <form class="portal-form" @onsubmit="CreateCategoryAsync" @onsubmit:preventDefault>
         <div class="portal-form-grid portal-form-grid--three">
@@ -41,7 +42,8 @@
 
 <section class="work-surface mb-3">
     <div class="surface-title">
-        <h2>Categories</h2>
+        <div><h2>Categories</h2><p class="surface-description">Organize products using the platform master catalog.</p></div>
+        <span class="count-badge">@_categories.Count total</span>
     </div>
     <div class="table-responsive">
         <table class="table align-middle categories-table">
@@ -69,7 +71,7 @@
 
 <section class="work-surface mb-3">
     <div class="surface-title">
-        <h2>Add Product</h2>
+        <h2>Add product</h2>
     </div>
     <form class="portal-form" @onsubmit="CreateProductAsync" @onsubmit:preventDefault>
         <div class="portal-form-grid portal-form-grid--three">
@@ -118,7 +120,8 @@
 
 <section class="work-surface">
     <div class="surface-title">
-        <h2>Products</h2>
+        <div><h2>Products</h2><p class="surface-description">Edit pricing, stock, identifiers, and catalog sync state inline.</p></div>
+        <span class="count-badge">@_products.Count total</span>
     </div>
     <div class="table-responsive">
         <table class="table align-middle products-table">

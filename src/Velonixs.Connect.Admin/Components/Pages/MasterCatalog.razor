@@ -6,6 +6,7 @@
     <div>
         <p>Platform catalog</p>
         <h1>Master catalog</h1>
+        <span class="page-description">Maintain reusable categories and items for every connected business.</span>
     </div>
     <div class="toolbar page-head-actions">
         <a href="/admin/blazor">Dashboard</a>
@@ -34,7 +35,8 @@
 
 <section class="work-surface mb-3">
     <div class="surface-title">
-        <h2>Master Categories</h2>
+        <div><h2>Master categories</h2><p class="surface-description">The shared category structure available during business setup.</p></div>
+        <span class="count-badge">@_categories.Count total</span>
     </div>
     <div class="table-responsive">
         <table class="table align-middle master-catalog-table master-category-table">
@@ -86,7 +88,8 @@
 
 <section class="work-surface">
     <div class="surface-title">
-        <h2>Master Items</h2>
+        <div><h2>Master items</h2><p class="surface-description">Canonical product definitions that businesses can add to their catalogs.</p></div>
+        <span class="count-badge">@_items.Count total</span>
     </div>
     <div class="table-responsive">
         <table class="table align-middle master-catalog-table master-item-table">

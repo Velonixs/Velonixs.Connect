@@ -1,30 +1,385 @@
 @inherits LayoutComponentBase
+@implements IDisposable
+@inject NavigationManager Navigation
+@inject IPlatformAdministrationService PlatformAdministrationService
 
-<div class="admin-application">
-    <header class="admin-application-header">
-        <a class="admin-header-logo" href="/admin/blazor" aria-label="Velonixs Admin Portal home">
-            <img class="admin-header-logo-image" src="/images/velonixs-logo.jpg" alt="Velonixs Systems Private Limited logo" />
-        </a>
-        <div class="admin-application-title">
-            <strong>Velonixs Systems Private Limited</strong>
-            <p>Admin Portal <span aria-hidden="true">&middot;</span> <span class="admin-application-role">Platform administrator</span></p>
+<div class="admin-application @(_sidebarCollapsed ? "sidebar-collapsed" : null) @(_mobileNavOpen ? "mobile-nav-open" : null)">
+    <aside class="app-sidebar" id="admin-sidebar" aria-label="Primary navigation">
+        <div class="sidebar-brand-row">
+            <a class="sidebar-brand" href="/admin/blazor" aria-label="Velonixs Connect dashboard">
+                <span class="brand-symbol" aria-hidden="true">V</span>
+                <span class="brand-copy"><strong>Velonixs</strong><small>Connect</small></span>
+            </a>
+            <button class="icon-button sidebar-collapse-button" type="button" @onclick="ToggleSidebar" aria-label="@(_sidebarCollapsed ? "Expand sidebar" : "Collapse sidebar")" aria-expanded="@(!_sidebarCollapsed)">
+                <svg class="ui-icon" aria-hidden="true"><use href="/icons/ui-icons.svg#icon-panel"></use></svg>
+            </button>
+            <button class="icon-button mobile-close-button" type="button" @onclick="CloseMobileNav" aria-label="Close navigation">
+                <svg class="ui-icon" aria-hidden="true"><use href="/icons/ui-icons.svg#icon-close"></use></svg>
+            </button>
         </div>
-        <span class="admin-header-spacer" aria-hidden="true"></span>
-    </header>
-    <div class="blazor-shell">
-        <aside class="blazor-sidebar">
-        <p class="blazor-nav-label">Workspace</p>
-        <nav>
-            <NavLink href="/admin/blazor" Match="NavLinkMatch.All">Dashboard</NavLink>
-            <NavLink href="/admin/blazor/master-catalog">Master catalog</NavLink>
-            <form method="post" action="/admin/logout">
-                <AntiforgeryToken />
-                <button type="submit">Sign out</button>
-            </form>
-        </nav>
-        </aside>
-        <main class="blazor-main">
+
+        <div class="sidebar-scroll">
+            <nav class="sidebar-nav">
+                <div class="nav-section">
+                    <span class="nav-section-label">Workspace</span>
+                    <NavLink class="nav-entry" href="/admin/blazor" Match="NavLinkMatch.All">
+                        <svg class="ui-icon" aria-hidden="true"><use href="/icons/ui-icons.svg#icon-grid"></use></svg>
+                        <span>Dashboard</span>
+                    </NavLink>
+                    @NavItem("Orders", "receipt", BusinessHref("orders"), "Select a business to open orders")
+                    @NavItem("Customers", "users", BusinessHref("customers"), "Select a business to open customers")
+                    @NavItem("Catalog", "box", BusinessHref("products"), "Select a business to manage its catalog")
+                    @DisabledNavItem("Conversations", "message")
+                    @DisabledNavItem("Payments", "card")
+                    @DisabledNavItem("Offers", "tag")
+                    @DisabledNavItem("Reports", "chart")
+                </div>
+
+                <div class="nav-section">
+                    <span class="nav-section-label">Operations</span>
+                    @DisabledNavItem("Staff", "badge")
+                    @NavItem("Branches", "building", BusinessHref("businesses"), "Select a business to open branch settings")
+                    @DisabledNavItem("Business Hours", "clock")
+                </div>
+
+                <div class="nav-section">
+                    <span class="nav-section-label">Automation</span>
+                    @DisabledNavItem("Auto Replies", "reply")
+                    @NavItem("WhatsApp", "whatsapp", BusinessHref("sync"), "Select a business to configure WhatsApp")
+                    @DisabledNavItem("AI Assistant", "sparkles")
+                </div>
+
+                <div class="nav-section">
+                    <span class="nav-section-label">Settings</span>
+                    @NavItem("Business Profile", "store", BusinessHref("businesses"), "Select a business to open its profile")
+                    @NavItem("Integrations", "plug", BusinessHref("sync"), "Select a business to manage integrations")
+                    @DisabledNavItem("Subscription", "credit-card")
+                    @NavItem("Users & Roles", "shield", BusinessHref("businesses"), "Select a business to manage users")
+                </div>
+            </nav>
+        </div>
+
+        <div class="sidebar-footer">
+            <span class="nav-entry nav-entry-disabled" title="Help center is not configured in this release" aria-disabled="true">
+                <svg class="ui-icon" aria-hidden="true"><use href="/icons/ui-icons.svg#icon-help"></use></svg>
+                <span>Help</span>
+            </span>
+            @NavItem("Settings", "settings", BusinessHref("businesses"), "Select a business to open settings")
+            <AuthorizeView>
+                <Authorized Context="authContext">
+                    <button class="sidebar-profile" type="button" @onclick="ToggleSidebarProfileMenu" aria-expanded="@_sidebarProfileOpen">
+                        <span class="avatar" aria-hidden="true">@Initials(authContext.User.Identity?.Name)</span>
+                        <span class="profile-copy"><strong>@DisplayName(authContext.User.Identity?.Name)</strong><small>Platform administrator</small></span>
+                        <svg class="ui-icon profile-chevron" aria-hidden="true"><use href="/icons/ui-icons.svg#icon-chevron-up"></use></svg>
+                    </button>
+                    @if (_sidebarProfileOpen)
+                    {
+                        <div class="sidebar-profile-menu">
+                            <a href="@(BusinessHref("businesses") ?? "/admin/blazor")"><svg class="ui-icon" aria-hidden="true"><use href="/icons/ui-icons.svg#icon-settings"></use></svg>Account settings</a>
+                            <form method="post" action="/admin/logout">
+                                <AntiforgeryToken />
+                                <button type="submit"><svg class="ui-icon" aria-hidden="true"><use href="/icons/ui-icons.svg#icon-log-out"></use></svg>Sign out</button>
+                            </form>
+                        </div>
+                    }
+                </Authorized>
+            </AuthorizeView>
+        </div>
+    </aside>
+
+    @if (_mobileNavOpen)
+    {
+        <button class="sidebar-backdrop" type="button" @onclick="CloseMobileNav" aria-label="Close navigation"></button>
+    }
+
+    <div class="app-workspace">
+        <header class="app-topbar">
+            <div class="topbar-title-group">
+                <button class="icon-button mobile-menu-button" type="button" @onclick="OpenMobileNav" aria-controls="admin-sidebar" aria-expanded="@_mobileNavOpen" aria-label="Open navigation">
+                    <svg class="ui-icon" aria-hidden="true"><use href="/icons/ui-icons.svg#icon-menu"></use></svg>
+                </button>
+                <div>
+                    <p class="topbar-eyebrow">@PageSection</p>
+                    <strong class="topbar-title">@PageTitle</strong>
+                </div>
+            </div>
+
+            <div class="global-search">
+                <svg class="ui-icon" aria-hidden="true"><use href="/icons/ui-icons.svg#icon-search"></use></svg>
+                <input type="search" placeholder="Search pages and tools" aria-label="Search pages and tools" @bind="_searchTerm" @bind:event="oninput" @onfocus="ShowSearch" @onkeydown="HandleSearchKey" />
+                <kbd aria-hidden="true">/</kbd>
+                @if (_searchOpen && !string.IsNullOrWhiteSpace(_searchTerm))
+                {
+                    <div class="search-results" role="listbox" aria-label="Search results">
+                        @foreach (var result in FilteredSearchItems)
+                        {
+                            <a href="@result.Href" role="option">
+                                <svg class="ui-icon" aria-hidden="true"><use href="/icons/ui-icons.svg#icon-@result.Icon"></use></svg>
+                                <span><strong>@result.Label</strong><small>@result.Section</small></span>
+                                <svg class="ui-icon search-arrow" aria-hidden="true"><use href="/icons/ui-icons.svg#icon-arrow-up-right"></use></svg>
+                            </a>
+                        }
+                        @if (!FilteredSearchItems.Any())
+                        {
+                            <p class="search-empty">No matching page is available.</p>
+                        }
+                    </div>
+                }
+            </div>
+
+            <div class="topbar-actions">
+                <label class="business-switcher">
+                    <svg class="ui-icon" aria-hidden="true"><use href="/icons/ui-icons.svg#icon-building"></use></svg>
+                    <span class="visually-hidden">Current business</span>
+                    <select value="@(_activeBusinessId?.ToString() ?? string.Empty)" @onchange="ChangeBusiness" aria-label="Current business">
+                        <option value="">All businesses</option>
+                        @foreach (var business in _businesses)
+                        {
+                            <option value="@business.BusinessId">@business.Name</option>
+                        }
+                    </select>
+                    <svg class="ui-icon switcher-chevron" aria-hidden="true"><use href="/icons/ui-icons.svg#icon-chevron-down"></use></svg>
+                </label>
+
+                <a class="topbar-primary-action" href="/admin/blazor#business-onboarding">
+                    <svg class="ui-icon" aria-hidden="true"><use href="/icons/ui-icons.svg#icon-plus"></use></svg>
+                    <span>Add business</span>
+                </a>
+
+                <div class="topbar-menu-wrap">
+                    <button class="icon-button notification-button" type="button" @onclick="ToggleNotifications" aria-label="Notifications" aria-expanded="@_notificationsOpen">
+                        <svg class="ui-icon" aria-hidden="true"><use href="/icons/ui-icons.svg#icon-bell"></use></svg>
+                    </button>
+                    @if (_notificationsOpen)
+                    {
+                        <div class="topbar-popover notifications-popover">
+                            <div class="popover-heading"><strong>Notifications</strong><span>0 new</span></div>
+                            <div class="empty-notifications">
+                                <span class="empty-icon"><svg class="ui-icon" aria-hidden="true"><use href="/icons/ui-icons.svg#icon-check"></use></svg></span>
+                                <strong>You're all caught up</strong>
+                                <small>New operational alerts will appear here.</small>
+                            </div>
+                        </div>
+                    }
+                </div>
+
+                <AuthorizeView>
+                    <Authorized Context="authContext">
+                        <div class="topbar-menu-wrap profile-menu-wrap">
+                            <button class="topbar-avatar-button" type="button" @onclick="ToggleProfileMenu" aria-label="Open profile menu" aria-expanded="@_profileMenuOpen">
+                                <span class="avatar" aria-hidden="true">@Initials(authContext.User.Identity?.Name)</span>
+                                <svg class="ui-icon" aria-hidden="true"><use href="/icons/ui-icons.svg#icon-chevron-down"></use></svg>
+                            </button>
+                            @if (_profileMenuOpen)
+                            {
+                                <div class="topbar-popover profile-popover">
+                                    <div class="profile-popover-user">
+                                        <span class="avatar">@Initials(authContext.User.Identity?.Name)</span>
+                                        <span><strong>@DisplayName(authContext.User.Identity?.Name)</strong><small>@authContext.User.Identity?.Name</small></span>
+                                    </div>
+                                    <a href="@(BusinessHref("businesses") ?? "/admin/blazor")"><svg class="ui-icon" aria-hidden="true"><use href="/icons/ui-icons.svg#icon-settings"></use></svg>Account settings</a>
+                                    <form method="post" action="/admin/logout">
+                                        <AntiforgeryToken />
+                                        <button type="submit"><svg class="ui-icon" aria-hidden="true"><use href="/icons/ui-icons.svg#icon-log-out"></use></svg>Sign out</button>
+                                    </form>
+                                </div>
+                            }
+                        </div>
+                    </Authorized>
+                </AuthorizeView>
+            </div>
+        </header>
+
+        <main class="blazor-main" id="main-content">
             @Body
         </main>
     </div>
 </div>
+
+@code {
+    private bool _sidebarCollapsed;
+    private bool _mobileNavOpen;
+    private bool _notificationsOpen;
+    private bool _profileMenuOpen;
+    private bool _sidebarProfileOpen;
+    private bool _searchOpen;
+    private string _searchTerm = string.Empty;
+    private Guid? _activeBusinessId;
+    private IReadOnlyCollection<PlatformBusinessSummary> _businesses = Array.Empty<PlatformBusinessSummary>();
+
+    private string CurrentPath => Navigation.ToBaseRelativePath(Navigation.Uri).Split('?', '#')[0].Trim('/');
+    private string PageTitle => CurrentPath switch
+    {
+        "admin/blazor" => "Dashboard",
+        "admin/blazor/master-catalog" => "Master catalog",
+        var path when path.StartsWith("admin/blazor/orders/", StringComparison.OrdinalIgnoreCase) => "Orders",
+        var path when path.StartsWith("admin/blazor/customers/", StringComparison.OrdinalIgnoreCase) => "Customers",
+        var path when path.StartsWith("admin/blazor/products/", StringComparison.OrdinalIgnoreCase) => "Catalog",
+        var path when path.StartsWith("admin/blazor/sync/", StringComparison.OrdinalIgnoreCase) => "WhatsApp integration",
+        var path when path.StartsWith("admin/blazor/businesses/", StringComparison.OrdinalIgnoreCase) => "Business settings",
+        _ => "Velonixs Connect"
+    };
+
+    private string PageSection => CurrentPath switch
+    {
+        "admin/blazor" => "Overview",
+        "admin/blazor/master-catalog" => "Catalog",
+        var path when path.StartsWith("admin/blazor/sync/", StringComparison.OrdinalIgnoreCase) => "Automation",
+        var path when path.StartsWith("admin/blazor/businesses/", StringComparison.OrdinalIgnoreCase) => "Settings",
+        _ => "Workspace"
+    };
+
+    private IEnumerable<ShellSearchItem> FilteredSearchItems => SearchItems
+        .Where(item => item.Label.Contains(_searchTerm, StringComparison.OrdinalIgnoreCase) || item.Section.Contains(_searchTerm, StringComparison.OrdinalIgnoreCase))
+        .Take(7);
+
+    private IEnumerable<ShellSearchItem> SearchItems
+    {
+        get
+        {
+            yield return new("Dashboard", "Overview", "grid", "/admin/blazor");
+            yield return new("Master catalog", "Catalog", "box", "/admin/blazor/master-catalog");
+            if (_activeBusinessId is not null)
+            {
+                yield return new("Orders", "Workspace", "receipt", BusinessHref("orders")!);
+                yield return new("Customers", "Workspace", "users", BusinessHref("customers")!);
+                yield return new("Products & categories", "Catalog", "box", BusinessHref("products")!);
+                yield return new("Business profile", "Settings", "store", BusinessHref("businesses")!);
+                yield return new("WhatsApp integration", "Automation", "whatsapp", BusinessHref("sync")!);
+            }
+        }
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+        Navigation.LocationChanged += OnLocationChanged;
+        ReadBusinessFromUri();
+
+        try
+        {
+            var dashboard = await PlatformAdministrationService.GetDashboardAsync();
+            _businesses = dashboard.Businesses;
+        }
+        catch
+        {
+            _businesses = Array.Empty<PlatformBusinessSummary>();
+        }
+    }
+
+    private RenderFragment NavItem(string label, string icon, string? href, string disabledHint) => builder =>
+    {
+        if (href is null)
+        {
+            builder.OpenElement(0, "span");
+            builder.AddAttribute(1, "class", "nav-entry nav-entry-disabled");
+            builder.AddAttribute(2, "title", disabledHint);
+            builder.AddAttribute(3, "aria-disabled", "true");
+        }
+        else
+        {
+            builder.OpenElement(0, "a");
+            builder.AddAttribute(1, "class", $"nav-entry {(IsCurrent(href) ? "active" : null)}");
+            builder.AddAttribute(2, "href", href);
+        }
+        builder.AddMarkupContent(4, $"<svg class=\"ui-icon\" aria-hidden=\"true\"><use href=\"/icons/ui-icons.svg#icon-{icon}\"></use></svg><span>{label}</span>");
+        builder.CloseElement();
+    };
+
+    private RenderFragment DisabledNavItem(string label, string icon) => builder =>
+    {
+        builder.OpenElement(0, "span");
+        builder.AddAttribute(1, "class", "nav-entry nav-entry-disabled nav-entry-future");
+        builder.AddAttribute(2, "title", "Not available in this release");
+        builder.AddAttribute(3, "aria-disabled", "true");
+        builder.AddMarkupContent(4, $"<svg class=\"ui-icon\" aria-hidden=\"true\"><use href=\"/icons/ui-icons.svg#icon-{icon}\"></use></svg><span>{label}</span>");
+        builder.CloseElement();
+    };
+
+    private string? BusinessHref(string section) => _activeBusinessId is Guid id ? $"/admin/blazor/{section}/{id}" : null;
+
+    private bool IsCurrent(string href) => Navigation.Uri.StartsWith(Navigation.ToAbsoluteUri(href).ToString(), StringComparison.OrdinalIgnoreCase);
+
+    private void ToggleSidebar() => _sidebarCollapsed = !_sidebarCollapsed;
+    private void OpenMobileNav() => _mobileNavOpen = true;
+    private void CloseMobileNav() => _mobileNavOpen = false;
+
+    private void ToggleNotifications()
+    {
+        _notificationsOpen = !_notificationsOpen;
+        _profileMenuOpen = false;
+        _sidebarProfileOpen = false;
+        _searchOpen = false;
+    }
+
+    private void ToggleProfileMenu()
+    {
+        _profileMenuOpen = !_profileMenuOpen;
+        _sidebarProfileOpen = false;
+        _notificationsOpen = false;
+        _searchOpen = false;
+    }
+
+    private void ToggleSidebarProfileMenu()
+    {
+        _sidebarProfileOpen = !_sidebarProfileOpen;
+        _profileMenuOpen = false;
+        _notificationsOpen = false;
+        _searchOpen = false;
+    }
+
+    private void ShowSearch(FocusEventArgs _) => _searchOpen = true;
+
+    private void HandleSearchKey(KeyboardEventArgs args)
+    {
+        if (args.Key == "Escape")
+        {
+            _searchOpen = false;
+            _searchTerm = string.Empty;
+        }
+    }
+
+    private void ChangeBusiness(ChangeEventArgs args)
+    {
+        if (!Guid.TryParse(args.Value?.ToString(), out var businessId))
+        {
+            _activeBusinessId = null;
+            Navigation.NavigateTo("/admin/blazor");
+            return;
+        }
+
+        _activeBusinessId = businessId;
+        var section = CurrentPath.Split('/').Skip(2).FirstOrDefault();
+        section = section is "orders" or "customers" or "products" or "sync" or "businesses" ? section : "businesses";
+        Navigation.NavigateTo($"/admin/blazor/{section}/{businessId}");
+    }
+
+    private void ReadBusinessFromUri()
+    {
+        var id = CurrentPath.Split('/').Select(segment => Guid.TryParse(segment, out var value) ? value : Guid.Empty).FirstOrDefault(value => value != Guid.Empty);
+        _activeBusinessId = id == Guid.Empty ? null : id;
+    }
+
+    private void OnLocationChanged(object? sender, LocationChangedEventArgs args)
+    {
+        _mobileNavOpen = false;
+        _searchOpen = false;
+        _notificationsOpen = false;
+        _profileMenuOpen = false;
+        _sidebarProfileOpen = false;
+        ReadBusinessFromUri();
+        _ = InvokeAsync(StateHasChanged);
+    }
+
+    private static string DisplayName(string? identityName) => string.IsNullOrWhiteSpace(identityName) ? "Admin" : identityName.Split('@')[0];
+
+    private static string Initials(string? identityName)
+    {
+        var display = DisplayName(identityName);
+        var parts = display.Split(new[] { '.', '_', '-', ' ' }, StringSplitOptions.RemoveEmptyEntries);
+        return string.Concat(parts.Take(2).Select(part => char.ToUpperInvariant(part[0])));
+    }
+
+    public void Dispose() => Navigation.LocationChanged -= OnLocationChanged;
+
+    private sealed record ShellSearchItem(string Label, string Section, string Icon, string Href);
+}

@@ -5,29 +5,45 @@
 }
 
 <section class="auth-shell">
-    <form class="card shadow-sm auth-panel p-4" asp-action="Login" asp-controller="Account" method="post">
-        @Html.AntiForgeryToken()
-        <input asp-for="ReturnUrl" type="hidden" />
-
+    <div class="auth-context-panel">
         <div>
-            <p class="eyebrow">Admin access</p>
-            <h1>Sign in to Velonixs Connect</h1>
+            <span class="auth-context-kicker">Operations workspace</span>
+            <h1>Run every connected business from one place.</h1>
+            <p>Manage orders, catalogs, customers, and WhatsApp commerce with a clear view across the platform.</p>
         </div>
-
-        <div asp-validation-summary="ModelOnly" class="text-danger"></div>
-
-        <div>
-            <label asp-for="Email" class="form-label"></label>
-            <input asp-for="Email" class="form-control" autocomplete="username" />
-            <span asp-validation-for="Email" class="text-danger"></span>
+        <div class="auth-context-footer">
+            <span class="status-dot" aria-hidden="true"></span>
+            <span>Protected platform administration</span>
         </div>
+    </div>
 
-        <div>
-            <label asp-for="Password" class="form-label"></label>
-            <input asp-for="Password" class="form-control" autocomplete="current-password" />
-            <span asp-validation-for="Password" class="text-danger"></span>
-        </div>
+    <div class="auth-form-wrap">
+        <form class="auth-panel" asp-action="Login" asp-controller="Account" method="post">
+            @Html.AntiForgeryToken()
+            <input asp-for="ReturnUrl" type="hidden" />
 
-        <button class="btn btn-success w-100" type="submit">Sign in</button>
-    </form>
+            <div class="auth-panel-heading">
+                <p class="eyebrow">Welcome back</p>
+                <h2>Sign in to your workspace</h2>
+                <p>Use your platform administrator account to continue.</p>
+            </div>
+
+            <div asp-validation-summary="ModelOnly" class="validation-summary"></div>
+
+            <label class="auth-field">
+                <span>Email address</span>
+                <input asp-for="Email" class="form-control" autocomplete="username" placeholder="admin@company.com" />
+                <span asp-validation-for="Email" class="field-error"></span>
+            </label>
+
+            <label class="auth-field">
+                <span>Password</span>
+                <input asp-for="Password" class="form-control" autocomplete="current-password" placeholder="Enter your password" />
+                <span asp-validation-for="Password" class="field-error"></span>
+            </label>
+
+            <button class="btn btn-primary w-100" type="submit">Sign in</button>
+            <p class="auth-support-copy">Access is restricted to authorized Velonixs platform administrators.</p>
+        </form>
+    </div>
 </section>

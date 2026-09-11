@@ -7,6 +7,7 @@
     <div>
         <p>@_restaurant?.Name</p>
         <h1>Customers</h1>
+        <span class="page-description">See customer activity and recent delivery details.</span>
     </div>
     <div class="toolbar page-head-actions">
         <a href="/admin/blazor">Dashboard</a>
@@ -16,7 +17,8 @@
 
 <section class="work-surface">
     <div class="surface-title">
-        <h2>Customer list</h2>
+        <div><h2>Customer list</h2><p class="surface-description">A consolidated view of customers ordering through connected channels.</p></div>
+        <span class="count-badge">@_customers.Count total</span>
     </div>
     <div class="table-responsive">
         <table class="table align-middle customers-table">

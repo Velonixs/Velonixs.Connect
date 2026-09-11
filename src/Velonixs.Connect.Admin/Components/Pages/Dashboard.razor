@@ -8,6 +8,7 @@
     <div>
         <p>Platform admin</p>
         <h1>Dashboard</h1>
+        <span class="page-description">Monitor businesses, catalog operations, and commerce activity.</span>
     </div>
     <div class="toolbar page-head-actions">
         <a href="/admin/blazor/master-catalog">Master catalog</a>
@@ -16,11 +17,31 @@
 </header>
 
 <section class="metric-grid">
-    <article><span>Businesses</span><strong>@_businesses.Count</strong></article>
-    <article><span>Active products</span><strong>@_activeProducts</strong></article>
-    <article><span>Pending sync</span><strong>@_pendingSync</strong></article>
-    <article><span>Today's orders</span><strong>@_todaysOrders</strong></article>
-    <article><span>Total revenue</span><strong>Rs @_revenue.ToString("0.##")</strong></article>
+    <article>
+        <div class="metric-card-head"><span class="metric-icon metric-icon-blue"><svg class="ui-icon" aria-hidden="true"><use href="/icons/ui-icons.svg#icon-building"></use></svg></span><span>Businesses</span></div>
+        <strong>@_businesses.Count</strong>
+        <small class="metric-meta">Connected accounts</small>
+    </article>
+    <article>
+        <div class="metric-card-head"><span class="metric-icon metric-icon-green"><svg class="ui-icon" aria-hidden="true"><use href="/icons/ui-icons.svg#icon-box"></use></svg></span><span>Active products</span></div>
+        <strong>@_activeProducts</strong>
+        <small class="metric-meta">Available for sale</small>
+    </article>
+    <article>
+        <div class="metric-card-head"><span class="metric-icon metric-icon-amber"><svg class="ui-icon" aria-hidden="true"><use href="/icons/ui-icons.svg#icon-clock"></use></svg></span><span>Pending sync</span></div>
+        <strong>@_pendingSync</strong>
+        <small class="metric-meta">Waiting to publish</small>
+    </article>
+    <article>
+        <div class="metric-card-head"><span class="metric-icon metric-icon-indigo"><svg class="ui-icon" aria-hidden="true"><use href="/icons/ui-icons.svg#icon-receipt"></use></svg></span><span>Today's orders</span></div>
+        <strong>@_todaysOrders</strong>
+        <small class="metric-meta">Since midnight</small>
+    </article>
+    <article>
+        <div class="metric-card-head"><span class="metric-icon metric-icon-slate"><svg class="ui-icon" aria-hidden="true"><use href="/icons/ui-icons.svg#icon-chart"></use></svg></span><span>Total revenue</span></div>
+        <strong>₹@_revenue.ToString("0.##")</strong>
+        <small class="metric-meta">All-time gross value</small>
+    </article>
 </section>
 
 @if (!string.IsNullOrWhiteSpace(_message))
@@ -30,7 +51,10 @@
 
 <section class="work-surface mb-3">
     <div class="surface-title">
-        <h2>GST defaults</h2>
+        <div>
+            <h2>GST defaults</h2>
+            <p class="surface-description">Applied automatically when a new business is created.</p>
+        </div>
     </div>
     <form class="gst-defaults-form" @onsubmit="SaveTaxAsync" @onsubmit:preventDefault>
         <div class="business-form-grid business-form-grid--two">
@@ -45,7 +69,10 @@
 
 <section id="business-onboarding" class="work-surface onboarding-surface mb-3">
     <div class="surface-title">
-        <h2>Create business</h2>
+        <div>
+            <h2>Create business</h2>
+            <p class="surface-description">Set up the business, WhatsApp connection, and initial owner access.</p>
+        </div>
     </div>
     <form class="business-create-form" @onsubmit="CreateBusinessAsync" @onsubmit:preventDefault>
         <section class="business-form-section">
@@ -94,7 +121,11 @@
 
 <section class="work-surface">
     <div class="surface-title">
-        <h2>Businesses</h2>
+        <div>
+            <h2>Businesses</h2>
+            <p class="surface-description">Open a workspace to manage its catalog, orders, customers, and integrations.</p>
+        </div>
+        <span class="count-badge">@_businesses.Count total</span>
     </div>
     <div class="table-responsive">
         <table class="table align-middle businesses-table">
@@ -109,12 +140,24 @@
                 </tr>
             </thead>
             <tbody>
+            @if (_businesses.Count == 0)
+            {
+                <tr>
+                    <td colspan="6">
+                        <div class="table-empty-state">
+                            <span class="empty-icon"><svg class="ui-icon" aria-hidden="true"><use href="/icons/ui-icons.svg#icon-building"></use></svg></span>
+                            <strong>No businesses yet</strong>
+                            <small>Create the first business to start managing its commerce operations.</small>
+                        </div>
+                    </td>
+                </tr>
+            }
             @foreach (var business in _businesses)
             {
                 <tr>
                     <td><strong>@business.Name</strong></td>
                     <td>@business.BusinessType</td>
-                    <td><span class="status-pill">@((business.IsActive) ? "Active" : "Inactive")</span></td>
+                    <td><span class="status-pill @(business.IsActive ? "status-success" : "status-neutral")">@((business.IsActive) ? "Active" : "Inactive")</span></td>
                     <td>@business.ActiveProductCount</td>
                     <td>@business.OrderCount</td>
                     <td class="business-actions">

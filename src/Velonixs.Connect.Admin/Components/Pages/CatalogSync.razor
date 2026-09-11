@@ -9,6 +9,7 @@
     <div>
         <p>@_restaurant?.Name</p>
         <h1>Catalog sync</h1>
+        <span class="page-description">Connect Meta, publish the menu, and monitor delivery health.</span>
     </div>
     <div class="toolbar page-head-actions">
         <a href="/admin/blazor">Dashboard</a>
@@ -93,7 +94,7 @@
 </section>
 
 <section class="work-surface mb-3">
-    <div class="surface-title"><h2>Queue</h2></div>
+    <div class="surface-title"><div><h2>Queue</h2><p class="surface-description">Products waiting to be processed by the catalog worker.</p></div><span class="count-badge">@_queue.Count total</span></div>
     <div class="table-responsive">
         <table class="table align-middle sync-queue-table">
             <thead><tr><th>Product</th><th>Event</th><th>Status</th><th>Retries</th><th>Next</th><th>Error</th><th class="portal-actions-heading">Actions</th></tr></thead>
@@ -103,7 +104,7 @@
                 <tr>
                     <td>@item.ProductName</td>
                     <td>@item.EventType</td>
-                    <td><span class="status-pill">@item.Status</span></td>
+                    <td><span class="status-pill status-@item.Status.ToLowerInvariant()">@item.Status</span></td>
                     <td>@item.RetryCount</td>
                     <td>@(item.NextAttemptAt?.ToLocalTime().ToString("dd MMM, hh:mm tt") ?? "-")</td>
                     <td>@item.LastError</td>
@@ -125,7 +126,7 @@
 </section>
 
 <section class="work-surface">
-    <div class="surface-title"><h2>Logs</h2></div>
+    <div class="surface-title"><div><h2>Logs</h2><p class="surface-description">Recent Meta catalog delivery attempts and responses.</p></div><span class="count-badge">@_logs.Count total</span></div>
     <div class="table-responsive">
         <table class="table align-middle sync-logs-table">
             <thead><tr><th>Time</th><th>Product</th><th>Event</th><th>Status</th><th>HTTP</th><th>Error</th></tr></thead>
@@ -136,7 +137,7 @@
                     <td>@log.CreatedAt.ToLocalTime().ToString("dd MMM yyyy, hh:mm tt")</td>
                     <td>@log.ProductName</td>
                     <td>@log.EventType</td>
-                    <td><span class="status-pill">@log.Status</span></td>
+                    <td><span class="status-pill status-@log.Status.ToLowerInvariant()">@log.Status</span></td>
                     <td>@log.ResponseCode</td>
                     <td>@log.ErrorMessage</td>
                 </tr>

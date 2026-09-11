@@ -7,6 +7,7 @@
     <div>
         <p>@_restaurant?.Name</p>
         <h1>Orders</h1>
+        <span class="page-description">Review incoming orders and move them through fulfilment.</span>
     </div>
     <div class="toolbar page-head-actions">
         <a href="/admin/blazor">Dashboard</a>
@@ -16,7 +17,8 @@
 
 <section class="work-surface">
     <div class="surface-title">
-        <h2>Order list</h2>
+        <div><h2>Order list</h2><p class="surface-description">Update status and add an operational comment without leaving the queue.</p></div>
+        <span class="count-badge">@_orders.Count total</span>
     </div>
     <div class="table-responsive">
         <table class="table align-middle orders-table">

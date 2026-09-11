@@ -796,13 +796,13 @@ public sealed partial class ConversationService(
         conversation.CurrentState = ConversationStates.ItemSelection;
 
         var body = string.IsNullOrWhiteSpace(prefix)
-            ? $"Welcome to {restaurant.Name}!\n\nBrowse our restaurant menu and order directly from WhatsApp."
+            ? WhatsAppOrderingMessageBuilder.BuildNativeCatalogBody(restaurant.Name)
             : $"{prefix.Trim()}\n\nBrowse our restaurant menu and order directly from WhatsApp.";
 
         return OutgoingReply.CatalogMessage(
             body,
             items[0].ProductRetailerId!,
-            "Add items to your cart and send it when ready.");
+            WhatsAppOrderingMessageBuilder.NativeCatalogFooter);
     }
 
     private async Task<OutgoingReply> AddCatalogOrderToCartAsync(

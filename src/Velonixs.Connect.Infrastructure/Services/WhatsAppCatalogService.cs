@@ -71,13 +71,13 @@ public sealed class WhatsAppCatalogService(
 
         var body = isTest
             ? $"Test {restaurant.Name}'s menu. Add products to the native WhatsApp cart and send the complete cart when ready."
-            : $"Welcome to {restaurant.Name}! Browse our menu and order directly from WhatsApp.";
+            : WhatsAppOrderingMessageBuilder.BuildNativeCatalogBody(restaurant.Name);
         var result = await messageSender.SendCatalogMessageAsync(
             restaurant.WhatsAppPhoneNumberId,
             customerPhoneNumber,
             body,
             thumbnailRetailerId,
-            isTest ? "Test catalog" : "Only active and in-stock products are shown.",
+            isTest ? "Test catalog" : WhatsAppOrderingMessageBuilder.NativeCatalogFooter,
             cancellationToken);
 
         return new CatalogMessageSendResult(

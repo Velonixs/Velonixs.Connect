@@ -140,6 +140,8 @@ public sealed class ConversationContinuationFlowTests
         Assert.Contains("Browse our restaurant menu", greeting.ReplyText);
         Assert.Equal(1, sender.CatalogMessageSendCount);
         Assert.Equal("paneer-pizza", sender.LastCatalogThumbnailProductRetailerId);
+        Assert.NotNull(sender.LastFooterText);
+        Assert.True(sender.LastFooterText.Length <= 60);
         Assert.Equal(0, sender.MultiProductSendCount);
         Assert.Empty(sender.LastButtons);
         Assert.Empty(sender.LastSections);

@@ -802,7 +802,7 @@ public sealed partial class ConversationService(
         return OutgoingReply.CatalogMessage(
             body,
             items[0].ProductRetailerId!,
-            "Add products to the native cart and send the complete cart when ready.");
+            "Add items to your cart and send it when ready.");
     }
 
     private async Task<OutgoingReply> AddCatalogOrderToCartAsync(

@@ -1796,8 +1796,55 @@ public sealed class MetaCatalogSyncService(
                 DateTimeOffset.UtcNow);
     }
 
+    private static string BuildMetaCatalogFailureMessage(int responseCode, string? responseBody)
+    {
+        var detail = TryGetMetaErrorDetail(responseBody);
+        return string.IsNullOrWhiteSpace(detail)
+            ? $"Meta catalog request failed with HTTP {responseCode}."
+            : $"Meta catalog request failed with HTTP {responseCode}: {detail}";
+    }
+
+    private static string? TryGetMetaErrorDetail(string? responseBody)
+    {
+        if (string.IsNullOrWhiteSpace(responseBody))
+        {
+            return null;
+        }
+
+        try
+        {
+            using var document = JsonDocument.Parse(responseBody);
+            var error = document.RootElement.TryGetProperty("error", out var nestedError)
+                ? nestedError
+                : document.RootElement;
+            var detail = TryReadString(error, "error_user_msg")
+                ?? TryReadString(error, "message")
+                ?? TryReadString(document.RootElement, "message");
+
+            return NormalizeMetaErrorDetail(detail);
+        }
+        catch (JsonException)
+        {
+            return null;
+        }
+    }
+
+    private static string? NormalizeMetaErrorDetail(string? detail)
+    {
+        var normalized = NormalizeOptional(detail);
+        if (normalized is null)
+        {
+            return null;
+        }
+
+        var safeText = new string(normalized
+            .Where(character => !char.IsControl(character))
+            .ToArray());
+        return safeText.Length <= 500 ? safeText : $"{safeText[..497]}...";
+    }
+
     private sealed class MetaCatalogHttpException(int responseCode, string? responseBody)
-        : Exception($"Meta catalog request failed with HTTP {responseCode}.")
+        : Exception(BuildMetaCatalogFailureMessage(responseCode, responseBody))
     {
         public int ResponseCode { get; } = responseCode;
         public string? ResponseBody { get; } = responseBody;

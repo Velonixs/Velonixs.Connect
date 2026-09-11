@@ -567,6 +567,30 @@ public sealed class MetaCatalogSyncServiceBehaviorTests
     }
 
     [Fact]
+    public async Task ProcessPendingAsync_ExposesMetaValidationMessageForBadRequests()
+    {
+        await using var dbContext = MetaCatalogTestSupport.CreateDbContext();
+        var (restaurant, _, item) = await MetaCatalogTestSupport.SeedProductAsync(dbContext);
+        await MetaCatalogTestSupport.EnableCatalogAsync(dbContext, restaurant.Id);
+        var handler = new RecordingHttpMessageHandler();
+        handler.Respond(
+            HttpStatusCode.BadRequest,
+            "{\"error\":{\"message\":\"The catalog ID is invalid for this WhatsApp business account.\"}}");
+        var service = MetaCatalogTestSupport.CreateSyncService(
+            dbContext,
+            handler,
+            new MetaCatalogOptions { DisableSending = false });
+
+        await service.QueueProductSyncAsync(restaurant.Id, item.Id, "update");
+        await service.ProcessPendingAsync();
+
+        var failed = await dbContext.CatalogSyncQueue.AsNoTracking().SingleAsync();
+        Assert.Equal(
+            "Meta catalog request failed with HTTP 400: The catalog ID is invalid for this WhatsApp business account.",
+            failed.LastError);
+    }
+
+    [Fact]
     public async Task ProcessPendingAsync_UsesDeleteEndpointWithoutAFormBody()
     {
         await using var dbContext = MetaCatalogTestSupport.CreateDbContext();

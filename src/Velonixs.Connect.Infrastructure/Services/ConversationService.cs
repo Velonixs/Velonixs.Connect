@@ -365,6 +365,7 @@ public sealed partial class ConversationService(
 
         if (normalized is "cart.add_more" or "add more" or "more")
         {
+            draft.IsAddingCatalogItems = draft.Items.Count > 0;
             return await BuildCatalogOrNumberedMenuReplyAsync(
                 restaurant,
                 conversation,
@@ -898,10 +899,16 @@ public sealed partial class ConversationService(
                 "The cart contains products with incompatible currencies. Please contact the restaurant before ordering.");
         }
 
-        // A native cart submission represents the complete cart. Replace any
-        // prior conversational draft instead of accidentally merging two carts.
-        draft.Items.Clear();
-        draft.CartId = Guid.NewGuid();
+        // The first native submission starts a fresh order. A submission made
+        // after the customer selected Add Items contains the newly selected
+        // catalog lines, so preserve the existing draft and merge those lines.
+        var mergeWithExistingCart = draft.IsAddingCatalogItems && draft.Items.Count > 0;
+        if (!mergeWithExistingCart)
+        {
+            draft.Items.Clear();
+            draft.CartId = Guid.NewGuid();
+        }
+
         var priceChanges = new List<string>();
 
         foreach (var orderItem in groupedOrderItems)
@@ -927,6 +934,7 @@ public sealed partial class ConversationService(
 
         draft.CurrentRestaurantId = restaurant.Id;
         draft.CurrentStep = ConversationStates.CartReview;
+        draft.IsAddingCatalogItems = false;
         draft.ExternalWhatsAppMessageId = string.IsNullOrWhiteSpace(message.WhatsAppMessageId)
             ? null
             : message.WhatsAppMessageId.Trim();

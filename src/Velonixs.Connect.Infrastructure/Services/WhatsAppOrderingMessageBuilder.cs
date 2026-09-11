@@ -334,7 +334,7 @@ public static class WhatsAppOrderingMessageBuilder
     public static IReadOnlyCollection<WhatsAppReplyButton> BuildCartButtons() =>
         new[]
         {
-            new WhatsAppReplyButton("cart.add_more", "Add More"),
+            new WhatsAppReplyButton("cart.add_more", "Add Items"),
             new WhatsAppReplyButton("cart.checkout", "Checkout"),
             new WhatsAppReplyButton("cart.cancel", "Cancel")
         };

@@ -20,6 +20,7 @@ public sealed class PendingOrderDraft
     public string? CheckoutState { get; set; }
     public string? ExternalWhatsAppMessageId { get; set; }
     public string? CatalogId { get; set; }
+    public bool IsAddingCatalogItems { get; set; }
     public decimal SubTotalAmount { get; set; }
     public decimal CgstPercent { get; set; }
     public decimal CgstAmount { get; set; }

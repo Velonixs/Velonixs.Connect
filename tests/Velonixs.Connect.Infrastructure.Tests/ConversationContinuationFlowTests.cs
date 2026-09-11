@@ -117,7 +117,6 @@ public sealed class ConversationContinuationFlowTests
         item.ProductRetailerId = "paneer-pizza";
         item.MetaProductId = "meta-paneer-pizza";
         item.SyncStatus = "Synced";
-
         dbContext.AddRange(
             restaurant,
             category,
@@ -168,11 +167,16 @@ public sealed class ConversationContinuationFlowTests
         item.ProductRetailerId = "paneer-pizza";
         item.MetaProductId = "meta-paneer-pizza";
         item.SyncStatus = "Synced";
+        var additionalItem = MenuItem(restaurant, category, "French Fries", 119, 2);
+        additionalItem.ProductRetailerId = "french-fries";
+        additionalItem.MetaProductId = "meta-french-fries";
+        additionalItem.SyncStatus = "Synced";
 
         dbContext.AddRange(
             restaurant,
             category,
             item,
+            additionalItem,
             new MetaCatalogSetting
             {
                 BusinessId = restaurant.Id,
@@ -209,6 +213,22 @@ public sealed class ConversationContinuationFlowTests
         Assert.Equal(1, sender.CatalogMessageSendCount);
         Assert.Equal("paneer-pizza", sender.LastCatalogThumbnailProductRetailerId);
         Assert.Empty(sender.LastButtons);
+
+        var updatedCart = await service.ProcessIncomingMessageAsync(
+            new IncomingWhatsAppMessage(
+                "phone-id",
+                "919999999999",
+                "catalog.order",
+                Guid.NewGuid().ToString("N"),
+                "Customer",
+                DateTimeOffset.UtcNow,
+                new[] { new IncomingWhatsAppOrderItem("french-fries", 1) },
+                "catalog-id",
+                "order"));
+
+        Assert.Contains("3 × Paneer Pizza", updatedCart.ReplyText);
+        Assert.Contains("1 × French Fries", updatedCart.ReplyText);
+        Assert.Contains("Total: Rs 866", updatedCart.ReplyText);
     }
 
     [Fact]

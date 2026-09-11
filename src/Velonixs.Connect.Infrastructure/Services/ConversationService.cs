@@ -365,7 +365,13 @@ public sealed partial class ConversationService(
 
         if (normalized is "cart.add_more" or "add more" or "more")
         {
-            return await BuildNumberedMenuReplyAsync(restaurant, conversation, draft, cancellationToken, page: 0);
+            return await BuildCatalogOrNumberedMenuReplyAsync(
+                restaurant,
+                conversation,
+                draft,
+                cancellationToken,
+                "Add more items to your order.",
+                page: 0);
         }
 
         if (normalized is "cart.cancel" or "cancel" or "stop")
@@ -797,12 +803,11 @@ public sealed partial class ConversationService(
 
         var body = string.IsNullOrWhiteSpace(prefix)
             ? WhatsAppOrderingMessageBuilder.BuildNativeCatalogBody(restaurant.Name)
-            : $"{prefix.Trim()}\n\nBrowse our restaurant menu and order directly from WhatsApp.";
+            : $"{prefix.Trim()}\n\nChoose items and quantities below.";
 
         return OutgoingReply.CatalogMessage(
             body,
-            items[0].ProductRetailerId!,
-            WhatsAppOrderingMessageBuilder.NativeCatalogFooter);
+            items[0].ProductRetailerId!);
     }
 
     private async Task<OutgoingReply> AddCatalogOrderToCartAsync(

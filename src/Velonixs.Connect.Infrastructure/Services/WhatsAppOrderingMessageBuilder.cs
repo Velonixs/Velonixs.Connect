@@ -6,7 +6,6 @@ namespace Velonixs.Connect.Infrastructure.Services;
 
 public static class WhatsAppOrderingMessageBuilder
 {
-    public const string NativeCatalogFooter = "Add items to your cart and send it when ready.";
     public const int CategoryPageSize = 8;
     public const int ItemPageSize = 6;
     public const int DirectMenuItemCount = 6;
@@ -14,7 +13,7 @@ public static class WhatsAppOrderingMessageBuilder
     public const int ProductListItemLimit = 30;
 
     public static string BuildNativeCatalogBody(string restaurantName) =>
-        $"Welcome to {restaurantName}!\n\nBrowse our restaurant menu and order directly from WhatsApp.";
+        $"Welcome to {restaurantName}. Please select the items and quantities you would like to order.";
 
     public static IReadOnlyCollection<WhatsAppInteractiveListSection> BuildDirectMenuSections(
         MenuCategory category,

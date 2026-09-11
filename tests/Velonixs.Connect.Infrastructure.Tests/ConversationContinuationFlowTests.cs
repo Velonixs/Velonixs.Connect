@@ -137,12 +137,12 @@ public sealed class ConversationContinuationFlowTests
 
         var greeting = await Send(service, "Hi");
 
-        Assert.Contains("Browse our restaurant menu", greeting.ReplyText);
+        Assert.Equal(
+            "Welcome to 99 Restaurant. Please select the items and quantities you would like to order.",
+            greeting.ReplyText);
         Assert.Equal(1, sender.CatalogMessageSendCount);
         Assert.Equal("paneer-pizza", sender.LastCatalogThumbnailProductRetailerId);
-        Assert.NotNull(sender.LastFooterText);
-        Assert.True(sender.LastFooterText.Length <= 60);
-        Assert.Equal(WhatsAppOrderingMessageBuilder.NativeCatalogFooter, sender.LastFooterText);
+        Assert.Null(sender.LastFooterText);
         Assert.Equal(0, sender.MultiProductSendCount);
         Assert.Empty(sender.LastButtons);
         Assert.Empty(sender.LastSections);
@@ -169,7 +169,18 @@ public sealed class ConversationContinuationFlowTests
         item.MetaProductId = "meta-paneer-pizza";
         item.SyncStatus = "Synced";
 
-        dbContext.AddRange(restaurant, category, item);
+        dbContext.AddRange(
+            restaurant,
+            category,
+            item,
+            new MetaCatalogSetting
+            {
+                BusinessId = restaurant.Id,
+                CatalogId = "catalog-id",
+                PhoneNumberId = "phone-id",
+                IsEnabled = true,
+                IsCartEnabled = true
+            });
         await dbContext.SaveChangesAsync();
 
         var sender = new FakeMessageSender();
@@ -191,6 +202,13 @@ public sealed class ConversationContinuationFlowTests
         Assert.Contains("Rs 747", result.ReplyText);
         Assert.Contains("Total: Rs 747", result.ReplyText);
         Assert.Equal(new[] { "cart.add_more", "cart.checkout", "cart.cancel" }, sender.LastButtons.Select(x => x.Id));
+
+        var addMore = await Send(service, "cart.add_more");
+
+        Assert.Contains("Add more items to your order", addMore.ReplyText);
+        Assert.Equal(1, sender.CatalogMessageSendCount);
+        Assert.Equal("paneer-pizza", sender.LastCatalogThumbnailProductRetailerId);
+        Assert.Empty(sender.LastButtons);
     }
 
     [Fact]

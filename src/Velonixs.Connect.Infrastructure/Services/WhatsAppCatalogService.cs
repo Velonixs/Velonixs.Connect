@@ -77,7 +77,7 @@ public sealed class WhatsAppCatalogService(
             customerPhoneNumber,
             body,
             thumbnailRetailerId,
-            isTest ? "Test catalog" : WhatsAppOrderingMessageBuilder.NativeCatalogFooter,
+            isTest ? "Test catalog" : null,
             cancellationToken);
 
         return new CatalogMessageSendResult(

@@ -82,7 +82,7 @@ public sealed class InteractiveOrderingTests
 
         Assert.Contains("🍽️ Welcome to 99 Restaurant!", message);
         Assert.DoesNotContain("Page 1 of 1", message);
-        Assert.Contains("Reply with an item number or type an item name to search.", message);
+        Assert.Contains("Reply with an item number, type an item name, or use 'search paneer'.", message);
         Assert.Contains("🍕 Pizza", message);
         Assert.Contains("1. Paneer Pizza", message);
         Assert.Contains("Rs 249", message);

@@ -674,6 +674,87 @@ public sealed class ConversationContinuationFlowTests
         Assert.Equal(OrderStatuses.PendingConfirmation, history.NewStatus);
     }
 
+    [Fact]
+    public async Task ExplicitSearch_PreservesCartAndRoutesSelectedItemToQuantity()
+    {
+        await using var dbContext = CreateDbContext();
+        var restaurant = new Restaurant { Name = "99 Restaurant", WhatsAppPhoneNumberId = "phone-id" };
+        var category = new MenuCategory { Restaurant = restaurant, Name = "Main Course", DisplayOrder = 1 };
+        var paneerTikka = MenuItem(restaurant, category, "Paneer Tikka", 249, 1);
+        var paneerButter = MenuItem(restaurant, category, "Paneer Butter Masala", 289, 2);
+        dbContext.AddRange(restaurant, category, paneerTikka, paneerButter);
+        await dbContext.SaveChangesAsync();
+
+        var sender = new FakeMessageSender();
+        var service = CreateService(dbContext, sender);
+        await AddOneItemToCart(service, category, paneerTikka, 2);
+
+        var search = await Send(service, "search paneer");
+
+        Assert.Contains("I found 2 matching items", search.ReplyText);
+        Assert.Equal(ConversationStates.SearchSelection, search.ConversationState);
+        Assert.Contains(sender.LastSections.SelectMany(section => section.Rows), row => row.Id == $"item.select:{paneerButter.Id}");
+
+        var quantity = await Send(service, $"item.select:{paneerButter.Id}");
+        Assert.Contains("Paneer Butter Masala", quantity.ReplyText);
+        Assert.Equal(ConversationStates.QuantitySelection, quantity.ConversationState);
+
+        await Send(service, $"quantity.select:{paneerButter.Id}:1");
+        var conversation = await dbContext.Conversations.SingleAsync();
+        var draft = ReadDraft(conversation);
+        Assert.Equal(2, draft.Items.Count);
+        Assert.Contains(draft.Items, item => item.MenuItemId == paneerTikka.Id && item.Quantity == 2);
+        Assert.Contains(draft.Items, item => item.MenuItemId == paneerButter.Id && item.Quantity == 1);
+    }
+
+    [Fact]
+    public async Task ExplicitSearch_WithoutQueryPromptsForWhatToSearch()
+    {
+        await using var dbContext = CreateDbContext();
+        dbContext.Add(new Restaurant { Name = "99 Restaurant", WhatsAppPhoneNumberId = "phone-id" });
+        await dbContext.SaveChangesAsync();
+
+        var result = await Send(CreateService(dbContext, new FakeMessageSender()), "find");
+
+        Assert.Equal("What would you like to search for? For example: search paneer", result.ReplyText);
+    }
+
+    [Fact]
+    public async Task ExplicitSearch_WithoutMatchesReturnsDiscoveryGuidance()
+    {
+        await using var dbContext = CreateDbContext();
+        var restaurant = new Restaurant { Name = "99 Restaurant", WhatsAppPhoneNumberId = "phone-id" };
+        var category = new MenuCategory { Restaurant = restaurant, Name = "Main Course", DisplayOrder = 1 };
+        dbContext.AddRange(restaurant, category, MenuItem(restaurant, category, "Chicken Biryani", 299, 1));
+        await dbContext.SaveChangesAsync();
+
+        var result = await Send(CreateService(dbContext, new FakeMessageSender()), "find xyzunknown");
+
+        Assert.Equal("No matching items found for \"xyzunknown\".\n\nTry another dish name or type Menu to browse the catalog.", result.ReplyText);
+    }
+
+    [Fact]
+    public async Task DeliveryAddressContainingSearch_IsNotTreatedAsProductSearch()
+    {
+        await using var dbContext = CreateDbContext();
+        var restaurant = new Restaurant { Name = "99 Restaurant", WhatsAppPhoneNumberId = "phone-id" };
+        var category = new MenuCategory { Restaurant = restaurant, Name = "Main Course", DisplayOrder = 1 };
+        var item = MenuItem(restaurant, category, "Paneer Butter Masala", 289, 1);
+        dbContext.AddRange(restaurant, category, item);
+        await dbContext.SaveChangesAsync();
+
+        var service = CreateService(dbContext, new FakeMessageSender());
+        await AddOneItemToCart(service, category, item, 1);
+        await Send(service, "cart.checkout");
+        await Send(service, "Customer");
+        await Send(service, "checkout.delivery");
+
+        var confirmation = await Send(service, "Search Road, Rajarhat");
+
+        Assert.Equal(ConversationStates.ConfirmationPending, confirmation.ConversationState);
+        Assert.Contains("Delivery address: Search Road, Rajarhat", confirmation.ReplyText);
+    }
+
     private static ConversationService CreateService(
         RestaurantConnectDbContext dbContext,
         IWhatsAppMessageSender sender)

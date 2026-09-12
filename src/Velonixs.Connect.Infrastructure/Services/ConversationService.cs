@@ -459,6 +459,30 @@ public sealed partial class ConversationService(
                     cancellationToken));
         }
 
+        // Fulfilment is a checkout decision, so it takes precedence over free
+        // text discovery commands just as name, address, quantity, and
+        // confirmation do above.
+        if (conversation.CurrentState == ConversationStates.FulfilmentPending)
+        {
+            return BuildFulfilmentReply();
+        }
+
+        if (TryReadSearchCommand(text, out var searchQuery))
+        {
+            if (string.IsNullOrWhiteSpace(searchQuery))
+            {
+                return OutgoingReply.TextOnly(
+                    "What would you like to search for? For example: search paneer");
+            }
+
+            return await BuildSearchReplyAsync(
+                restaurant,
+                conversation,
+                draft,
+                searchQuery,
+                cancellationToken);
+        }
+
         var legacyOrderLines = ParseLegacyOrder(text);
         if (legacyOrderLines.Count > 0)
         {
@@ -992,7 +1016,7 @@ public sealed partial class ConversationService(
                 categories,
                 draft.CategoryPage,
                 draft.Items.Count > 0),
-            "Or type an item name to search.");
+            "Or type 'search paneer' to quickly find a dish.");
     }
 
     private async Task<OutgoingReply> BuildItemsReplyAsync(
@@ -1532,9 +1556,66 @@ public sealed partial class ConversationService(
         Guid restaurantId,
         CancellationToken cancellationToken) =>
         dbContext.MenuItems.AsNoTracking()
+            .Include(x => x.Category)
             .Where(x => x.RestaurantId == restaurantId && x.IsActive && x.IsAvailable)
             .OrderBy(x => x.ItemCode)
             .ToArrayAsync(cancellationToken);
+
+    private async Task<OutgoingReply> BuildSearchReplyAsync(
+        Domain.Entities.Restaurant restaurant,
+        Conversation conversation,
+        PendingOrderDraft draft,
+        string searchQuery,
+        CancellationToken cancellationToken)
+    {
+        var matches = menuSearchService.Search(
+            searchQuery,
+            await LoadActiveItemsAsync(restaurant.Id, cancellationToken));
+
+        if (matches.Count == 0)
+        {
+            return OutgoingReply.TextOnly(
+                $"No matching items found for \"{searchQuery.Trim()}\".\n\nTry another dish name or type Menu to browse the catalog.");
+        }
+
+        if (matches.Count == 1 && matches[0].Score >= 0.95)
+        {
+            return await BuildQuantityReplyAsync(
+                restaurant,
+                conversation,
+                draft,
+                matches[0].Item.Id,
+                selectedFromSearch: true,
+                cancellationToken);
+        }
+
+        conversation.CurrentState = ConversationStates.SearchSelection;
+        var items = matches.Select(match => match.Item).ToArray();
+        var summary = string.Join(
+            "\n",
+            items.Select((item, index) => $"{index + 1}. {item.Name} — Rs {item.Price:0.##}"));
+        return OutgoingReply.List(
+            $"I found {items.Length} matching {(items.Length == 1 ? "item" : "items")}:\n\n{summary}",
+            "View matches",
+            WhatsAppOrderingMessageBuilder.BuildSearchSections(items));
+    }
+
+    private static bool TryReadSearchCommand(string text, out string query)
+    {
+        var trimmed = text.Trim();
+        var separatorIndex = trimmed.IndexOfAny([' ', '\t', '\r', '\n']);
+        var command = separatorIndex < 0 ? trimmed : trimmed[..separatorIndex];
+
+        if (!string.Equals(command, "search", StringComparison.OrdinalIgnoreCase) &&
+            !string.Equals(command, "find", StringComparison.OrdinalIgnoreCase))
+        {
+            query = string.Empty;
+            return false;
+        }
+
+        query = separatorIndex < 0 ? string.Empty : trimmed[(separatorIndex + 1)..].Trim();
+        return true;
+    }
 
     private async Task<Customer> GetOrCreateCustomerAsync(
         Guid restaurantId,

@@ -18,46 +18,56 @@ public sealed class PlatformAdministrationService(
     RestaurantConnectDbContext dbContext,
     UserManager<ApplicationUser> userManager) : IPlatformAdministrationService
 {
+    private readonly SemaphoreSlim _dbLock = new(1, 1);
+
     public async Task<PlatformDashboardResponse> GetDashboardAsync(CancellationToken cancellationToken = default)
     {
-        var businesses = await dbContext.Restaurants
-            .AsNoTracking()
-            .OrderBy(x => x.Name)
-            .Select(x => new { x.Id, x.Name, x.BusinessType, x.IsActive })
-            .ToArrayAsync(cancellationToken);
+        await _dbLock.WaitAsync(cancellationToken);
+        try
+        {
+            var businesses = await dbContext.Restaurants
+                .AsNoTracking()
+                .OrderBy(x => x.Name)
+                .Select(x => new { x.Id, x.Name, x.BusinessType, x.IsActive })
+                .ToArrayAsync(cancellationToken);
 
-        var productCounts = await dbContext.MenuItems
-            .AsNoTracking()
-            .Where(x => x.IsActive)
-            .GroupBy(x => x.RestaurantId)
-            .Select(x => new { BusinessId = x.Key, Count = x.Count() })
-            .ToDictionaryAsync(x => x.BusinessId, x => x.Count, cancellationToken);
-        var orderCounts = await dbContext.Orders
-            .AsNoTracking()
-            .GroupBy(x => x.RestaurantId)
-            .Select(x => new { BusinessId = x.Key, Count = x.Count() })
-            .ToDictionaryAsync(x => x.BusinessId, x => x.Count, cancellationToken);
+            var productCounts = await dbContext.MenuItems
+                .AsNoTracking()
+                .Where(x => x.IsActive)
+                .GroupBy(x => x.RestaurantId)
+                .Select(x => new { BusinessId = x.Key, Count = x.Count() })
+                .ToDictionaryAsync(x => x.BusinessId, x => x.Count, cancellationToken);
+            var orderCounts = await dbContext.Orders
+                .AsNoTracking()
+                .GroupBy(x => x.RestaurantId)
+                .Select(x => new { BusinessId = x.Key, Count = x.Count() })
+                .ToDictionaryAsync(x => x.BusinessId, x => x.Count, cancellationToken);
 
-        var today = DateTimeOffset.UtcNow.Date;
-        var activeProductCount = await dbContext.MenuItems.CountAsync(x => x.IsActive && x.IsAvailable, cancellationToken);
-        var pendingCatalogSyncCount = await dbContext.CatalogSyncQueue.CountAsync(
-            x => x.Status == "Pending" || x.Status == "Failed",
-            cancellationToken);
-        var todaysOrderCount = await dbContext.Orders.CountAsync(x => x.CreatedAt >= today, cancellationToken);
-        var totalRevenue = await dbContext.Orders.SumAsync(x => (decimal?)x.TotalAmount, cancellationToken) ?? 0;
+            var today = DateTimeOffset.UtcNow.Date;
+            var activeProductCount = await dbContext.MenuItems.CountAsync(x => x.IsActive && x.IsAvailable, cancellationToken);
+            var pendingCatalogSyncCount = await dbContext.CatalogSyncQueue.CountAsync(
+                x => x.Status == "Pending" || x.Status == "Failed",
+                cancellationToken);
+            var todaysOrderCount = await dbContext.Orders.CountAsync(x => x.CreatedAt >= today, cancellationToken);
+            var totalRevenue = await dbContext.Orders.SumAsync(x => (decimal?)x.TotalAmount, cancellationToken) ?? 0;
 
-        return new PlatformDashboardResponse(
-            businesses.Select(x => new PlatformBusinessSummary(
-                x.Id,
-                x.Name,
-                x.BusinessType,
-                x.IsActive,
-                productCounts.GetValueOrDefault(x.Id),
-                orderCounts.GetValueOrDefault(x.Id))).ToArray(),
-            activeProductCount,
-            pendingCatalogSyncCount,
-            todaysOrderCount,
-            totalRevenue);
+            return new PlatformDashboardResponse(
+                businesses.Select(x => new PlatformBusinessSummary(
+                    x.Id,
+                    x.Name,
+                    x.BusinessType,
+                    x.IsActive,
+                    productCounts.GetValueOrDefault(x.Id),
+                    orderCounts.GetValueOrDefault(x.Id))).ToArray(),
+                activeProductCount,
+                pendingCatalogSyncCount,
+                todaysOrderCount,
+                totalRevenue);
+        }
+        finally
+        {
+            _dbLock.Release();
+        }
     }
 
     public async Task<RestaurantResponse> CreateBusinessWithOwnerAsync(

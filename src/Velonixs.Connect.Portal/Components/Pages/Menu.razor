@@ -203,7 +203,7 @@ else if (_restaurant is not null)
     <section class="portal-blazor-surface">
         <div class="portal-blazor-surface-head">
             <div>
-                <p class="portal-blazor-eyebrow">@_categories.Count categories · @_items.Count products</p>
+                <p class="portal-blazor-eyebrow">@_categories.Count categories · <span class="portal-menu-result-count">@(HasActiveFilters ? $"{FilteredItems.Count()} of {_items.Count} products" : $"{_items.Count} products")</span></p>
                 <h2>Current menu</h2>
             </div>
         </div>
@@ -214,6 +214,53 @@ else if (_restaurant is not null)
         }
         else
         {
+            <div class="portal-menu-filter-bar">
+                <div class="portal-menu-search">
+                    <span class="portal-menu-search-icon" aria-hidden="true">&#128269;</span>
+                    <input class="form-control"
+                           type="search"
+                           placeholder="Search products..."
+                           aria-label="Search products"
+                           @bind="_searchText"
+                           @bind:event="oninput" />
+                    @if (!string.IsNullOrWhiteSpace(_searchText))
+                    {
+                        <button type="button"
+                                class="portal-menu-clear-search"
+                                aria-label="Clear product search"
+                                @onclick="ClearSearch">&#215;</button>
+                    }
+                </div>
+
+                <div class="portal-menu-category-filters" role="group" aria-label="Filter products by category">
+                    <button type="button" class="portal-menu-filter-chip @(_selectedCategoryId is null ? "is-active" : string.Empty)" aria-pressed="@(_selectedCategoryId is null)" @onclick="() => _selectedCategoryId = null">All Categories</button>
+                    @foreach (var category in _categories.Where(category => category.IsActive).OrderBy(category => category.DisplayOrder).ThenBy(category => category.Name, StringComparer.OrdinalIgnoreCase))
+                    {
+                        <button type="button" class="portal-menu-filter-chip @(_selectedCategoryId == category.Id ? "is-active" : string.Empty)" aria-pressed="@(_selectedCategoryId == category.Id)" @onclick="() => _selectedCategoryId = category.Id">@category.Name</button>
+                    }
+                </div>
+
+                <div class="portal-menu-category-filters" role="group" aria-label="Filter products by dietary preference and availability">
+                    <button type="button" class="portal-menu-filter-chip @(_dietFilter == "all" ? "is-active" : string.Empty)" aria-pressed="@(_dietFilter == "all")" @onclick="SelectAllDiet">All</button>
+                    <button type="button" class="portal-menu-filter-chip @(_dietFilter == "veg" ? "is-active" : string.Empty)" aria-pressed="@(_dietFilter == "veg")" @onclick="SelectVegDiet">Veg</button>
+                    <button type="button" class="portal-menu-filter-chip @(_dietFilter == "non-veg" ? "is-active" : string.Empty)" aria-pressed="@(_dietFilter == "non-veg")" @onclick="SelectNonVegDiet">Non-Veg</button>
+                    <button type="button" class="portal-menu-filter-chip @(_availableOnly ? "is-active" : string.Empty)" aria-pressed="@_availableOnly" @onclick="() => _availableOnly = !_availableOnly">Available</button>
+                    @if (HasActiveFilters)
+                    {
+                        <button type="button" class="portal-menu-clear-filters" @onclick="ClearFilters">Clear filters</button>
+                    }
+                </div>
+            </div>
+
+            @if (!FilteredItems.Any())
+            {
+                <div class="portal-blazor-empty">
+                    <p>No products match your search or filters.</p>
+                    <button type="button" class="btn btn-outline-primary" @onclick="ClearFilters">Clear filters</button>
+                </div>
+            }
+            else
+            {
             <div class="table-responsive">
                 <table class="table align-middle portal-blazor-table">
                     <thead>
@@ -231,7 +278,7 @@ else if (_restaurant is not null)
                         </tr>
                     </thead>
                     <tbody>
-                    @foreach (var item in _items)
+                    @foreach (var item in FilteredItems)
                     {
                         <tr @key="item.Id">
                             <td>@item.ItemCode</td>
@@ -276,6 +323,7 @@ else if (_restaurant is not null)
                     </tbody>
                 </table>
             </div>
+            }
         }
     </section>
 }
@@ -301,8 +349,33 @@ else if (_restaurant is not null)
     private string? _error;
     private string? _message;
     private string _customerPhoneNumber = string.Empty;
+    private string _searchText = string.Empty;
+    private Guid? _selectedCategoryId;
+    private string _dietFilter = "all";
+    private bool _availableOnly;
 
     private bool CanManage { get; set; }
+
+    private IEnumerable<MenuItemResponse> FilteredItems
+    {
+        get
+        {
+            var searchText = _searchText.Trim();
+            return _items.Where(item =>
+                (string.IsNullOrWhiteSpace(searchText) || MatchesSearch(item, searchText)) &&
+                (_selectedCategoryId is null || item.CategoryId == _selectedCategoryId) &&
+                (_dietFilter == "all" ||
+                    (_dietFilter == "veg" && item.IsVegetarian) ||
+                    (_dietFilter == "non-veg" && !item.IsVegetarian)) &&
+                (!_availableOnly || item.IsAvailable));
+        }
+    }
+
+    private bool HasActiveFilters =>
+        !string.IsNullOrWhiteSpace(_searchText) ||
+        _selectedCategoryId is not null ||
+        _dietFilter != "all" ||
+        _availableOnly;
 
     protected override async Task OnInitializedAsync() => await LoadAsync();
 
@@ -597,6 +670,29 @@ else if (_restaurant is not null)
         _message = message;
         _messageIsError = isError;
     }
+
+    private void ClearSearch() => _searchText = string.Empty;
+
+    private void SelectAllDiet() => _dietFilter = "all";
+
+    private void SelectVegDiet() => _dietFilter = "veg";
+
+    private void SelectNonVegDiet() => _dietFilter = "non-veg";
+
+    private void ClearFilters()
+    {
+        _searchText = string.Empty;
+        _selectedCategoryId = null;
+        _dietFilter = "all";
+        _availableOnly = false;
+    }
+
+    private static bool MatchesSearch(MenuItemResponse item, string searchText) =>
+        item.Name.Contains(searchText, StringComparison.OrdinalIgnoreCase) ||
+        (item.Description?.Contains(searchText, StringComparison.OrdinalIgnoreCase) ?? false) ||
+        item.CategoryName.Contains(searchText, StringComparison.OrdinalIgnoreCase) ||
+        (item.ProductRetailerId?.Contains(searchText, StringComparison.OrdinalIgnoreCase) ?? false) ||
+        item.ItemCode.ToString().Contains(searchText, StringComparison.OrdinalIgnoreCase);
 
     private static Guid? ParseBusinessId(ClaimsPrincipal? user)
     {

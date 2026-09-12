@@ -266,7 +266,7 @@ public static class WhatsAppOrderingMessageBuilder
         }
 
         builder.AppendLine();
-        builder.AppendLine("Reply with an item number or type an item name to search.");
+        builder.AppendLine("Reply with an item number, type an item name, or use 'search paneer'.");
 
         return builder.ToString().Trim();
     }

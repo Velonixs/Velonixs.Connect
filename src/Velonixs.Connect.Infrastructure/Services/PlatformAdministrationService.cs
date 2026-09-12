@@ -79,7 +79,6 @@ public sealed class PlatformAdministrationService : IPlatformAdministrationServi
                 cancellationToken);
             var todaysOrderCount = await context.Orders.CountAsync(x => x.CreatedAt >= today, cancellationToken);
             var totalRevenue = await context.Orders.SumAsync(x => (decimal?)x.TotalAmount, cancellationToken) ?? 0;
-
             return new PlatformDashboardResponse(
                 businesses.Select(x => new PlatformBusinessSummary(
                     x.Id,
@@ -99,7 +98,6 @@ public sealed class PlatformAdministrationService : IPlatformAdministrationServi
             {
                 await isolatedContext.DisposeAsync();
             }
-
             _dbLock.Release();
         }
     }

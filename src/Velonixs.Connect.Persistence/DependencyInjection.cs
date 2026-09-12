@@ -30,7 +30,7 @@ public static class DependencyInjection
         });
         services.AddSingleton<IFieldEncryptionService, AesGcmFieldEncryptionService>();
 
-        services.AddDbContext<RestaurantConnectDbContext>(options =>
+        services.AddDbContextFactory<RestaurantConnectDbContext>(options =>
             options.UseSqlServer(connectionString));
 
         services.Configure<RestaurantConnectOptions>(configuration.GetSection("RestaurantConnect"));

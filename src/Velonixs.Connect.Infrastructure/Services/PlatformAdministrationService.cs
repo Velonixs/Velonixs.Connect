@@ -14,43 +14,71 @@ namespace Velonixs.Connect.Infrastructure.Services;
 /// the sole place where the presentation layer's former EF/Identity work is
 /// performed, keeping UI components focused on DTO-based commands and views.
 /// </summary>
-public sealed class PlatformAdministrationService(
-    RestaurantConnectDbContext dbContext,
-    UserManager<ApplicationUser> userManager) : IPlatformAdministrationService
+public sealed class PlatformAdministrationService : IPlatformAdministrationService
 {
+    private readonly RestaurantConnectDbContext dbContext;
+    private readonly UserManager<ApplicationUser> userManager;
+    private readonly IDbContextFactory<RestaurantConnectDbContext>? dbContextFactory;
     private readonly SemaphoreSlim _dbLock = new(1, 1);
+
+    // Retained for focused service tests and non-Blazor hosts that do not
+    // register a context factory.
+    public PlatformAdministrationService(
+        RestaurantConnectDbContext dbContext,
+        UserManager<ApplicationUser> userManager)
+    {
+        this.dbContext = dbContext;
+        this.userManager = userManager;
+    }
+
+    public PlatformAdministrationService(
+        RestaurantConnectDbContext dbContext,
+        UserManager<ApplicationUser> userManager,
+        IDbContextFactory<RestaurantConnectDbContext> dbContextFactory)
+        : this(dbContext, userManager)
+    {
+        this.dbContextFactory = dbContextFactory;
+    }
 
     public async Task<PlatformDashboardResponse> GetDashboardAsync(CancellationToken cancellationToken = default)
     {
         await _dbLock.WaitAsync(cancellationToken);
+        RestaurantConnectDbContext? isolatedContext = null;
         try
         {
-            var businesses = await dbContext.Restaurants
+            // A Blazor layout and its page initialize independently. Use a
+            // short-lived context for the layout dashboard read so it cannot
+            // overlap the page's scoped context operations.
+            isolatedContext = dbContextFactory is null
+                ? null
+                : await dbContextFactory.CreateDbContextAsync(cancellationToken);
+            var context = isolatedContext ?? dbContext;
+
+            var businesses = await context.Restaurants
                 .AsNoTracking()
                 .OrderBy(x => x.Name)
                 .Select(x => new { x.Id, x.Name, x.BusinessType, x.IsActive })
                 .ToArrayAsync(cancellationToken);
 
-            var productCounts = await dbContext.MenuItems
+            var productCounts = await context.MenuItems
                 .AsNoTracking()
                 .Where(x => x.IsActive)
                 .GroupBy(x => x.RestaurantId)
                 .Select(x => new { BusinessId = x.Key, Count = x.Count() })
                 .ToDictionaryAsync(x => x.BusinessId, x => x.Count, cancellationToken);
-            var orderCounts = await dbContext.Orders
+            var orderCounts = await context.Orders
                 .AsNoTracking()
                 .GroupBy(x => x.RestaurantId)
                 .Select(x => new { BusinessId = x.Key, Count = x.Count() })
                 .ToDictionaryAsync(x => x.BusinessId, x => x.Count, cancellationToken);
 
             var today = DateTimeOffset.UtcNow.Date;
-            var activeProductCount = await dbContext.MenuItems.CountAsync(x => x.IsActive && x.IsAvailable, cancellationToken);
-            var pendingCatalogSyncCount = await dbContext.CatalogSyncQueue.CountAsync(
+            var activeProductCount = await context.MenuItems.CountAsync(x => x.IsActive && x.IsAvailable, cancellationToken);
+            var pendingCatalogSyncCount = await context.CatalogSyncQueue.CountAsync(
                 x => x.Status == "Pending" || x.Status == "Failed",
                 cancellationToken);
-            var todaysOrderCount = await dbContext.Orders.CountAsync(x => x.CreatedAt >= today, cancellationToken);
-            var totalRevenue = await dbContext.Orders.SumAsync(x => (decimal?)x.TotalAmount, cancellationToken) ?? 0;
-
+            var todaysOrderCount = await context.Orders.CountAsync(x => x.CreatedAt >= today, cancellationToken);
+            var totalRevenue = await context.Orders.SumAsync(x => (decimal?)x.TotalAmount, cancellationToken) ?? 0;
             return new PlatformDashboardResponse(
                 businesses.Select(x => new PlatformBusinessSummary(
                     x.Id,
@@ -66,6 +94,10 @@ public sealed class PlatformAdministrationService(
         }
         finally
         {
+            if (isolatedContext is not null)
+            {
+                await isolatedContext.DisposeAsync();
+            }
             _dbLock.Release();
         }
     }

@@ -1,4 +1,4 @@
-@page "/admin/blazor/master-catalog"
+@page "/admin/master-catalog"
 @attribute [Authorize(Roles = AppRoles.PlatformAdmin)]
 @inject IMenuService MenuService
 
@@ -9,7 +9,7 @@
         <span class="page-description">Maintain reusable categories and items for every connected business.</span>
     </div>
     <div class="toolbar page-head-actions">
-        <a href="/admin/blazor">Dashboard</a>
+        <a href="/admin/dashboard">Dashboard</a>
     </div>
 </header>
 
@@ -36,13 +36,14 @@
 <section class="work-surface mb-3">
     <div class="surface-title">
         <div><h2>Master categories</h2><p class="surface-description">The shared category structure available during business setup.</p></div>
-        <span class="count-badge">@_categories.Count total</span>
+        <span class="count-badge">@_categories.Count total · @FilteredCategories.Count shown</span>
+        @if (HasCategoryFilters) { <button class="vx-clear-filters" @onclick="ClearCategoryFilters">Clear filters</button> }
     </div>
     <div class="table-responsive">
-        <table class="table align-middle master-catalog-table master-category-table">
-            <thead><tr><th>Name</th><th class="catalog-active-heading">Active</th><th class="catalog-actions-heading">Actions</th></tr></thead>
+        <table class="table align-middle master-catalog-table master-category-table vx-table">
+            <thead><tr><th>Name</th><th class="catalog-active-heading">Active</th><th class="catalog-actions-heading">Actions</th></tr><tr class="vx-table-filter-row"><th><input class="vx-table-filter-input" aria-label="Filter master category" placeholder="Search category" @bind="_categoryFilter" @bind:event="oninput" /></th><th><select class="vx-table-filter-select" aria-label="Filter category status" @bind="_categoryActiveFilter"><option value="">All</option><option value="active">Active</option><option value="inactive">Inactive</option></select></th><th></th></tr></thead>
             <tbody>
-            @foreach (var category in _categories)
+            @foreach (var category in FilteredCategories)
             {
                 <tr>
                     <td><input class="inline-input" @bind="category.Name" /></td>
@@ -89,13 +90,14 @@
 <section class="work-surface">
     <div class="surface-title">
         <div><h2>Master items</h2><p class="surface-description">Canonical product definitions that businesses can add to their catalogs.</p></div>
-        <span class="count-badge">@_items.Count total</span>
+        <span class="count-badge">@_items.Count total · @FilteredItems.Count shown</span>
+        @if (HasItemFilters) { <button class="vx-clear-filters" @onclick="ClearItemFilters">Clear filters</button> }
     </div>
     <div class="table-responsive">
-        <table class="table align-middle master-catalog-table master-item-table">
-            <thead><tr><th>Category</th><th>Name</th><th>Description</th><th class="catalog-active-heading">Active</th><th class="catalog-actions-heading">Actions</th></tr></thead>
+        <table class="table align-middle master-catalog-table master-item-table vx-table">
+            <thead><tr><th>Category</th><th>Name</th><th>Description</th><th class="catalog-active-heading">Active</th><th class="catalog-actions-heading">Actions</th></tr><tr class="vx-table-filter-row"><th><select class="vx-table-filter-select" aria-label="Filter item category" @bind="_itemCategoryFilter"><option value="">All categories</option>@foreach (var category in _categories) { <option value="@category.Id">@category.Name</option> }</select></th><th><input class="vx-table-filter-input" aria-label="Filter master item name" placeholder="Search item" @bind="_itemFilter" @bind:event="oninput" /></th><th><input class="vx-table-filter-input" aria-label="Filter description" placeholder="Search description" @bind="_descriptionFilter" @bind:event="oninput" /></th><th><select class="vx-table-filter-select" aria-label="Filter item active status" @bind="_itemActiveFilter"><option value="">All</option><option value="active">Active</option><option value="inactive">Inactive</option></select></th><th></th></tr></thead>
             <tbody>
-            @foreach (var item in _items)
+            @foreach (var item in FilteredItems)
             {
                 <tr>
                     <td>
@@ -128,6 +130,23 @@
     private MasterCategoryEditor _newCategory = new() { IsActive = true };
     private MasterItemEditor _newItem = new() { IsActive = true };
     private string? _message;
+    private string _categoryFilter = string.Empty;
+    private string _categoryActiveFilter = string.Empty;
+    private string _itemCategoryFilter = string.Empty;
+    private string _itemFilter = string.Empty;
+    private string _descriptionFilter = string.Empty;
+    private string _itemActiveFilter = string.Empty;
+
+    private IReadOnlyCollection<MasterCategoryEditor> FilteredCategories => _categories.Where(category =>
+        (string.IsNullOrWhiteSpace(_categoryFilter) || category.Name.Contains(_categoryFilter, StringComparison.OrdinalIgnoreCase)) &&
+        (string.IsNullOrWhiteSpace(_categoryActiveFilter) || (_categoryActiveFilter == "active" ? category.IsActive : !category.IsActive))).ToArray();
+    private IReadOnlyCollection<MasterItemEditor> FilteredItems => _items.Where(item =>
+        (string.IsNullOrWhiteSpace(_itemCategoryFilter) || item.MasterCategoryId.ToString() == _itemCategoryFilter) &&
+        (string.IsNullOrWhiteSpace(_itemFilter) || item.Name.Contains(_itemFilter, StringComparison.OrdinalIgnoreCase)) &&
+        (string.IsNullOrWhiteSpace(_descriptionFilter) || (item.Description ?? string.Empty).Contains(_descriptionFilter, StringComparison.OrdinalIgnoreCase)) &&
+        (string.IsNullOrWhiteSpace(_itemActiveFilter) || (_itemActiveFilter == "active" ? item.IsActive : !item.IsActive))).ToArray();
+    private bool HasCategoryFilters => !string.IsNullOrWhiteSpace(_categoryFilter) || !string.IsNullOrWhiteSpace(_categoryActiveFilter);
+    private bool HasItemFilters => !string.IsNullOrWhiteSpace(_itemCategoryFilter) || !string.IsNullOrWhiteSpace(_itemFilter) || !string.IsNullOrWhiteSpace(_descriptionFilter) || !string.IsNullOrWhiteSpace(_itemActiveFilter);
 
     protected override async Task OnInitializedAsync()
     {
@@ -143,6 +162,9 @@
         _items.AddRange(catalog.Items.Select(MasterItemEditor.From));
         _newItem.MasterCategoryId = _categories.FirstOrDefault(x => x.IsActive)?.Id ?? Guid.Empty;
     }
+
+    private void ClearCategoryFilters() => (_categoryFilter, _categoryActiveFilter) = (string.Empty, string.Empty);
+    private void ClearItemFilters() => (_itemCategoryFilter, _itemFilter, _descriptionFilter, _itemActiveFilter) = (string.Empty, string.Empty, string.Empty, string.Empty);
 
     private async Task CreateCategoryAsync()
     {

@@ -1,66 +1,77 @@
 @inherits LayoutComponentBase
 @inject NavigationManager Navigation
+@inject IRestaurantService RestaurantService
 
-<div class="portal-application">
-    <header class="portal-application-header">
-        <a class="portal-header-logo" href="/portal/blazor" aria-label="Velonixs Business Portal home">
-            <img class="portal-header-logo-image" src="/images/velonixs-logo.jpg" alt="Velonixs Systems Private Limited logo" />
+<div class="vx-portal-app">
+    <header class="vx-topbar">
+        <a class="vx-business-brand" href="/portal/dashboard" aria-label="Business portal dashboard">
+            @if (!string.IsNullOrWhiteSpace(BusinessLogoUrl))
+            {
+                <img class="vx-business-logo" src="@BusinessLogoUrl" alt="@BusinessName logo" />
+            }
+            else
+            {
+                <span class="vx-business-logo vx-business-initials" aria-hidden="true">@BusinessInitials</span>
+            }
+            <span class="vx-brand-copy"><strong>@BusinessName</strong><small>Velonixs Connect</small></span>
         </a>
-        <div class="portal-application-title">
-            <strong>Velonixs Systems Private Limited</strong>
-            <span>Business Portal <span aria-hidden="true">&middot;</span> Restaurant team</span>
+        <div class="vx-topbar-actions">
+            <button class="vx-icon-button" type="button" aria-label="Notifications">&#128276;</button>
+            <AuthorizeView Roles="@AppRoles.PortalRoles"><Authorized Context="auth"><span class="vx-avatar" title="@auth.User.Identity?.Name">@Initials(auth.User.Identity?.Name)</span></Authorized></AuthorizeView>
         </div>
-        <div aria-hidden="true"></div>
     </header>
-
-    <div class="portal-blazor-shell">
-    <aside class="portal-blazor-sidebar">
-        <a class="portal-blazor-brand" href="/portal/blazor">
-            <img class="portal-blazor-logo" src="/images/velonixs-logo.jpg" alt="Velonixs Systems Private Limited logo" />
-            <span>
-                <strong>Velonixs</strong>
-                <small>Systems Private Limited · Business Portal</small>
-            </span>
-        </a>
-
-        <p class="portal-blazor-nav-label">Business workspace</p>
-        <nav class="portal-blazor-nav" aria-label="Business portal">
-            <a class="@NavClass("/portal/blazor")" href="/portal/blazor">Dashboard</a>
-            <a class="@NavClass("/portal/blazor/menu")" href="/portal/blazor/menu">Menu</a>
-            <a class="@NavClass("/portal/blazor/orders")" href="/portal/blazor/orders">Orders</a>
-            <a class="@NavClass("/portal/blazor/customers")" href="/portal/blazor/customers">Customers</a>
-        </nav>
-
-        <AuthorizeView Roles="@AppRoles.PortalRoles">
-            <Authorized Context="authenticationState">
-                <div class="portal-blazor-account">
-                    <span>Signed in as</span>
-                    <strong>@(authenticationState.User.Identity?.Name ?? "Business user")</strong>
-                </div>
-                <form method="post" action="/portal/logout">
-                    <AntiforgeryToken />
-                    <button class="portal-blazor-signout" type="submit">Sign out</button>
-                </form>
-            </Authorized>
-        </AuthorizeView>
-
-        <a class="portal-blazor-classic-link" href="/portal">Open classic portal</a>
-    </aside>
-
-    <main class="portal-blazor-main">
-        @Body
-    </main>
+    <div class="vx-portal-shell">
+        <aside class="vx-sidebar" aria-label="Business portal navigation">
+            <span class="vx-nav-label">Operations</span>
+            <nav class="vx-nav">
+                <a class="@NavClass("/portal/dashboard")" href="/portal/dashboard"><span aria-hidden="true">⌂</span>Dashboard</a>
+                <a class="@NavClass("/portal/orders")" href="/portal/orders"><span aria-hidden="true">▤</span>Orders</a>
+                <a class="@NavClass("/portal/menu")" href="/portal/menu"><span aria-hidden="true">□</span>Menu</a>
+                <a class="@NavClass("/portal/customers")" href="/portal/customers"><span aria-hidden="true">♙</span>Customers</a>
+            </nav>
+            <div class="vx-sidebar-footer">
+                <AuthorizeView Roles="@AppRoles.PortalRoles"><Authorized Context="auth">
+                    <span class="vx-account"><strong>@DisplayName(auth.User.Identity?.Name)</strong><small>Business team</small></span>
+                    <form method="post" action="/portal/logout"><AntiforgeryToken /><button class="vx-signout" type="submit">Sign out</button></form>
+                </Authorized></AuthorizeView>
+            </div>
+        </aside>
+        <main class="vx-portal-main">@Body</main>
     </div>
+    <nav class="vx-mobile-nav" aria-label="Business portal navigation">
+        <a class="@NavClass("/portal/dashboard")" href="/portal/dashboard"><span>⌂</span><small>Home</small></a>
+        <a class="@NavClass("/portal/orders")" href="/portal/orders"><span>▤</span><small>Orders</small></a>
+        <a class="@NavClass("/portal/menu")" href="/portal/menu"><span>□</span><small>Menu</small></a>
+        <a class="@NavClass("/portal/customers")" href="/portal/customers"><span>♙</span><small>Customers</small></a>
+    </nav>
+    <footer class="vx-app-footer">© 2026 Velonixs Systems Private Limited. All rights reserved.</footer>
 </div>
 
 @code {
+    [CascadingParameter] private Task<AuthenticationState>? AuthenticationStateTask { get; set; }
+    private RestaurantResponse? _restaurant;
+
+    private string BusinessName => _restaurant?.Name ?? "Business Portal";
+    // RestaurantResponse has no logo field today. This seam supports a future BusinessLogoUrl without using the corporate logo as a restaurant logo.
+    private string? BusinessLogoUrl => null;
+    private string BusinessInitials => Initials(BusinessName);
+
+    protected override async Task OnInitializedAsync()
+    {
+        var authenticationState = AuthenticationStateTask is null ? null : await AuthenticationStateTask;
+        var businessClaim = authenticationState?.User.FindFirst(AppClaimTypes.BusinessId)?.Value;
+        if (Guid.TryParse(businessClaim, out var businessId))
+        {
+            _restaurant = await RestaurantService.GetRestaurantAsync(businessId);
+        }
+    }
+
     private string NavClass(string href)
     {
         var path = Navigation.ToBaseRelativePath(Navigation.Uri).TrimEnd('/');
-        var target = href.TrimStart('/').TrimEnd('/');
-
-        return string.Equals(path, target, StringComparison.OrdinalIgnoreCase)
-            ? "active"
-            : string.Empty;
+        return string.Equals(path, href.TrimStart('/').TrimEnd('/'), StringComparison.OrdinalIgnoreCase) ? "active" : string.Empty;
     }
+
+    private static string DisplayName(string? name) => string.IsNullOrWhiteSpace(name) ? "Business user" : name.Split('@')[0];
+    private static string Initials(string? name) => string.Concat((name ?? "Business").Split(new[] { '.', '_', '-', ' ' }, StringSplitOptions.RemoveEmptyEntries).Take(2).Select(part => char.ToUpperInvariant(part[0])));
 }

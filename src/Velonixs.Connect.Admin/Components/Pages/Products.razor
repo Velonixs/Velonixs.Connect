@@ -1,4 +1,4 @@
-@page "/admin/blazor/products/{BusinessId:guid}"
+@page "/admin/catalog/{BusinessId:guid}"
 @attribute [Authorize(Roles = AppRoles.PlatformAdmin)]
 @inject IRestaurantService RestaurantService
 @inject IMenuService MenuService
@@ -11,8 +11,8 @@
         <span class="page-description">Build the sellable catalog and control product availability.</span>
     </div>
     <div class="toolbar page-head-actions">
-        <a href="/admin/blazor">Dashboard</a>
-        <a href="/admin/blazor/sync/@BusinessId">Catalog Sync</a>
+        <a href="/admin/dashboard">Dashboard</a>
+        <a href="/admin/integrations/@BusinessId">Catalog Sync</a>
     </div>
 </header>
 
@@ -43,13 +43,14 @@
 <section class="work-surface mb-3">
     <div class="surface-title">
         <div><h2>Categories</h2><p class="surface-description">Organize products using the platform master catalog.</p></div>
-        <span class="count-badge">@_categories.Count total</span>
+        <span class="count-badge">@_categories.Count total · @FilteredCategories.Count shown</span>
+        @if (HasCategoryFilters) { <button class="vx-clear-filters" @onclick="ClearCategoryFilters">Clear filters</button> }
     </div>
     <div class="table-responsive">
-        <table class="table align-middle categories-table">
-            <thead><tr><th>Master category</th><th>Order</th><th class="portal-active-heading">Active</th><th class="portal-actions-heading">Actions</th></tr></thead>
+        <table class="table align-middle categories-table vx-table">
+            <thead><tr><th>Master category</th><th>Order</th><th class="portal-active-heading">Active</th><th class="portal-actions-heading">Actions</th></tr><tr class="vx-table-filter-row"><th><input class="vx-table-filter-input" aria-label="Filter category" placeholder="Search category" @bind="_categoryFilter" @bind:event="oninput" /></th><th></th><th><select class="vx-table-filter-select" aria-label="Filter category active status" @bind="_categoryActiveFilter"><option value="">All</option><option value="active">Active</option><option value="inactive">Inactive</option></select></th><th></th></tr></thead>
             <tbody>
-            @foreach (var category in _categories)
+            @foreach (var category in FilteredCategories)
             {
                 <tr>
                     <td>@GetMasterCategoryName(category)</td>
@@ -121,10 +122,11 @@
 <section class="work-surface">
     <div class="surface-title">
         <div><h2>Products</h2><p class="surface-description">Edit pricing, stock, identifiers, and catalog sync state inline.</p></div>
-        <span class="count-badge">@_products.Count total</span>
+        <span class="count-badge">@_products.Count total · @FilteredProducts.Count shown</span>
+        @if (HasProductFilters) { <button class="vx-clear-filters" @onclick="ClearProductFilters">Clear filters</button> }
     </div>
     <div class="table-responsive">
-        <table class="table align-middle products-table">
+        <table class="table align-middle products-table vx-table">
             <thead>
                 <tr>
                     <th>Code</th>
@@ -137,9 +139,10 @@
                     <th>Status</th>
                     <th class="portal-actions-heading">Actions</th>
                 </tr>
+                <tr class="vx-table-filter-row"><th><input class="vx-table-filter-input" aria-label="Filter product code" placeholder="Code" @bind="_productCodeFilter" @bind:event="oninput" /></th><th><select class="vx-table-filter-select" aria-label="Filter category" @bind="_productCategoryFilter"><option value="">All categories</option>@foreach (var category in _categories) { <option value="@category.Id">@category.Name</option> }</select></th><th><input class="vx-table-filter-input" aria-label="Filter product name" placeholder="Search name" @bind="_productNameFilter" @bind:event="oninput" /></th><th><select class="vx-table-filter-select" aria-label="Filter menu type" @bind="_vegetarianFilter"><option value="">All types</option><option value="veg">Vegetarian</option><option value="nonveg">Non-vegetarian</option></select></th><th><input class="vx-table-filter-input" type="number" min="0" aria-label="Minimum price" placeholder="Min price" @bind="_minPrice" /></th><th><input class="vx-table-filter-input" aria-label="Filter SKU" placeholder="Search SKU" @bind="_skuFilter" @bind:event="oninput" /></th><th></th><th><select class="vx-table-filter-select" aria-label="Filter availability" @bind="_availabilityFilter"><option value="">All</option><option value="available">Available</option><option value="soldout">Sold out</option></select></th><th></th></tr>
             </thead>
             <tbody>
-            @foreach (var item in _products)
+            @foreach (var item in FilteredProducts)
             {
                 <tr>
                     <td><input class="inline-input" type="number" @bind="item.ItemCode" /></td>
@@ -188,6 +191,29 @@
     private IReadOnlyCollection<MasterMenuItemResponse> _masterItems = Array.Empty<MasterMenuItemResponse>();
     private CategoryEditor _newCategory = new();
     private ProductEditor _newProduct = new() { IsActive = true, IsAvailable = true };
+    private string _categoryFilter = string.Empty;
+    private string _categoryActiveFilter = string.Empty;
+    private string _productCodeFilter = string.Empty;
+    private string _productNameFilter = string.Empty;
+    private string _productCategoryFilter = string.Empty;
+    private string _vegetarianFilter = string.Empty;
+    private decimal? _minPrice;
+    private string _skuFilter = string.Empty;
+    private string _availabilityFilter = string.Empty;
+
+    private IReadOnlyCollection<CategoryEditor> FilteredCategories => _categories.Where(category =>
+        (string.IsNullOrWhiteSpace(_categoryFilter) || GetMasterCategoryName(category).Contains(_categoryFilter, StringComparison.OrdinalIgnoreCase)) &&
+        (string.IsNullOrWhiteSpace(_categoryActiveFilter) || (_categoryActiveFilter == "active" ? category.IsActive : !category.IsActive))).ToArray();
+    private IReadOnlyCollection<ProductEditor> FilteredProducts => _products.Where(item =>
+        (string.IsNullOrWhiteSpace(_productCodeFilter) || item.ItemCode.ToString().Contains(_productCodeFilter, StringComparison.OrdinalIgnoreCase)) &&
+        (string.IsNullOrWhiteSpace(_productNameFilter) || item.Name.Contains(_productNameFilter, StringComparison.OrdinalIgnoreCase)) &&
+        (string.IsNullOrWhiteSpace(_productCategoryFilter) || item.CategoryId.ToString() == _productCategoryFilter) &&
+        (string.IsNullOrWhiteSpace(_vegetarianFilter) || (_vegetarianFilter == "veg" ? item.IsVegetarian : !item.IsVegetarian)) &&
+        (_minPrice is null || item.Price >= _minPrice) &&
+        (string.IsNullOrWhiteSpace(_skuFilter) || (item.ProductRetailerId ?? string.Empty).Contains(_skuFilter, StringComparison.OrdinalIgnoreCase)) &&
+        (string.IsNullOrWhiteSpace(_availabilityFilter) || (_availabilityFilter == "available" ? item.IsAvailable : !item.IsAvailable))).ToArray();
+    private bool HasCategoryFilters => !string.IsNullOrWhiteSpace(_categoryFilter) || !string.IsNullOrWhiteSpace(_categoryActiveFilter);
+    private bool HasProductFilters => !string.IsNullOrWhiteSpace(_productCodeFilter) || !string.IsNullOrWhiteSpace(_productNameFilter) || !string.IsNullOrWhiteSpace(_productCategoryFilter) || !string.IsNullOrWhiteSpace(_vegetarianFilter) || _minPrice is not null || !string.IsNullOrWhiteSpace(_skuFilter) || !string.IsNullOrWhiteSpace(_availabilityFilter);
 
     protected override async Task OnParametersSetAsync()
     {
@@ -307,6 +333,13 @@
         _newProduct.MasterMenuItemId = Guid.Empty;
         _newProduct.Name = string.Empty;
         _newProduct.Description = null;
+    }
+
+    private void ClearCategoryFilters() => (_categoryFilter, _categoryActiveFilter) = (string.Empty, string.Empty);
+    private void ClearProductFilters()
+    {
+        _productCodeFilter = _productNameFilter = _productCategoryFilter = _vegetarianFilter = _skuFilter = _availabilityFilter = string.Empty;
+        _minPrice = null;
     }
 
     private void ApplySelectedMasterItem()

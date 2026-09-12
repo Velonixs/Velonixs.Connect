@@ -1,0 +1,3 @@
+.vx-app-footer { color: var(--text-muted, var(--vx-text-muted)); font-size: 12px; padding: 16px 24px 20px; text-align: center; }
+.page-description, .surface-description { display: none; }
+@media (max-width: 768px) { .vx-app-footer { padding-bottom: 20px; } }

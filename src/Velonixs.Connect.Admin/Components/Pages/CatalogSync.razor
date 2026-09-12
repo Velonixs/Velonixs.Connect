@@ -1,4 +1,4 @@
-@page "/admin/blazor/sync/{BusinessId:guid}"
+@page "/admin/integrations/{BusinessId:guid}"
 @attribute [Authorize(Roles = AppRoles.PlatformAdmin)]
 @inject IRestaurantService RestaurantService
 @inject IMetaCatalogSyncService MetaSyncService
@@ -12,8 +12,8 @@
         <span class="page-description">Connect Meta, publish the menu, and monitor delivery health.</span>
     </div>
     <div class="toolbar page-head-actions">
-        <a href="/admin/blazor">Dashboard</a>
-        <a href="/admin/blazor/products/@BusinessId">Products</a>
+        <a href="/admin/dashboard">Dashboard</a>
+        <a href="/admin/catalog/@BusinessId">Products</a>
     </div>
 </header>
 
@@ -94,12 +94,12 @@
 </section>
 
 <section class="work-surface mb-3">
-    <div class="surface-title"><div><h2>Queue</h2><p class="surface-description">Products waiting to be processed by the catalog worker.</p></div><span class="count-badge">@_queue.Count total</span></div>
+    <div class="surface-title"><div><h2>Queue</h2><p class="surface-description">Products waiting to be processed by the catalog worker.</p></div><span class="count-badge">@_queue.Count total · @FilteredQueue.Count shown</span>@if (HasQueueFilters) { <button class="vx-clear-filters" @onclick="ClearQueueFilters">Clear filters</button> }</div>
     <div class="table-responsive">
-        <table class="table align-middle sync-queue-table">
-            <thead><tr><th>Product</th><th>Event</th><th>Status</th><th>Retries</th><th>Next</th><th>Error</th><th class="portal-actions-heading">Actions</th></tr></thead>
+        <table class="table align-middle sync-queue-table vx-table">
+            <thead><tr><th>Product</th><th>Event</th><th>Status</th><th>Retries</th><th>Next</th><th>Error</th><th class="portal-actions-heading">Actions</th></tr><tr class="vx-table-filter-row"><th><input class="vx-table-filter-input" aria-label="Filter queue product" placeholder="Search product" @bind="_queueProductFilter" @bind:event="oninput" /></th><th><input class="vx-table-filter-input" aria-label="Filter event" placeholder="Event" @bind="_queueEventFilter" @bind:event="oninput" /></th><th><input class="vx-table-filter-input" aria-label="Filter queue status" placeholder="Status" @bind="_queueStatusFilter" @bind:event="oninput" /></th><th><input class="vx-table-filter-input" type="number" min="0" aria-label="Minimum retries" placeholder="Min" @bind="_minRetries" /></th><th></th><th><input class="vx-table-filter-input" aria-label="Filter error" placeholder="Search error" @bind="_queueErrorFilter" @bind:event="oninput" /></th><th></th></tr></thead>
             <tbody>
-            @foreach (var item in _queue)
+            @foreach (var item in FilteredQueue)
             {
                 <tr>
                     <td>@item.ProductName</td>
@@ -126,12 +126,12 @@
 </section>
 
 <section class="work-surface">
-    <div class="surface-title"><div><h2>Logs</h2><p class="surface-description">Recent Meta catalog delivery attempts and responses.</p></div><span class="count-badge">@_logs.Count total</span></div>
+    <div class="surface-title"><div><h2>Logs</h2><p class="surface-description">Recent Meta catalog delivery attempts and responses.</p></div><span class="count-badge">@_logs.Count total · @FilteredLogs.Count shown</span>@if (HasLogFilters) { <button class="vx-clear-filters" @onclick="ClearLogFilters">Clear filters</button> }</div>
     <div class="table-responsive">
-        <table class="table align-middle sync-logs-table">
-            <thead><tr><th>Time</th><th>Product</th><th>Event</th><th>Status</th><th>HTTP</th><th>Error</th></tr></thead>
+        <table class="table align-middle sync-logs-table vx-table">
+            <thead><tr><th>Time</th><th>Product</th><th>Event</th><th>Status</th><th>HTTP</th><th>Error</th></tr><tr class="vx-table-filter-row"><th><select class="vx-table-filter-select" aria-label="Filter log date" @bind="_logDateFilter"><option value="">All dates</option><option value="7">Last 7 days</option><option value="30">Last 30 days</option></select></th><th><input class="vx-table-filter-input" aria-label="Filter log product" placeholder="Product" @bind="_logProductFilter" @bind:event="oninput" /></th><th><input class="vx-table-filter-input" aria-label="Filter log event" placeholder="Event" @bind="_logEventFilter" @bind:event="oninput" /></th><th><input class="vx-table-filter-input" aria-label="Filter log status" placeholder="Status" @bind="_logStatusFilter" @bind:event="oninput" /></th><th></th><th><input class="vx-table-filter-input" aria-label="Filter log error" placeholder="Error" @bind="_logErrorFilter" @bind:event="oninput" /></th></tr></thead>
             <tbody>
-            @foreach (var log in _logs)
+            @foreach (var log in FilteredLogs)
             {
                 <tr>
                     <td>@log.CreatedAt.ToLocalTime().ToString("dd MMM yyyy, hh:mm tt")</td>
@@ -157,11 +157,31 @@
     private string? _message;
     private string? _catalogName;
     private bool _creatingCatalog;
+    private string _queueProductFilter = string.Empty, _queueEventFilter = string.Empty, _queueStatusFilter = string.Empty, _queueErrorFilter = string.Empty;
+    private int? _minRetries;
+    private string _logDateFilter = string.Empty, _logProductFilter = string.Empty, _logEventFilter = string.Empty, _logStatusFilter = string.Empty, _logErrorFilter = string.Empty;
+    private IReadOnlyCollection<CatalogSyncQueueSummary> FilteredQueue => _queue.Where(item =>
+        (string.IsNullOrWhiteSpace(_queueProductFilter) || item.ProductName.Contains(_queueProductFilter, StringComparison.OrdinalIgnoreCase)) &&
+        (string.IsNullOrWhiteSpace(_queueEventFilter) || item.EventType.Contains(_queueEventFilter, StringComparison.OrdinalIgnoreCase)) &&
+        (string.IsNullOrWhiteSpace(_queueStatusFilter) || item.Status.Contains(_queueStatusFilter, StringComparison.OrdinalIgnoreCase)) &&
+        (_minRetries is null || item.RetryCount >= _minRetries) &&
+        (string.IsNullOrWhiteSpace(_queueErrorFilter) || (item.LastError ?? string.Empty).Contains(_queueErrorFilter, StringComparison.OrdinalIgnoreCase))).ToArray();
+    private IReadOnlyCollection<CatalogSyncLogSummary> FilteredLogs => _logs.Where(log =>
+        (string.IsNullOrWhiteSpace(_logProductFilter) || log.ProductName.Contains(_logProductFilter, StringComparison.OrdinalIgnoreCase)) &&
+        (string.IsNullOrWhiteSpace(_logEventFilter) || log.EventType.Contains(_logEventFilter, StringComparison.OrdinalIgnoreCase)) &&
+        (string.IsNullOrWhiteSpace(_logStatusFilter) || log.Status.Contains(_logStatusFilter, StringComparison.OrdinalIgnoreCase)) &&
+        (string.IsNullOrWhiteSpace(_logErrorFilter) || (log.ErrorMessage ?? string.Empty).Contains(_logErrorFilter, StringComparison.OrdinalIgnoreCase)) &&
+        (_logDateFilter == "" || log.CreatedAt >= DateTimeOffset.Now.AddDays(-int.Parse(_logDateFilter)))).ToArray();
+    private bool HasQueueFilters => !string.IsNullOrWhiteSpace(_queueProductFilter) || !string.IsNullOrWhiteSpace(_queueEventFilter) || !string.IsNullOrWhiteSpace(_queueStatusFilter) || _minRetries is not null || !string.IsNullOrWhiteSpace(_queueErrorFilter);
+    private bool HasLogFilters => !string.IsNullOrWhiteSpace(_logDateFilter) || !string.IsNullOrWhiteSpace(_logProductFilter) || !string.IsNullOrWhiteSpace(_logEventFilter) || !string.IsNullOrWhiteSpace(_logStatusFilter) || !string.IsNullOrWhiteSpace(_logErrorFilter);
 
     protected override async Task OnParametersSetAsync()
     {
         await LoadAsync();
     }
+
+    private void ClearQueueFilters() { _queueProductFilter = _queueEventFilter = _queueStatusFilter = _queueErrorFilter = string.Empty; _minRetries = null; }
+    private void ClearLogFilters() => (_logDateFilter, _logProductFilter, _logEventFilter, _logStatusFilter, _logErrorFilter) = (string.Empty, string.Empty, string.Empty, string.Empty, string.Empty);
 
     private async Task LoadAsync()
     {

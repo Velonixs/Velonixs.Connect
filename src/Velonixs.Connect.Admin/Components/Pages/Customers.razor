@@ -1,4 +1,4 @@
-@page "/admin/blazor/customers/{BusinessId:guid}"
+@page "/admin/customers/{BusinessId:guid}"
 @attribute [Authorize(Roles = AppRoles.PlatformAdmin)]
 @inject IRestaurantService RestaurantService
 @inject IPlatformAdministrationService PlatformAdministrationService
@@ -10,21 +10,23 @@
         <span class="page-description">See customer activity and recent delivery details.</span>
     </div>
     <div class="toolbar page-head-actions">
-        <a href="/admin/blazor">Dashboard</a>
-        <a href="/admin/blazor/orders/@BusinessId">Orders</a>
+        <a href="/admin/dashboard">Dashboard</a>
+        <a href="/admin/orders/@BusinessId">Orders</a>
     </div>
 </header>
 
 <section class="work-surface">
     <div class="surface-title">
         <div><h2>Customer list</h2><p class="surface-description">A consolidated view of customers ordering through connected channels.</p></div>
-        <span class="count-badge">@_customers.Count total</span>
+        <span class="count-badge">@_customers.Count total · @FilteredCustomers.Count shown</span>
+        @if (HasActiveFilters) { <button class="vx-clear-filters" @onclick="ClearFilters">Clear filters</button> }
     </div>
     <div class="table-responsive">
-        <table class="table align-middle customers-table">
-            <thead><tr><th>Name</th><th>Phone</th><th>Orders</th><th>Last Address</th><th>Last Active</th></tr></thead>
+        <table class="table align-middle customers-table vx-table">
+            <thead><tr><th>Name</th><th>Phone</th><th>Orders</th><th>Last Address</th><th>Last Active</th></tr>
+            <tr class="vx-table-filter-row"><th><input class="vx-table-filter-input" aria-label="Filter customer name" placeholder="Search customer" @bind="_nameFilter" @bind:event="oninput" /></th><th><input class="vx-table-filter-input" aria-label="Filter phone" placeholder="Search phone" @bind="_phoneFilter" @bind:event="oninput" /></th><th><input class="vx-table-filter-input" type="number" min="0" aria-label="Minimum orders" placeholder="Min" @bind="_minOrders" /></th><th><input class="vx-table-filter-input" aria-label="Filter address" placeholder="Search address" @bind="_addressFilter" @bind:event="oninput" /></th><th><select class="vx-table-filter-select" aria-label="Filter last active" @bind="_activityFilter"><option value="">All dates</option><option value="7">Last 7 days</option><option value="30">Last 30 days</option></select></th></tr></thead>
             <tbody>
-            @foreach (var customer in _customers)
+            @foreach (var customer in FilteredCustomers)
             {
                 <tr>
                     <td>@(customer.Name ?? "WhatsApp Customer")</td>
@@ -44,10 +46,30 @@
 
     private RestaurantResponse? _restaurant;
     private IReadOnlyCollection<CustomerSummaryResponse> _customers = Array.Empty<CustomerSummaryResponse>();
+    private string _nameFilter = string.Empty;
+    private string _phoneFilter = string.Empty;
+    private string _addressFilter = string.Empty;
+    private int? _minOrders;
+    private string _activityFilter = string.Empty;
+
+    private IReadOnlyCollection<CustomerSummaryResponse> FilteredCustomers => _customers.Where(customer =>
+        (string.IsNullOrWhiteSpace(_nameFilter) || (customer.Name ?? string.Empty).Contains(_nameFilter, StringComparison.OrdinalIgnoreCase)) &&
+        (string.IsNullOrWhiteSpace(_phoneFilter) || customer.PhoneNumber.Contains(_phoneFilter, StringComparison.OrdinalIgnoreCase)) &&
+        (string.IsNullOrWhiteSpace(_addressFilter) || (customer.LastAddress ?? string.Empty).Contains(_addressFilter, StringComparison.OrdinalIgnoreCase)) &&
+        (_minOrders is null || customer.OrderCount >= _minOrders) &&
+        (_activityFilter == "" || customer.LastInteractionAt >= DateTimeOffset.Now.AddDays(-int.Parse(_activityFilter)))).ToArray();
+
+    private bool HasActiveFilters => !string.IsNullOrWhiteSpace(_nameFilter) || !string.IsNullOrWhiteSpace(_phoneFilter) || !string.IsNullOrWhiteSpace(_addressFilter) || _minOrders is not null || !string.IsNullOrWhiteSpace(_activityFilter);
 
     protected override async Task OnParametersSetAsync()
     {
         _restaurant = await RestaurantService.GetRestaurantAsync(BusinessId);
         _customers = await PlatformAdministrationService.GetCustomerSummariesAsync(BusinessId);
+    }
+
+    private void ClearFilters()
+    {
+        _nameFilter = _phoneFilter = _addressFilter = _activityFilter = string.Empty;
+        _minOrders = null;
     }
 }

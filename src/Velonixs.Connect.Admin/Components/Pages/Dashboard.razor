@@ -1,4 +1,4 @@
-@page "/admin/blazor"
+@page "/admin/dashboard"
 @attribute [Authorize(Roles = AppRoles.PlatformAdmin)]
 @inject IRestaurantService RestaurantService
 @inject IPlatformAdministrationService PlatformAdministrationService
@@ -11,7 +11,7 @@
         <span class="page-description">Monitor businesses, catalog operations, and commerce activity.</span>
     </div>
     <div class="toolbar page-head-actions">
-        <a href="/admin/blazor/master-catalog">Master catalog</a>
+        <a href="/admin/master-catalog">Master catalog</a>
         <a class="btn btn-primary" href="#business-onboarding">Add business</a>
     </div>
 </header>
@@ -125,10 +125,11 @@
             <h2>Businesses</h2>
             <p class="surface-description">Open a workspace to manage its catalog, orders, customers, and integrations.</p>
         </div>
-        <span class="count-badge">@_businesses.Count total</span>
+        <span class="count-badge">@_businesses.Count total · @FilteredBusinesses.Count shown</span>
+        @if (HasBusinessFilters) { <button class="vx-clear-filters" @onclick="ClearBusinessFilters">Clear filters</button> }
     </div>
     <div class="table-responsive">
-        <table class="table align-middle businesses-table">
+        <table class="table align-middle businesses-table vx-table">
             <thead>
                 <tr>
                     <th>Name</th>
@@ -137,6 +138,14 @@
                     <th>Products</th>
                     <th>Orders</th>
                     <th class="business-actions-heading">Actions</th>
+                </tr>
+                <tr class="vx-table-filter-row">
+                    <th><input class="vx-table-filter-input" aria-label="Filter business" placeholder="Search business" @bind="_businessFilter" @bind:event="oninput" /></th>
+                    <th><select class="vx-table-filter-select" aria-label="Filter business type" @bind="_typeFilter"><option value="">All types</option>@foreach (var type in _businesses.Select(x => x.BusinessType).Distinct().Order()) { <option value="@type">@type</option> }</select></th>
+                    <th><select class="vx-table-filter-select" aria-label="Filter business status" @bind="_activeFilter"><option value="">All statuses</option><option value="active">Active</option><option value="inactive">Inactive</option></select></th>
+                    <th><input class="vx-table-filter-input" type="number" min="0" aria-label="Minimum products" placeholder="Min" @bind="_minProducts" /></th>
+                    <th><input class="vx-table-filter-input" type="number" min="0" aria-label="Minimum orders" placeholder="Min" @bind="_minOrders" /></th>
+                    <th></th>
                 </tr>
             </thead>
             <tbody>
@@ -152,7 +161,7 @@
                     </td>
                 </tr>
             }
-            @foreach (var business in _businesses)
+            @foreach (var business in FilteredBusinesses)
             {
                 <tr>
                     <td><strong>@business.Name</strong></td>
@@ -162,11 +171,11 @@
                     <td>@business.OrderCount</td>
                     <td class="business-actions">
                         <div class="action-row">
-                            <a href="/admin/blazor/businesses/@business.BusinessId">Settings</a>
-                            <a class="action-primary" href="/admin/blazor/products/@business.BusinessId">Products</a>
-                            <a href="/admin/blazor/orders/@business.BusinessId">Orders</a>
-                            <a href="/admin/blazor/customers/@business.BusinessId">Customers</a>
-                            <a class="action-catalog" href="/admin/blazor/sync/@business.BusinessId">Catalog sync</a>
+                            <a href="/admin/businesses/@business.BusinessId">Settings</a>
+                            <a class="action-primary" href="/admin/catalog/@business.BusinessId">Products</a>
+                            <a href="/admin/orders/@business.BusinessId">Orders</a>
+                            <a href="/admin/customers/@business.BusinessId">Customers</a>
+                            <a class="action-catalog" href="/admin/integrations/@business.BusinessId">Catalog sync</a>
                         </div>
                     </td>
                 </tr>
@@ -183,8 +192,22 @@
     private int _todaysOrders;
     private decimal _revenue;
     private string? _message;
+    private string _businessFilter = string.Empty;
+    private string _typeFilter = string.Empty;
+    private string _activeFilter = string.Empty;
+    private int? _minProducts;
+    private int? _minOrders;
     private TaxEditor _tax = new();
     private BusinessEditor _newBusiness = new();
+
+    private IReadOnlyCollection<PlatformBusinessSummary> FilteredBusinesses => _businesses.Where(business =>
+        (string.IsNullOrWhiteSpace(_businessFilter) || business.Name.Contains(_businessFilter, StringComparison.OrdinalIgnoreCase)) &&
+        (string.IsNullOrWhiteSpace(_typeFilter) || business.BusinessType == _typeFilter) &&
+        (string.IsNullOrWhiteSpace(_activeFilter) || (_activeFilter == "active" ? business.IsActive : !business.IsActive)) &&
+        (_minProducts is null || business.ActiveProductCount >= _minProducts) &&
+        (_minOrders is null || business.OrderCount >= _minOrders)).ToArray();
+
+    private bool HasBusinessFilters => !string.IsNullOrWhiteSpace(_businessFilter) || !string.IsNullOrWhiteSpace(_typeFilter) || !string.IsNullOrWhiteSpace(_activeFilter) || _minProducts is not null || _minOrders is not null;
 
     protected override async Task OnInitializedAsync()
     {
@@ -250,12 +273,18 @@
                 _newBusiness.OwnerName,
                 _newBusiness.OwnerEmail,
                 _newBusiness.OwnerPassword));
-            Navigation.NavigateTo($"/admin/blazor/businesses/{restaurant.Id}");
+            Navigation.NavigateTo($"/admin/businesses/{restaurant.Id}");
         }
         catch (InvalidOperationException ex)
         {
             _message = ex.Message;
         }
+    }
+
+    private void ClearBusinessFilters()
+    {
+        _businessFilter = _typeFilter = _activeFilter = string.Empty;
+        _minProducts = _minOrders = null;
     }
 
     private sealed class TaxEditor

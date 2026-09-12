@@ -3,65 +3,26 @@
 <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>@ViewData["Title"] - Velonixs Connect Portal</title>
+    <title>@ViewData["Title"] - Velonixs Connect</title>
     <link rel="icon" type="image/jpeg" href="~/images/velonixs-logo.jpg" />
     <link rel="stylesheet" href="~/lib/bootstrap/dist/css/bootstrap.min.css" />
     <link rel="stylesheet" href="~/css/portal.css" asp-append-version="true" />
+    <link rel="stylesheet" href="~/css/vx-shell.css" asp-append-version="true" />
 </head>
 <body>
-    <header class="navbar navbar-expand-lg bg-white border-bottom sticky-top portal-classic-header">
-        <div class="portal-classic-title" aria-label="Velonixs Systems Private Limited Business Portal">
-            <strong>Velonixs Systems Private Limited</strong>
-            <span>Business Portal <span aria-hidden="true">&middot;</span> Restaurant team</span>
-        </div>
-        <div class="container-fluid px-3 px-lg-4">
-            <a class="navbar-brand brand" asp-controller="Portal" asp-action="Index">
-                <img class="brand-logo" src="/images/velonixs-logo.jpg" alt="Velonixs Systems Private Limited logo" />
-                <span><strong>Velonixs</strong><small>Systems Private Limited · Business Portal</small></span>
-            </a>
-            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#portalNavigation" aria-controls="portalNavigation" aria-expanded="false" aria-label="Toggle navigation">
-                <span class="navbar-toggler-icon"></span>
-            </button>
-            <div class="collapse navbar-collapse" id="portalNavigation">
-                <ul class="navbar-nav ms-auto align-items-lg-center gap-lg-2 py-2 py-lg-0">
-                    @if (User.Identity?.IsAuthenticated == true)
-                    {
-                        <li class="nav-item"><a class="nav-link" asp-controller="Portal" asp-action="Index">Dashboard</a></li>
-                        <li class="nav-item"><a class="nav-link" asp-controller="Portal" asp-action="Menu">Menu</a></li>
-                        <li class="nav-item"><a class="nav-link" asp-controller="Portal" asp-action="Customers">Customers</a></li>
-                        @if (User.IsInRole(Velonixs.Connect.Shared.Security.AppRoles.BusinessOwner))
-                        {
-                            <li class="nav-item"><a class="nav-link" asp-controller="Portal" asp-action="Staff">Staff Users</a></li>
-                        }
-                        <li class="nav-item"><span class="nav-link text-secondary">@User.Identity.Name</span></li>
-                        <li class="nav-item">
-                            <form method="post" action="/portal/logout">
-                                @Html.AntiForgeryToken()
-                                <button class="btn btn-outline-secondary w-100" type="submit">Sign out</button>
-                            </form>
-                        </li>
-                    }
-                </ul>
-            </div>
-        </div>
+    <header class="vx-auth-header">
+        <a class="vx-brand" href="/portal/dashboard" aria-label="Velonixs Connect Business Portal home">
+            <img class="vx-brand-logo" src="/images/velonixs-logo.jpg" alt="Velonixs" />
+            <span class="vx-brand-copy"><strong>Velonixs Systems Private Limited</strong><small>Velonixs Connect · Business Portal</small></span>
+        </a>
+        <span class="vx-secure-label">Secure access</span>
     </header>
-
-    <main class="container-fluid page-shell px-3 px-lg-4 py-4">
-        @if (TempData["Success"] is string success)
-        {
-            <div class="alert alert-success" role="alert">@success</div>
-        }
-        @if (TempData["Warning"] is string warning)
-        {
-            <div class="alert alert-warning" role="alert">@warning</div>
-        }
-        @if (TempData["Error"] is string error)
-        {
-            <div class="alert alert-danger" role="alert">@error</div>
-        }
-
+    <main class="vx-auth-page">
+        @if (TempData["Success"] is string success) { <div class="vx-alert vx-alert-success" role="alert">@success</div> }
+        @if (TempData["Warning"] is string warning) { <div class="vx-alert vx-alert-warning" role="alert">@warning</div> }
+        @if (TempData["Error"] is string error) { <div class="vx-alert vx-alert-danger" role="alert">@error</div> }
         @RenderBody()
     </main>
-    <script src="~/lib/bootstrap/dist/js/bootstrap.bundle.min.js"></script>
+    <footer class="vx-app-footer">© 2026 Velonixs Systems Private Limited. All rights reserved.</footer>
 </body>
 </html>

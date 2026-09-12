@@ -1,0 +1,3 @@
+.vx-app-footer { color: var(--vx-text-muted); font-size: 12px; padding: 16px 24px 20px; text-align: center; }
+.portal-blazor-page-head .text-muted, .surface-description { display: none; }
+@media (max-width: 768px) { .vx-portal-app > .vx-app-footer { padding-bottom: 82px; } }

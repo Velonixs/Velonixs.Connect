@@ -66,6 +66,13 @@ public sealed class AccountController(UserManager<ApplicationUser> userManager) 
         return RedirectToAction(nameof(Login));
     }
 
+    [HttpGet("portal/logout")]
+    public async Task<IActionResult> LogoutFromLink()
+    {
+        await HttpContext.SignOutAsync(CookieAuthenticationDefaults.AuthenticationScheme);
+        return RedirectToAction(nameof(Login));
+    }
+
     private static ClaimsPrincipal BuildPrincipal(ApplicationUser user, IEnumerable<string> roles)
     {
         var claims = new List<Claim>

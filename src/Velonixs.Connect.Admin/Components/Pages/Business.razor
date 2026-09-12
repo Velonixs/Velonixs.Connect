@@ -1,4 +1,4 @@
-@page "/admin/blazor/businesses/{BusinessId:guid}"
+@page "/admin/businesses/{BusinessId:guid}"
 @attribute [Authorize(Roles = AppRoles.PlatformAdmin)]
 @inject IRestaurantService RestaurantService
 @inject IMenuService MenuService
@@ -12,11 +12,11 @@
         <span class="page-description">Manage the business profile, commerce configuration, and owner access.</span>
     </div>
     <div class="toolbar page-head-actions">
-        <a href="/admin/blazor">Dashboard</a>
-        <a href="/admin/blazor/products/@BusinessId">Products</a>
-        <a href="/admin/blazor/orders/@BusinessId">Orders</a>
-        <a href="/admin/blazor/customers/@BusinessId">Customers</a>
-        <a href="/admin/blazor/sync/@BusinessId">Sync</a>
+        <a href="/admin/dashboard">Dashboard</a>
+        <a href="/admin/catalog/@BusinessId">Products</a>
+        <a href="/admin/orders/@BusinessId">Orders</a>
+        <a href="/admin/customers/@BusinessId">Customers</a>
+        <a href="/admin/integrations/@BusinessId">Sync</a>
     </div>
 </header>
 
@@ -60,7 +60,7 @@
                 <label><span class="field-label">Staff WhatsApp</span><input @bind="_editor.StaffWhatsAppNumber" /></label>
                 <label><span class="field-label">Notification email</span><input type="email" @bind="_editor.NotificationEmail" /></label>
                 <label><span class="field-label">Catalog ID</span><input value="@CatalogIdDisplay" readonly /></label>
-                <label><span class="field-label">Meta catalog</span><a class="portal-field-link" href="/admin/blazor/sync/@BusinessId">Manage catalog sync</a></label>
+                <label><span class="field-label">Meta catalog</span><a class="portal-field-link" href="/admin/integrations/@BusinessId">Manage catalog sync</a></label>
             </div>
         </section>
         <section class="portal-form-section">
@@ -99,10 +99,10 @@
         <span class="count-badge">@_users.Count total</span>
     </div>
     <div class="table-responsive">
-        <table class="table align-middle business-users-table">
-            <thead><tr><th>Name</th><th>Email</th><th>Role</th><th>Status</th><th>Temporary password</th><th class="portal-actions-heading">Actions</th></tr></thead>
+        <table class="table align-middle business-users-table vx-table">
+            <thead><tr><th>Name</th><th>Email</th><th>Role</th><th>Status</th><th>Temporary password</th><th class="portal-actions-heading">Actions</th></tr><tr class="vx-table-filter-row"><th><input class="vx-table-filter-input" aria-label="Filter user name" placeholder="Search user" @bind="_userNameFilter" @bind:event="oninput" /></th><th><input class="vx-table-filter-input" aria-label="Filter user email" placeholder="Search email" @bind="_userEmailFilter" @bind:event="oninput" /></th><th><select class="vx-table-filter-select" aria-label="Filter user role" @bind="_userRoleFilter"><option value="">All roles</option>@foreach (var role in _users.Select(x => x.Role).Distinct()) { <option value="@role">@role</option> }</select></th><th><select class="vx-table-filter-select" aria-label="Filter user status" @bind="_userStatusFilter"><option value="">All</option><option value="active">Active</option><option value="inactive">Inactive</option></select></th><th></th><th></th></tr></thead>
             <tbody>
-            @foreach (var user in _users)
+            @foreach (var user in FilteredUsers)
             {
                 <tr>
                     <td>@user.DisplayName</td>
@@ -134,6 +134,12 @@
     private int _pendingOrderCount;
     private decimal _revenue;
     private string? _message;
+    private string _userNameFilter = string.Empty, _userEmailFilter = string.Empty, _userRoleFilter = string.Empty, _userStatusFilter = string.Empty;
+    private IReadOnlyCollection<UserEditor> FilteredUsers => _users.Where(user =>
+        (string.IsNullOrWhiteSpace(_userNameFilter) || user.DisplayName.Contains(_userNameFilter, StringComparison.OrdinalIgnoreCase)) &&
+        (string.IsNullOrWhiteSpace(_userEmailFilter) || user.Email.Contains(_userEmailFilter, StringComparison.OrdinalIgnoreCase)) &&
+        (string.IsNullOrWhiteSpace(_userRoleFilter) || user.Role == _userRoleFilter) &&
+        (string.IsNullOrWhiteSpace(_userStatusFilter) || (_userStatusFilter == "active" ? user.IsActive : !user.IsActive))).ToArray();
     private string CatalogIdDisplay => _restaurant?.WhatsAppCatalogId ?? "Not configured";
 
     protected override async Task OnParametersSetAsync()

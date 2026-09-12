@@ -57,11 +57,15 @@ app.UseAuthorization();
 app.UseAntiforgery();
 
 app.MapHealthChecks("/health");
+app.MapGet("/portal", () => Results.Redirect("/portal/dashboard"))
+    .RequireAuthorization(policy => policy.RequireRole(AppRoles.PortalRoleNames));
+app.MapGet("/portal/blazor", () => Results.Redirect("/portal/dashboard"))
+    .RequireAuthorization(policy => policy.RequireRole(AppRoles.PortalRoleNames));
+app.MapGet("/portal/blazor/{page}", (string page) => Results.Redirect($"/portal/{page}"))
+    .RequireAuthorization(policy => policy.RequireRole(AppRoles.PortalRoleNames));
 app.MapRazorComponents<Velonixs.Connect.Portal.Components.App>()
     .AddInteractiveServerRenderMode()
     .RequireAuthorization(policy => policy.RequireRole(AppRoles.PortalRoleNames));
-app.MapControllerRoute(
-    name: "default",
-    pattern: "{controller=Portal}/{action=Index}/{id?}");
+app.MapControllers();
 
 app.Run();

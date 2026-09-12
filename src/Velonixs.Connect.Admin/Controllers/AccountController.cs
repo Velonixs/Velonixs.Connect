@@ -50,7 +50,7 @@ public sealed class AccountController(UserManager<ApplicationUser> userManager) 
 
         var returnUrl = !string.IsNullOrWhiteSpace(model.ReturnUrl) && Url.IsLocalUrl(model.ReturnUrl)
             ? model.ReturnUrl
-            : "/admin/blazor";
+            : "/admin/dashboard";
 
         return LocalRedirect(returnUrl);
     }
@@ -58,6 +58,13 @@ public sealed class AccountController(UserManager<ApplicationUser> userManager) 
     [HttpPost("admin/logout")]
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> Logout()
+    {
+        await HttpContext.SignOutAsync(CookieAuthenticationDefaults.AuthenticationScheme);
+        return RedirectToAction(nameof(Login));
+    }
+
+    [HttpGet("admin/logout")]
+    public async Task<IActionResult> LogoutFromLink()
     {
         await HttpContext.SignOutAsync(CookieAuthenticationDefaults.AuthenticationScheme);
         return RedirectToAction(nameof(Login));

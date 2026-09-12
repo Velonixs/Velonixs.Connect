@@ -5,34 +5,23 @@
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>@ViewData["Title"] - Velonixs Connect</title>
     <link rel="icon" type="image/jpeg" href="~/images/velonixs-logo.jpg" />
-    <link rel="stylesheet" href="~/lib/bootstrap/dist/css/bootstrap.min.css" />
     <link rel="stylesheet" href="~/css/admin.css" asp-append-version="true" />
+    <link rel="stylesheet" href="~/css/vx-shell.css" asp-append-version="true" />
 </head>
 <body>
-    <header class="auth-brandbar">
-        <a class="auth-brand" href="/admin/blazor" aria-label="Velonixs Connect home">
-            <span class="auth-brand-symbol" aria-hidden="true">V</span>
-            <span><strong>Velonixs</strong><small>Connect</small></span>
+    <header class="vx-auth-header">
+        <a class="vx-brand" href="/admin/dashboard" aria-label="Velonixs Connect Admin home">
+            <img class="vx-brand-logo" src="/images/velonixs-logo.jpg" alt="Velonixs" />
+            <span class="vx-brand-copy"><strong>Velonixs Systems Private Limited</strong><small>Velonixs Connect · Platform Admin</small></span>
         </a>
-        <span class="auth-secure-label">Secure admin access</span>
+        <span class="vx-secure-label">Secure access</span>
     </header>
-
-    <main class="page-shell">
-        @if (TempData["Success"] is string success)
-        {
-            <div class="alert alert-success" role="alert">@success</div>
-        }
-        @if (TempData["Warning"] is string warning)
-        {
-            <div class="alert alert-warning" role="alert">@warning</div>
-        }
-        @if (TempData["Error"] is string error)
-        {
-            <div class="alert alert-danger" role="alert">@error</div>
-        }
-
+    <main class="vx-auth-page">
+        @if (TempData["Success"] is string success) { <div class="vx-alert vx-alert-success" role="alert">@success</div> }
+        @if (TempData["Warning"] is string warning) { <div class="vx-alert vx-alert-warning" role="alert">@warning</div> }
+        @if (TempData["Error"] is string error) { <div class="vx-alert vx-alert-danger" role="alert">@error</div> }
         @RenderBody()
     </main>
-    <script src="~/lib/bootstrap/dist/js/bootstrap.bundle.min.js"></script>
+    <footer class="vx-app-footer">© 2026 Velonixs Systems Private Limited. All rights reserved.</footer>
 </body>
 </html>

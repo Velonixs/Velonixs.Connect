@@ -1,4 +1,4 @@
-@page "/portal/blazor/orders"
+@page "/portal/orders"
 @attribute [Authorize(Roles = AppRoles.PortalRoles)]
 @using Velonixs.Connect.Domain.Entities
 @inject IRestaurantService RestaurantService
@@ -40,19 +40,21 @@ else if (_restaurant is not null)
     <section class="portal-blazor-surface">
         <div class="portal-blazor-surface-head">
             <div>
-                <p class="portal-blazor-eyebrow">@_orders.Count total</p>
+                <p class="portal-blazor-eyebrow">@_orders.Count total · @FilteredOrders.Count shown</p>
                 <h2>All orders</h2>
             </div>
-            <label class="portal-blazor-filter">
-                <span>Status</span>
-                <select class="form-select" @bind="_statusFilter">
+            <div class="portal-blazor-filter">
+                <label><span>Find order</span><input class="form-control" aria-label="Filter orders" placeholder="Order, customer or phone" @bind="_searchFilter" @bind:event="oninput" /></label>
+                <label><span>Status</span><select class="form-select" aria-label="Filter order status" @bind="_statusFilter">
                     <option value="">All statuses</option>
                     @foreach (var status in KnownStatuses)
                     {
                         <option value="@status">@FormatStatus(status)</option>
                     }
-                </select>
-            </label>
+                </select></label>
+                <label><span>Date</span><select class="form-select" aria-label="Filter order date" @bind="_dateFilter"><option value="">All dates</option><option value="today">Today</option><option value="7">Last 7 days</option><option value="30">Last 30 days</option></select></label>
+                @if (HasActiveFilters) { <button class="vx-clear-filters" @onclick="ClearFilters">Clear filters</button> }
+            </div>
         </div>
 
         @if (FilteredOrders.Count == 0)
@@ -170,11 +172,16 @@ else if (_restaurant is not null)
     private string? _error;
     private string? _message;
     private string _statusFilter = string.Empty;
+    private string _searchFilter = string.Empty;
+    private string _dateFilter = string.Empty;
 
     private IReadOnlyCollection<OrderSummaryResponse> FilteredOrders =>
-        string.IsNullOrWhiteSpace(_statusFilter)
-            ? _orders
-            : _orders.Where(order => string.Equals(order.OrderStatus, _statusFilter, StringComparison.OrdinalIgnoreCase)).ToArray();
+        _orders.Where(order =>
+            (string.IsNullOrWhiteSpace(_statusFilter) || string.Equals(order.OrderStatus, _statusFilter, StringComparison.OrdinalIgnoreCase)) &&
+            (string.IsNullOrWhiteSpace(_searchFilter) || order.OrderNumber.Contains(_searchFilter, StringComparison.OrdinalIgnoreCase) || order.CustomerName.Contains(_searchFilter, StringComparison.OrdinalIgnoreCase) || order.CustomerPhone.Contains(_searchFilter, StringComparison.OrdinalIgnoreCase)) &&
+            MatchesDate(order.CreatedAt)).ToArray();
+
+    private bool HasActiveFilters => !string.IsNullOrWhiteSpace(_statusFilter) || !string.IsNullOrWhiteSpace(_searchFilter) || !string.IsNullOrWhiteSpace(_dateFilter);
 
     protected override async Task OnInitializedAsync() => await LoadAsync();
 
@@ -334,6 +341,9 @@ else if (_restaurant is not null)
         string.IsNullOrWhiteSpace(status)
             ? "Unknown"
             : System.Text.RegularExpressions.Regex.Replace(status, "(?<!^)([A-Z])", " $1");
+
+    private bool MatchesDate(DateTimeOffset createdAt) => _dateFilter switch { "today" => createdAt.LocalDateTime.Date == DateTime.Today, "7" => createdAt >= DateTimeOffset.Now.AddDays(-7), "30" => createdAt >= DateTimeOffset.Now.AddDays(-30), _ => true };
+    private void ClearFilters() => (_statusFilter, _searchFilter, _dateFilter) = (string.Empty, string.Empty, string.Empty);
 
     private sealed class OrderUpdateDraft
     {

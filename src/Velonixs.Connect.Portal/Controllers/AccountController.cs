@@ -4,6 +4,7 @@ using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
+using Velonixs.Connect.Application.Abstractions;
 using Velonixs.Connect.Persistence.Identity;
 using Velonixs.Connect.Portal.Models;
 using Velonixs.Connect.Shared.Security;
@@ -11,14 +12,18 @@ using Velonixs.Connect.Shared.Security;
 namespace Velonixs.Connect.Portal.Controllers;
 
 [AllowAnonymous]
-public sealed class AccountController(UserManager<ApplicationUser> userManager) : Controller
+public sealed class AccountController(
+    UserManager<ApplicationUser> userManager,
+    IRestaurantService restaurantService) : Controller
 {
+    [HttpGet("")]
     [HttpGet("portal/login")]
     public IActionResult Login(string? returnUrl = null)
     {
         return View(new LoginViewModel { ReturnUrl = returnUrl });
     }
 
+    [HttpPost("")]
     [HttpPost("portal/login")]
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> Login(LoginViewModel model)
@@ -44,7 +49,7 @@ public sealed class AccountController(UserManager<ApplicationUser> userManager) 
 
         await HttpContext.SignInAsync(
             CookieAuthenticationDefaults.AuthenticationScheme,
-            BuildPrincipal(user, roles),
+            await BuildPrincipalAsync(user, roles),
             new AuthenticationProperties
             {
                 IsPersistent = true,
@@ -62,11 +67,23 @@ public sealed class AccountController(UserManager<ApplicationUser> userManager) 
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> Logout()
     {
-        await HttpContext.SignOutAsync(CookieAuthenticationDefaults.AuthenticationScheme);
-        return RedirectToAction(nameof(Login));
+        return await SignOutAndRedirectAsync();
     }
 
-    private static ClaimsPrincipal BuildPrincipal(ApplicationUser user, IEnumerable<string> roles)
+    [HttpGet("portal/logout")]
+    public async Task<IActionResult> LogoutFromLink()
+    {
+        return await SignOutAndRedirectAsync();
+    }
+
+    private async Task<IActionResult> SignOutAndRedirectAsync()
+    {
+        await HttpContext.SignOutAsync(CookieAuthenticationDefaults.AuthenticationScheme);
+        Response.Cookies.Delete("Velonixs.Connect.Portal", new CookieOptions { Path = "/" });
+        return LocalRedirect("/");
+    }
+
+    private async Task<ClaimsPrincipal> BuildPrincipalAsync(ApplicationUser user, IEnumerable<string> roles)
     {
         var claims = new List<Claim>
         {
@@ -75,6 +92,12 @@ public sealed class AccountController(UserManager<ApplicationUser> userManager) 
             new Claim(ClaimTypes.Email, user.Email ?? string.Empty),
             new Claim(AppClaimTypes.BusinessId, user.BusinessId!.Value.ToString())
         };
+
+        var business = await restaurantService.GetRestaurantAsync(user.BusinessId.Value);
+        if (!string.IsNullOrWhiteSpace(business?.Name))
+        {
+            claims.Add(new Claim(AppClaimTypes.BusinessName, business.Name));
+        }
 
         claims.AddRange(roles.Select(role => new Claim(ClaimTypes.Role, role)));
         return new ClaimsPrincipal(new ClaimsIdentity(claims, CookieAuthenticationDefaults.AuthenticationScheme));

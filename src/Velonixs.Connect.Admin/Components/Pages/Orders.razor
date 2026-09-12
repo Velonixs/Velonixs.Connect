@@ -1,4 +1,4 @@
-@page "/admin/blazor/orders/{BusinessId:guid}"
+@page "/admin/orders/{BusinessId:guid}"
 @attribute [Authorize(Roles = AppRoles.PlatformAdmin)]
 @inject IRestaurantService RestaurantService
 @inject IOrderService OrderService
@@ -10,18 +10,25 @@
         <span class="page-description">Review incoming orders and move them through fulfilment.</span>
     </div>
     <div class="toolbar page-head-actions">
-        <a href="/admin/blazor">Dashboard</a>
-        <a href="/admin/blazor/products/@BusinessId">Products</a>
+        <a href="/admin/dashboard">Dashboard</a>
+        <a href="/admin/catalog/@BusinessId">Products</a>
     </div>
 </header>
 
 <section class="work-surface">
     <div class="surface-title">
         <div><h2>Order list</h2><p class="surface-description">Update status and add an operational comment without leaving the queue.</p></div>
-        <span class="count-badge">@_orders.Count total</span>
+        <span class="count-badge">@_orders.Count total · @FilteredOrders.Count shown</span>
+        @if (HasActiveFilters) { <button class="vx-clear-filters" @onclick="ClearFilters">Clear filters</button> }
     </div>
+    @if (FilteredOrders.Count == 0)
+    {
+        <div class="vx-empty-state">@(_orders.Count == 0 ? "No orders found." : "No orders match the selected filters.")</div>
+    }
+    else
+    {
     <div class="table-responsive">
-        <table class="table align-middle orders-table">
+        <table class="table align-middle orders-table vx-table">
             <thead>
                 <tr>
                     <th>Order</th>
@@ -31,9 +38,17 @@
                     <th>Created</th>
                     <th class="portal-actions-heading">Actions</th>
                 </tr>
+                <tr class="vx-table-filter-row">
+                    <th><input class="vx-table-filter-input" aria-label="Filter order number" placeholder="Search order" @bind="_orderFilter" @bind:event="oninput" /></th>
+                    <th><input class="vx-table-filter-input" aria-label="Filter customer" placeholder="Search customer" @bind="_customerFilter" @bind:event="oninput" /></th>
+                    <th><input class="vx-table-filter-input" type="number" min="0" aria-label="Minimum amount" placeholder="Min amount" @bind="_minAmount" /></th>
+                    <th><select class="vx-table-filter-select" aria-label="Filter order status" @bind="_statusFilter"><option value="">All statuses</option>@foreach (var status in _statusOptions) { <option value="@status">@status</option> }</select></th>
+                    <th><select class="vx-table-filter-select" aria-label="Filter created date" @bind="_dateFilter"><option value="">All dates</option><option value="today">Today</option><option value="7">Last 7 days</option><option value="30">Last 30 days</option></select></th>
+                    <th></th>
+                </tr>
             </thead>
             <tbody>
-            @foreach (var order in _orders)
+            @foreach (var order in FilteredOrders)
             {
                 <tr>
                     <td><strong>@order.OrderNumber</strong></td>
@@ -59,6 +74,7 @@
             </tbody>
         </table>
     </div>
+    }
 </section>
 
 @code {
@@ -66,6 +82,11 @@
 
     private RestaurantResponse? _restaurant;
     private readonly List<OrderEditor> _orders = new();
+    private string _orderFilter = string.Empty;
+    private string _customerFilter = string.Empty;
+    private decimal? _minAmount;
+    private string _statusFilter = string.Empty;
+    private string _dateFilter = string.Empty;
     private readonly string[] _statusOptions =
     [
         OrderStatuses.PendingConfirmation,
@@ -78,6 +99,15 @@
         OrderStatuses.Cancelled,
         OrderStatuses.Failed
     ];
+
+    private IReadOnlyCollection<OrderEditor> FilteredOrders => _orders.Where(order =>
+        (string.IsNullOrWhiteSpace(_orderFilter) || order.OrderNumber.Contains(_orderFilter, StringComparison.OrdinalIgnoreCase)) &&
+        (string.IsNullOrWhiteSpace(_customerFilter) || order.CustomerName.Contains(_customerFilter, StringComparison.OrdinalIgnoreCase) || order.CustomerPhone.Contains(_customerFilter, StringComparison.OrdinalIgnoreCase)) &&
+        (_minAmount is null || order.TotalAmount >= _minAmount) &&
+        (string.IsNullOrWhiteSpace(_statusFilter) || order.NextStatus == _statusFilter) &&
+        MatchesDate(order.CreatedAt)).ToArray();
+
+    private bool HasActiveFilters => !string.IsNullOrWhiteSpace(_orderFilter) || !string.IsNullOrWhiteSpace(_customerFilter) || _minAmount is not null || !string.IsNullOrWhiteSpace(_statusFilter) || !string.IsNullOrWhiteSpace(_dateFilter);
 
     protected override async Task OnParametersSetAsync()
     {
@@ -93,8 +123,22 @@
 
     private async Task UpdateStatusAsync(OrderEditor order)
     {
-        await OrderService.UpdateStatusAsync(order.Id, new UpdateOrderStatusRequest(order.NextStatus, order.Comment, "Blazor admin", null));
+        await OrderService.UpdateStatusAsync(order.Id, new UpdateOrderStatusRequest(order.NextStatus, order.Comment, "Platform admin", null));
         await LoadAsync();
+    }
+
+    private bool MatchesDate(DateTimeOffset createdAt) => _dateFilter switch
+    {
+        "today" => createdAt.LocalDateTime.Date == DateTime.Today,
+        "7" => createdAt >= DateTimeOffset.Now.AddDays(-7),
+        "30" => createdAt >= DateTimeOffset.Now.AddDays(-30),
+        _ => true
+    };
+
+    private void ClearFilters()
+    {
+        _orderFilter = _customerFilter = _statusFilter = _dateFilter = string.Empty;
+        _minAmount = null;
     }
 
     private sealed class OrderEditor

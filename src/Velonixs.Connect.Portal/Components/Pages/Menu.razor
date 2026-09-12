@@ -1,4 +1,4 @@
-@page "/portal/blazor/menu"
+@page "/portal/menu"
 @attribute [Authorize(Roles = AppRoles.PortalRoles)]
 @inject IRestaurantService RestaurantService
 @inject IMenuService MenuService
@@ -26,9 +26,7 @@ else if (_restaurant is not null)
 {
     <header class="portal-blazor-page-head">
         <div>
-            <p class="portal-blazor-eyebrow">@_restaurant.Name</p>
             <h1>Menu management</h1>
-            <p class="text-muted mb-0">Keep the products shown to customers accurate and available.</p>
         </div>
         <button class="btn btn-outline-primary" @onclick="LoadAsync" disabled="@_loadInProgress">Refresh</button>
     </header>
@@ -85,7 +83,7 @@ else if (_restaurant is not null)
             else
             {
                 <div class="portal-blazor-notice portal-blazor-notice-error">
-                    <p class="mb-2">Complete the following before sending the catalog:</p>
+                    <p class="mb-2">Catalog setup needs attention.</p>
                     <ul class="mb-0">
                         @foreach (var issue in _catalogDiagnostics.Issues)
                         {

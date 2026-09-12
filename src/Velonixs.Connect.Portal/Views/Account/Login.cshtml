@@ -1,33 +1,36 @@
 @model LoginViewModel
 
 @{
-    ViewData["Title"] = "Portal Sign In";
+    ViewData["Title"] = "Business Portal Sign In";
 }
 
 <section class="auth-shell">
-    <form class="card shadow-sm auth-panel p-4" asp-action="Login" asp-controller="Account" method="post">
-        @Html.AntiForgeryToken()
-        <input asp-for="ReturnUrl" type="hidden" />
-
+    <div class="auth-context-panel">
         <div>
-            <p class="eyebrow">Staff access</p>
-            <h1>Sign in to the business portal</h1>
+            <span class="auth-context-kicker">Business portal</span>
+            <h1>Sign in to Velonixs Connect</h1>
         </div>
-
-        <div asp-validation-summary="ModelOnly" class="text-danger"></div>
-
-        <div>
-            <label asp-for="Email" class="form-label"></label>
-            <input asp-for="Email" class="form-control" autocomplete="username" />
-            <span asp-validation-for="Email" class="text-danger"></span>
-        </div>
-
-        <div>
-            <label asp-for="Password" class="form-label"></label>
-            <input asp-for="Password" class="form-control" autocomplete="current-password" />
-            <span asp-validation-for="Password" class="text-danger"></span>
-        </div>
-
-        <button class="btn btn-primary w-100" type="submit">Sign in</button>
-    </form>
+    </div>
+    <div class="auth-form-wrap">
+        <form class="auth-panel" action="/" method="post">
+            @Html.AntiForgeryToken()
+            <input asp-for="ReturnUrl" type="hidden" />
+            <div class="auth-panel-heading">
+                <p class="eyebrow">Velonixs Connect</p>
+                <h2>Sign in</h2>
+            </div>
+            <div asp-validation-summary="ModelOnly" class="validation-summary"></div>
+            <label class="auth-field">
+                <span>Email address</span>
+                <input asp-for="Email" autocomplete="username" placeholder="you@business.com" />
+                <span asp-validation-for="Email" class="field-error"></span>
+            </label>
+            <label class="auth-field">
+                <span>Password</span>
+                <input asp-for="Password" autocomplete="current-password" placeholder="Enter your password" />
+                <span asp-validation-for="Password" class="field-error"></span>
+            </label>
+            <button class="btn btn-primary w-100" type="submit">Sign in</button>
+        </form>
+    </div>
 </section>

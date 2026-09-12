@@ -1,11 +1,11 @@
-@page "/portal/blazor"
-@page "/portal/blazor/dashboard"
+@page "/portal/dashboard"
 @attribute [Authorize(Roles = AppRoles.PortalRoles)]
 @implements IAsyncDisposable
 @using Velonixs.Connect.Domain.Entities
 @inject IRestaurantService RestaurantService
 @inject IMenuService MenuService
 @inject IOrderService OrderService
+@inject ILogger<Dashboard> Logger
 
 <PageTitle>Business Dashboard | Velonixs Connect</PageTitle>
 
@@ -28,9 +28,8 @@ else if (_restaurant is not null)
 {
     <header class="portal-blazor-page-head">
         <div>
-            <p class="portal-blazor-eyebrow">@_restaurant.Name</p>
-            <h1>Today at a glance</h1>
-            <p class="text-muted mb-0">Track orders and keep your WhatsApp menu ready for customers.</p>
+            <p class="portal-blazor-eyebrow">Today at a glance</p>
+            <h1>Dashboard</h1>
         </div>
         <button class="btn btn-outline-primary" @onclick="LoadAsync">Refresh</button>
     </header>
@@ -44,7 +43,7 @@ else if (_restaurant is not null)
                 <span>Open the order queue to accept with a preparation time or reject with a reason.</span>
             </div>
             <div class="portal-blazor-catalog-order-actions">
-                <a class="btn btn-primary btn-sm" href="/portal/blazor/orders">Review orders</a>
+                <a class="btn btn-primary btn-sm" href="/portal/orders">Review orders</a>
                 <button class="btn btn-outline-secondary btn-sm" type="button" @onclick="DismissCatalogOrderAlert">Dismiss</button>
             </div>
         </section>
@@ -65,7 +64,7 @@ else if (_restaurant is not null)
         <article class="portal-blazor-metric portal-blazor-metric-urgent">
             <span>Needs confirmation</span>
             <strong>@_pendingCount</strong>
-            <a href="/portal/blazor/orders">Review orders</a>
+            <a href="/portal/orders">Review orders</a>
         </article>
         <article class="portal-blazor-metric">
             <span>Orders today</span>
@@ -80,7 +79,7 @@ else if (_restaurant is not null)
         <article class="portal-blazor-metric">
             <span>Available products</span>
             <strong>@_availableItemCount</strong>
-            <a href="/portal/blazor/menu">Manage menu</a>
+            <a href="/portal/menu">Manage menu</a>
         </article>
     </section>
 
@@ -90,17 +89,17 @@ else if (_restaurant is not null)
                 <p class="portal-blazor-eyebrow">Live work queue</p>
                 <h2>Recent orders</h2>
             </div>
-            <a class="btn btn-outline-primary btn-sm" href="/portal/blazor/orders">All orders</a>
+            <a class="btn btn-outline-primary btn-sm" href="/portal/orders">All orders</a>
         </div>
 
-        @if (_recentOrders.Count == 0)
+        @if (FilteredRecentOrders.Count == 0)
         {
-            <div class="portal-blazor-empty">No orders have been received for this business yet.</div>
+            <div class="portal-blazor-empty">@(_recentOrders.Count == 0 ? "No orders found." : "No orders match the selected filters.")</div>
         }
         else
         {
             <div class="table-responsive">
-                <table class="table align-middle portal-blazor-table">
+                <table class="table align-middle portal-blazor-table vx-table">
                     <thead>
                         <tr>
                             <th>Order</th>
@@ -111,10 +110,10 @@ else if (_restaurant is not null)
                         </tr>
                     </thead>
                     <tbody>
-                    @foreach (var order in _recentOrders)
+                    @foreach (var order in FilteredRecentOrders)
                     {
                         <tr>
-                            <td><a href="/portal/blazor/orders">@order.OrderNumber</a></td>
+                            <td><a href="/portal/orders">@order.OrderNumber</a></td>
                             <td>
                                 <strong>@order.CustomerName</strong>
                                 <small>@order.CustomerPhone</small>
@@ -158,6 +157,12 @@ else if (_restaurant is not null)
     private int _availableItemCount;
     private decimal _todayRevenue;
     private DateTimeOffset? _lastOrderRefreshAt;
+    private string _recentOrderFilter = string.Empty, _recentCustomerFilter = string.Empty, _recentStatusFilter = string.Empty, _recentDateFilter = string.Empty;
+    private IReadOnlyCollection<OrderSummaryResponse> FilteredRecentOrders => _recentOrders.Where(order =>
+        (string.IsNullOrWhiteSpace(_recentOrderFilter) || order.OrderNumber.Contains(_recentOrderFilter, StringComparison.OrdinalIgnoreCase)) &&
+        (string.IsNullOrWhiteSpace(_recentCustomerFilter) || order.CustomerName.Contains(_recentCustomerFilter, StringComparison.OrdinalIgnoreCase) || order.CustomerPhone.Contains(_recentCustomerFilter, StringComparison.OrdinalIgnoreCase)) &&
+        (string.IsNullOrWhiteSpace(_recentStatusFilter) || order.OrderStatus == _recentStatusFilter) &&
+        (_recentDateFilter == "" || (_recentDateFilter == "today" ? order.CreatedAt.LocalDateTime.Date == DateTime.Today : order.CreatedAt >= DateTimeOffset.Now.AddDays(-7)))).ToArray();
 
     private string LastOrderRefreshLabel => _lastOrderRefreshAt is { } refreshedAt
         ? refreshedAt.LocalDateTime.ToString("HH:mm:ss")
@@ -213,8 +218,9 @@ else if (_restaurant is not null)
             _lastOrderRefreshAt = DateTimeOffset.UtcNow;
             _liveRefreshFailed = false;
         }
-        catch (Exception)
+        catch (Exception exception)
         {
+            Logger.LogError(exception, "Portal dashboard load failed for business {BusinessId}.", _businessId);
             _error = "We could not load the business dashboard. Please try again.";
         }
         finally

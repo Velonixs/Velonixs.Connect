@@ -16,9 +16,9 @@ builder.Services
     .AddCookie(options =>
     {
         options.Cookie.Name = "Velonixs.Connect.Portal";
-        options.LoginPath = "/portal/login";
+        options.LoginPath = "/";
         options.LogoutPath = "/portal/logout";
-        options.AccessDeniedPath = "/portal/login";
+        options.AccessDeniedPath = "/";
         options.Events.OnValidatePrincipal = async context =>
         {
             var userId = context.Principal?.FindFirstValue(ClaimTypes.NameIdentifier);
@@ -57,11 +57,15 @@ app.UseAuthorization();
 app.UseAntiforgery();
 
 app.MapHealthChecks("/health");
+app.MapGet("/portal", () => Results.Redirect("/portal/dashboard"))
+    .RequireAuthorization(policy => policy.RequireRole(AppRoles.PortalRoleNames));
+app.MapGet("/portal/blazor", () => Results.Redirect("/portal/dashboard"))
+    .RequireAuthorization(policy => policy.RequireRole(AppRoles.PortalRoleNames));
+app.MapGet("/portal/blazor/{page}", (string page) => Results.Redirect($"/portal/{page}"))
+    .RequireAuthorization(policy => policy.RequireRole(AppRoles.PortalRoleNames));
 app.MapRazorComponents<Velonixs.Connect.Portal.Components.App>()
     .AddInteractiveServerRenderMode()
     .RequireAuthorization(policy => policy.RequireRole(AppRoles.PortalRoleNames));
-app.MapControllerRoute(
-    name: "default",
-    pattern: "{controller=Portal}/{action=Index}/{id?}");
+app.MapControllers();
 
 app.Run();

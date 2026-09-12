@@ -4,30 +4,18 @@
     var requestId = ViewData["RequestId"] as string;
 }
 
-<section class="page-title">
-    <div>
-        <p class="eyebrow">Business Portal</p>
-        <h1>Something went wrong</h1>
+<section class="auth-shell" style="grid-template-columns:1fr; min-height:auto;">
+    <div class="auth-form-wrap">
+        <div class="auth-panel">
+            <div class="auth-panel-heading">
+                <p class="eyebrow">Velonixs Connect Business Portal</p>
+                <h2>Something went wrong</h2>
+            </div>
+            @if (statusCode is 404) { <p>The page or record you requested could not be found.</p> }
+            else if (statusCode is 403) { <p>You do not have permission to complete this request.</p> }
+            else { <p>The portal could not complete the request. Please try again. If the problem continues, check the application logs.</p> }
+            @if (!string.IsNullOrWhiteSpace(requestId)) { <p class="auth-support-copy">Request ID: @requestId</p> }
+            <a class="btn btn-primary" href="/portal/dashboard">Back to dashboard</a>
+        </div>
     </div>
-    <a class="button secondary" asp-action="Index">Back to dashboard</a>
-</section>
-
-<section class="section-band">
-    @if (statusCode is 404)
-    {
-        <p>The page or record you requested could not be found.</p>
-    }
-    else if (statusCode is 403)
-    {
-        <p>You do not have permission to complete this request.</p>
-    }
-    else
-    {
-        <p>The portal could not complete the request. Please try again. If the problem continues, check the application logs.</p>
-    }
-
-    @if (!string.IsNullOrWhiteSpace(requestId))
-    {
-        <p><small>Request ID: @requestId</small></p>
-    }
 </section>

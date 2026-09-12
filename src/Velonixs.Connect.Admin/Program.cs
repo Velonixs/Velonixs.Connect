@@ -15,9 +15,9 @@ builder.Services
     .AddCookie(options =>
     {
         options.Cookie.Name = "Velonixs.Connect.Admin";
-        options.LoginPath = "/admin/login";
+        options.LoginPath = "/";
         options.LogoutPath = "/admin/logout";
-        options.AccessDeniedPath = "/admin/login";
+        options.AccessDeniedPath = "/";
         options.Events.OnValidatePrincipal = async context =>
         {
             var userId = context.Principal?.FindFirstValue(ClaimTypes.NameIdentifier);
@@ -39,7 +39,7 @@ builder.Services.AddHealthChecks();
 var app = builder.Build();
 var allowRemoteAdmin = builder.Configuration.GetValue<bool>("Admin:AllowRemote");
 
-app.UseExceptionHandler("/admin/blazor");
+app.UseExceptionHandler("/admin/dashboard");
 
 app.UseStaticFiles();
 
@@ -66,15 +66,18 @@ app.UseAuthorization();
 app.UseAntiforgery();
 
 app.MapHealthChecks("/health");
-app.MapGet("/", () => Results.Redirect("/admin/blazor"))
+app.MapGet("/admin", () => Results.Redirect("/admin/dashboard"))
     .RequireAuthorization(policy => policy.RequireRole(AppRoles.PlatformAdmin));
-app.MapGet("/admin", () => Results.Redirect("/admin/blazor"))
+app.MapGet("/admin/blazor", () => Results.Redirect("/admin/dashboard"))
+    .RequireAuthorization(policy => policy.RequireRole(AppRoles.PlatformAdmin));
+app.MapGet("/admin/blazor/master-catalog", () => Results.Redirect("/admin/master-catalog"))
+    .RequireAuthorization(policy => policy.RequireRole(AppRoles.PlatformAdmin));
+app.MapGet("/admin/blazor/{section}/{businessId:guid}", (string section, Guid businessId) =>
+    Results.Redirect($"/admin/{(section == "products" ? "catalog" : section == "sync" ? "integrations" : section)}/{businessId}"))
     .RequireAuthorization(policy => policy.RequireRole(AppRoles.PlatformAdmin));
 app.MapRazorComponents<Velonixs.Connect.Admin.Components.App>()
     .AddInteractiveServerRenderMode()
     .RequireAuthorization(policy => policy.RequireRole(AppRoles.PlatformAdmin));
-app.MapControllerRoute(
-    name: "account",
-    pattern: "{controller=Account}/{action=Login}/{id?}");
+app.MapControllers();
 
 app.Run();

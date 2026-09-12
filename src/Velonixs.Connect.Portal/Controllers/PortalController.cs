@@ -30,8 +30,6 @@ public sealed class PortalController(
         OrderStatuses.Cancelled
     ];
 
-    [HttpGet("")]
-    [HttpGet("portal")]
     public async Task<IActionResult> Index(CancellationToken cancellationToken)
     {
         var restaurant = await ResolveRestaurantAsync(cancellationToken);
@@ -75,7 +73,6 @@ public sealed class PortalController(
         return View(model);
     }
 
-    [HttpGet("portal/menu")]
     public async Task<IActionResult> Menu(CancellationToken cancellationToken)
     {
         var restaurant = await ResolveRestaurantAsync(cancellationToken);
@@ -112,7 +109,6 @@ public sealed class PortalController(
         });
     }
 
-    [HttpGet("portal/customers")]
     public async Task<IActionResult> Customers(CancellationToken cancellationToken)
     {
         var restaurant = await ResolveRestaurantAsync(cancellationToken);
@@ -144,7 +140,6 @@ public sealed class PortalController(
         });
     }
 
-    [HttpGet("portal/orders/{id:guid}")]
     public async Task<IActionResult> Order(Guid id, CancellationToken cancellationToken)
     {
         var order = await orderService.GetOrderAsync(id, cancellationToken);

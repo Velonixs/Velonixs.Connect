@@ -1,0 +1,15 @@
+.vx-app-footer { color: var(--text-muted, var(--vx-text-muted)); font-size: 12px; padding: 16px 24px 20px; text-align: center; }
+.page-description, .surface-description { display: none; }
+.vx-auth-header { display: grid; grid-template-columns: 1fr auto 1fr; justify-content: normal; }
+.vx-auth-header .vx-brand-logo-link { justify-self: start; }
+.vx-auth-company { display: grid; line-height: 1.15; text-align: center; }
+.vx-auth-company strong { font-size: 15px; letter-spacing: -.02em; }
+.vx-auth-company small { color: var(--vx-text-muted); font-size: 11px; margin-top: 3px; }
+.vx-auth-header-spacer { justify-self: end; min-width: 52px; }
+.auth-context-panel { justify-content: center; }
+.auth-form-wrap { padding: 56px 24px; }
+.auth-panel { gap: 24px; }
+.vx-empty-state { color: var(--vx-text-muted); padding: 28px 4px; }
+.work-surface .surface-title { padding-bottom: 12px; padding-top: 12px; }
+.vx-table .vx-table-filter-row th { padding-bottom: 6px; padding-top: 3px; }
+@media (max-width: 768px) { .vx-app-footer { padding-bottom: 20px; } }

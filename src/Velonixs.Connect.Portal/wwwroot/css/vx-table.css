@@ -1,0 +1,6 @@
+.vx-table thead th { background: var(--vx-surface); position: sticky; top: var(--vx-header-height); z-index: 2; }
+.vx-table .vx-table-filter-row th { padding-bottom: 9px; padding-top: 4px; top: calc(var(--vx-header-height) + 34px); z-index: 3; }
+.vx-table-filter-input, .vx-table-filter-select { background: var(--vx-surface-secondary); border: 1px solid var(--vx-border); border-radius: 7px; color: var(--vx-text-primary); font-size: 12px; height: 32px; max-width: 145px; padding: 0 8px; width: 100%; }
+.vx-table-filter-input:focus, .vx-table-filter-select:focus { border-color: var(--vx-primary); outline: 0; }
+.vx-clear-filters { background: transparent; border: 0; color: var(--vx-primary); cursor: pointer; font-size: 13px; font-weight: 700; }
+@media (max-width: 768px) { .vx-table .vx-table-filter-row th { position: static; } }

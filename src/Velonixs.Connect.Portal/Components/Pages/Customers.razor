@@ -1,4 +1,4 @@
-@page "/portal/blazor/customers"
+@page "/portal/customers"
 @attribute [Authorize(Roles = AppRoles.PortalRoles)]
 @inject IRestaurantService RestaurantService
 @inject IOrderService OrderService
@@ -24,9 +24,7 @@ else if (_restaurant is not null)
 {
     <header class="portal-blazor-page-head">
         <div>
-            <p class="portal-blazor-eyebrow">@_restaurant.Name</p>
             <h1>Customers</h1>
-            <p class="text-muted mb-0">A business-scoped directory summarized from orders received by this restaurant.</p>
         </div>
         <button class="btn btn-outline-primary" @onclick="LoadAsync">Refresh</button>
     </header>
@@ -34,13 +32,10 @@ else if (_restaurant is not null)
     <section class="portal-blazor-surface">
         <div class="portal-blazor-surface-head">
             <div>
-                <p class="portal-blazor-eyebrow">@_customers.Count customers</p>
+                <p class="portal-blazor-eyebrow">@_customers.Count customers · @FilteredCustomers.Count shown</p>
                 <h2>Customer directory</h2>
             </div>
-            <label class="portal-blazor-filter">
-                <span>Find a customer</span>
-                <input class="form-control" placeholder="Name, phone, or address" @bind="_search" @bind:event="oninput" />
-            </label>
+            @if (HasActiveFilters) { <button class="btn btn-outline-primary btn-sm" @onclick="ClearFilters">Clear filters</button> }
         </div>
 
         @if (FilteredCustomers.Count == 0)
@@ -50,7 +45,7 @@ else if (_restaurant is not null)
         else
         {
             <div class="table-responsive">
-                <table class="table align-middle portal-blazor-table">
+                <table class="table align-middle portal-blazor-table vx-table">
                     <thead>
                         <tr>
                             <th>Customer</th>
@@ -58,6 +53,14 @@ else if (_restaurant is not null)
                             <th>Orders</th>
                             <th>Last order</th>
                             <th class="text-end">Lifetime spend</th>
+                            <th></th>
+                        </tr>
+                        <tr class="vx-table-filter-row">
+                            <th><input class="vx-table-filter-input" aria-label="Filter by customer" placeholder="Search customer" @bind="_search" @bind:event="oninput" /></th>
+                            <th><input class="vx-table-filter-input" aria-label="Filter by address" placeholder="Search address" @bind="_addressFilter" @bind:event="oninput" /></th>
+                            <th><input class="vx-table-filter-input" type="number" min="0" aria-label="Minimum order count" placeholder="Min" @bind="_minOrders" /></th>
+                            <th><select class="vx-table-filter-select" aria-label="Filter by last activity" @bind="_activityFilter"><option value="">All dates</option><option value="today">Today</option><option value="7">Last 7 days</option><option value="30">Last 30 days</option></select></th>
+                            <th><input class="vx-table-filter-input" type="number" min="0" aria-label="Minimum lifetime spend" placeholder="Min spend" @bind="_minSpend" /></th>
                             <th></th>
                         </tr>
                     </thead>
@@ -97,15 +100,23 @@ else if (_restaurant is not null)
     private bool _loading = true;
     private string? _error;
     private string _search = string.Empty;
+    private string _addressFilter = string.Empty;
+    private int? _minOrders;
+    private decimal? _minSpend;
+    private string _activityFilter = string.Empty;
 
-    private IReadOnlyCollection<CustomerSummary> FilteredCustomers =>
-        string.IsNullOrWhiteSpace(_search)
-            ? _customers
-            : _customers.Where(customer =>
+    private IReadOnlyCollection<CustomerSummary> FilteredCustomers => _customers.Where(customer =>
+                (string.IsNullOrWhiteSpace(_search) ||
                     customer.Name.Contains(_search, StringComparison.OrdinalIgnoreCase) ||
                     customer.Phone.Contains(_search, StringComparison.OrdinalIgnoreCase) ||
-                    customer.Address.Contains(_search, StringComparison.OrdinalIgnoreCase))
+                    customer.Address.Contains(_search, StringComparison.OrdinalIgnoreCase)) &&
+                (string.IsNullOrWhiteSpace(_addressFilter) || customer.Address.Contains(_addressFilter, StringComparison.OrdinalIgnoreCase)) &&
+                (_minOrders is null || customer.OrderCount >= _minOrders) &&
+                (_minSpend is null || customer.LifetimeSpend >= _minSpend) &&
+                MatchesActivity(customer.LastOrderAt))
                 .ToArray();
+
+    private bool HasActiveFilters => !string.IsNullOrWhiteSpace(_search) || !string.IsNullOrWhiteSpace(_addressFilter) || _minOrders is not null || _minSpend is not null || !string.IsNullOrWhiteSpace(_activityFilter);
 
     protected override async Task OnInitializedAsync() => await LoadAsync();
 
@@ -177,6 +188,21 @@ else if (_restaurant is not null)
     {
         var digits = new string(phone.Where(char.IsDigit).ToArray());
         return string.IsNullOrWhiteSpace(digits) ? null : $"https://wa.me/{digits}";
+    }
+
+    private bool MatchesActivity(DateTimeOffset value) => _activityFilter switch
+    {
+        "today" => value.LocalDateTime.Date == DateTime.Today,
+        "7" => value >= DateTimeOffset.Now.AddDays(-7),
+        "30" => value >= DateTimeOffset.Now.AddDays(-30),
+        _ => true
+    };
+
+    private void ClearFilters()
+    {
+        _search = _addressFilter = _activityFilter = string.Empty;
+        _minOrders = null;
+        _minSpend = null;
     }
 
     private sealed record CustomerSummary(

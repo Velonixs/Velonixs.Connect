@@ -136,7 +136,7 @@ public sealed class WhatsAppCommerceService(
                 issues.Add("The WhatsApp cart is not enabled.");
             }
 
-            if (!commerce.IsRemoteValidated)
+            if (!commerce.IsRemoteValidated && !_options.DisableSending)
             {
                 issues.Add(commerce.Diagnostic ?? "Commerce settings were not validated against Meta.");
             }
@@ -148,7 +148,8 @@ public sealed class WhatsAppCommerceService(
             phoneMatched,
             commerce?.IsCatalogVisible == true,
             commerce?.IsCartEnabled == true,
-            configured && phoneMatched && commerce is { IsCatalogVisible: true, IsCartEnabled: true, IsRemoteValidated: true },
+            configured && phoneMatched && commerce is { IsCatalogVisible: true, IsCartEnabled: true } &&
+                (_options.DisableSending || commerce.IsRemoteValidated),
             issues);
     }
 

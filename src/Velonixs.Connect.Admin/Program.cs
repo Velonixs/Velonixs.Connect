@@ -15,9 +15,9 @@ builder.Services
     .AddCookie(options =>
     {
         options.Cookie.Name = "Velonixs.Connect.Admin";
-        options.LoginPath = "/admin/login";
+        options.LoginPath = "/";
         options.LogoutPath = "/admin/logout";
-        options.AccessDeniedPath = "/admin/login";
+        options.AccessDeniedPath = "/";
         options.Events.OnValidatePrincipal = async context =>
         {
             var userId = context.Principal?.FindFirstValue(ClaimTypes.NameIdentifier);
@@ -66,8 +66,6 @@ app.UseAuthorization();
 app.UseAntiforgery();
 
 app.MapHealthChecks("/health");
-app.MapGet("/", () => Results.Redirect("/admin/dashboard"))
-    .RequireAuthorization(policy => policy.RequireRole(AppRoles.PlatformAdmin));
 app.MapGet("/admin", () => Results.Redirect("/admin/dashboard"))
     .RequireAuthorization(policy => policy.RequireRole(AppRoles.PlatformAdmin));
 app.MapGet("/admin/blazor", () => Results.Redirect("/admin/dashboard"))

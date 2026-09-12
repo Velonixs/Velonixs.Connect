@@ -128,6 +128,12 @@
         <span class="count-badge">@_businesses.Count total · @FilteredBusinesses.Count shown</span>
         @if (HasBusinessFilters) { <button class="vx-clear-filters" @onclick="ClearBusinessFilters">Clear filters</button> }
     </div>
+    @if (FilteredBusinesses.Count == 0)
+    {
+        <div class="vx-empty-state">@(_businesses.Count == 0 ? "No businesses yet." : "No businesses found.")</div>
+    }
+    else
+    {
     <div class="table-responsive">
         <table class="table align-middle businesses-table vx-table">
             <thead>
@@ -149,18 +155,6 @@
                 </tr>
             </thead>
             <tbody>
-            @if (_businesses.Count == 0)
-            {
-                <tr>
-                    <td colspan="6">
-                        <div class="table-empty-state">
-                            <span class="empty-icon"><svg class="ui-icon" aria-hidden="true"><use href="/icons/ui-icons.svg#icon-building"></use></svg></span>
-                            <strong>No businesses yet</strong>
-                            <small>Create the first business to start managing its commerce operations.</small>
-                        </div>
-                    </td>
-                </tr>
-            }
             @foreach (var business in FilteredBusinesses)
             {
                 <tr>
@@ -183,6 +177,7 @@
             </tbody>
         </table>
     </div>
+    }
 </section>
 
 @code {

@@ -21,6 +21,12 @@
         <span class="count-badge">@_customers.Count total · @FilteredCustomers.Count shown</span>
         @if (HasActiveFilters) { <button class="vx-clear-filters" @onclick="ClearFilters">Clear filters</button> }
     </div>
+    @if (FilteredCustomers.Count == 0)
+    {
+        <div class="vx-empty-state">@(_customers.Count == 0 ? "No customers found." : "No customers match the selected filters.")</div>
+    }
+    else
+    {
     <div class="table-responsive">
         <table class="table align-middle customers-table vx-table">
             <thead><tr><th>Name</th><th>Phone</th><th>Orders</th><th>Last Address</th><th>Last Active</th></tr>
@@ -39,6 +45,7 @@
             </tbody>
         </table>
     </div>
+    }
 </section>
 
 @code {

@@ -5,6 +5,7 @@
 @inject IRestaurantService RestaurantService
 @inject IMenuService MenuService
 @inject IOrderService OrderService
+@inject ILogger<Dashboard> Logger
 
 <PageTitle>Business Dashboard | Velonixs Connect</PageTitle>
 
@@ -28,8 +29,7 @@ else if (_restaurant is not null)
     <header class="portal-blazor-page-head">
         <div>
             <p class="portal-blazor-eyebrow">Today at a glance</p>
-            <h1>@_restaurant.Name</h1>
-            <p class="text-muted mb-0">Track orders and keep your WhatsApp menu ready for customers.</p>
+            <h1>Dashboard</h1>
         </div>
         <button class="btn btn-outline-primary" @onclick="LoadAsync">Refresh</button>
     </header>
@@ -92,9 +92,9 @@ else if (_restaurant is not null)
             <a class="btn btn-outline-primary btn-sm" href="/portal/orders">All orders</a>
         </div>
 
-        @if (_recentOrders.Count == 0)
+        @if (FilteredRecentOrders.Count == 0)
         {
-            <div class="portal-blazor-empty">No orders have been received for this business yet.</div>
+            <div class="portal-blazor-empty">@(_recentOrders.Count == 0 ? "No orders found." : "No orders match the selected filters.")</div>
         }
         else
         {
@@ -108,7 +108,6 @@ else if (_restaurant is not null)
                             <th>Received</th>
                             <th class="text-end">Total</th>
                         </tr>
-                        <tr class="vx-table-filter-row"><th><input class="vx-table-filter-input" aria-label="Filter recent orders" placeholder="Search order" @bind="_recentOrderFilter" @bind:event="oninput" /></th><th><input class="vx-table-filter-input" aria-label="Filter recent customers" placeholder="Search customer" @bind="_recentCustomerFilter" @bind:event="oninput" /></th><th><select class="vx-table-filter-select" aria-label="Filter recent order status" @bind="_recentStatusFilter"><option value="">All statuses</option>@foreach (var status in _recentOrders.Select(x => x.OrderStatus).Distinct()) { <option value="@status">@FormatStatus(status)</option> }</select></th><th><select class="vx-table-filter-select" aria-label="Filter recent order date" @bind="_recentDateFilter"><option value="">All dates</option><option value="today">Today</option><option value="7">Last 7 days</option></select></th><th></th></tr>
                     </thead>
                     <tbody>
                     @foreach (var order in FilteredRecentOrders)
@@ -219,8 +218,9 @@ else if (_restaurant is not null)
             _lastOrderRefreshAt = DateTimeOffset.UtcNow;
             _liveRefreshFailed = false;
         }
-        catch (Exception)
+        catch (Exception exception)
         {
+            Logger.LogError(exception, "Portal dashboard load failed for business {BusinessId}.", _businessId);
             _error = "We could not load the business dashboard. Please try again.";
         }
         finally

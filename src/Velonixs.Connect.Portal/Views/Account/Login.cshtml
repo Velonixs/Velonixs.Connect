@@ -9,18 +9,15 @@
         <div>
             <span class="auth-context-kicker">Business portal</span>
             <h1>Sign in to Velonixs Connect</h1>
-            <p>Manage orders, customers, menu availability and everyday business operations.</p>
         </div>
-        <div class="auth-context-footer"><span class="status-dot" aria-hidden="true"></span><span>Secure business access</span></div>
     </div>
     <div class="auth-form-wrap">
-        <form class="auth-panel" asp-action="Login" asp-controller="Account" method="post">
+        <form class="auth-panel" action="/" method="post">
             @Html.AntiForgeryToken()
             <input asp-for="ReturnUrl" type="hidden" />
             <div class="auth-panel-heading">
-                <p class="eyebrow">Business portal</p>
-                <h2>Welcome back</h2>
-                <p>Use your business account to continue.</p>
+                <p class="eyebrow">Velonixs Connect</p>
+                <h2>Sign in</h2>
             </div>
             <div asp-validation-summary="ModelOnly" class="validation-summary"></div>
             <label class="auth-field">
@@ -34,7 +31,6 @@
                 <span asp-validation-for="Password" class="field-error"></span>
             </label>
             <button class="btn btn-primary w-100" type="submit">Sign in</button>
-            <p class="auth-support-copy">Access is restricted to authorized business team members.</p>
         </form>
     </div>
 </section>

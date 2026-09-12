@@ -98,6 +98,12 @@
         <div><h2>Business users</h2><p class="surface-description">Review assigned roles and issue temporary password resets.</p></div>
         <span class="count-badge">@_users.Count total</span>
     </div>
+    @if (FilteredUsers.Count == 0)
+    {
+        <div class="vx-empty-state">@(_users.Count == 0 ? "No business users found." : "No business users match the selected filters.")</div>
+    }
+    else
+    {
     <div class="table-responsive">
         <table class="table align-middle business-users-table vx-table">
             <thead><tr><th>Name</th><th>Email</th><th>Role</th><th>Status</th><th>Temporary password</th><th class="portal-actions-heading">Actions</th></tr><tr class="vx-table-filter-row"><th><input class="vx-table-filter-input" aria-label="Filter user name" placeholder="Search user" @bind="_userNameFilter" @bind:event="oninput" /></th><th><input class="vx-table-filter-input" aria-label="Filter user email" placeholder="Search email" @bind="_userEmailFilter" @bind:event="oninput" /></th><th><select class="vx-table-filter-select" aria-label="Filter user role" @bind="_userRoleFilter"><option value="">All roles</option>@foreach (var role in _users.Select(x => x.Role).Distinct()) { <option value="@role">@role</option> }</select></th><th><select class="vx-table-filter-select" aria-label="Filter user status" @bind="_userStatusFilter"><option value="">All</option><option value="active">Active</option><option value="inactive">Inactive</option></select></th><th></th><th></th></tr></thead>
@@ -120,6 +126,7 @@
             </tbody>
         </table>
     </div>
+    }
 </section>
 
 @code {

@@ -1,6 +1,5 @@
 @inherits LayoutComponentBase
 @inject NavigationManager Navigation
-@inject IRestaurantService RestaurantService
 
 <div class="vx-portal-app">
     <header class="vx-topbar">
@@ -49,9 +48,9 @@
 
 @code {
     [CascadingParameter] private Task<AuthenticationState>? AuthenticationStateTask { get; set; }
-    private RestaurantResponse? _restaurant;
+    private string _businessName = "Business Portal";
 
-    private string BusinessName => _restaurant?.Name ?? "Business Portal";
+    private string BusinessName => _businessName;
     // RestaurantResponse has no logo field today. This seam supports a future BusinessLogoUrl without using the corporate logo as a restaurant logo.
     private string? BusinessLogoUrl => null;
     private string BusinessInitials => Initials(BusinessName);
@@ -59,11 +58,7 @@
     protected override async Task OnInitializedAsync()
     {
         var authenticationState = AuthenticationStateTask is null ? null : await AuthenticationStateTask;
-        var businessClaim = authenticationState?.User.FindFirst(AppClaimTypes.BusinessId)?.Value;
-        if (Guid.TryParse(businessClaim, out var businessId))
-        {
-            _restaurant = await RestaurantService.GetRestaurantAsync(businessId);
-        }
+        _businessName = authenticationState?.User.FindFirst(AppClaimTypes.BusinessName)?.Value ?? "Business Portal";
     }
 
     private string NavClass(string href)

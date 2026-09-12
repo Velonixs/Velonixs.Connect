@@ -24,9 +24,7 @@ else if (_restaurant is not null)
 {
     <header class="portal-blazor-page-head">
         <div>
-            <p class="portal-blazor-eyebrow">@_restaurant.Name</p>
             <h1>Customers</h1>
-            <p class="text-muted mb-0">A business-scoped directory summarized from orders received by this restaurant.</p>
         </div>
         <button class="btn btn-outline-primary" @onclick="LoadAsync">Refresh</button>
     </header>

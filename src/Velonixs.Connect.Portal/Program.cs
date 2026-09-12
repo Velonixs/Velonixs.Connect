@@ -16,9 +16,9 @@ builder.Services
     .AddCookie(options =>
     {
         options.Cookie.Name = "Velonixs.Connect.Portal";
-        options.LoginPath = "/portal/login";
+        options.LoginPath = "/";
         options.LogoutPath = "/portal/logout";
-        options.AccessDeniedPath = "/portal/login";
+        options.AccessDeniedPath = "/";
         options.Events.OnValidatePrincipal = async context =>
         {
             var userId = context.Principal?.FindFirstValue(ClaimTypes.NameIdentifier);

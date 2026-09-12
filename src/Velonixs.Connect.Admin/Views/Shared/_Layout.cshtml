@@ -10,11 +10,11 @@
 </head>
 <body>
     <header class="vx-auth-header">
-        <a class="vx-brand" href="/admin/dashboard" aria-label="Velonixs Connect Admin home">
+        <a class="vx-brand vx-brand-logo-link" href="/admin/dashboard" aria-label="Velonixs Connect Admin home">
             <img class="vx-brand-logo" src="/images/velonixs-logo.jpg" alt="Velonixs" />
-            <span class="vx-brand-copy"><strong>Velonixs Systems Private Limited</strong><small>Velonixs Connect · Platform Admin</small></span>
         </a>
-        <span class="vx-secure-label">Secure access</span>
+        <span class="vx-auth-company"><strong>Velonixs Systems Private Limited</strong><small>Velonixs Connect &middot; Platform Admin</small></span>
+        <span class="vx-auth-header-spacer" aria-hidden="true"></span>
     </header>
     <main class="vx-auth-page">
         @if (TempData["Success"] is string success) { <div class="vx-alert vx-alert-success" role="alert">@success</div> }
@@ -22,6 +22,6 @@
         @if (TempData["Error"] is string error) { <div class="vx-alert vx-alert-danger" role="alert">@error</div> }
         @RenderBody()
     </main>
-    <footer class="vx-app-footer">© 2026 Velonixs Systems Private Limited. All rights reserved.</footer>
+    <footer class="vx-app-footer">&copy; 2026 Velonixs Systems Private Limited. All rights reserved.</footer>
 </body>
 </html>

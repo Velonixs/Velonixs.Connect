@@ -95,6 +95,12 @@
 
 <section class="work-surface mb-3">
     <div class="surface-title"><div><h2>Queue</h2><p class="surface-description">Products waiting to be processed by the catalog worker.</p></div><span class="count-badge">@_queue.Count total · @FilteredQueue.Count shown</span>@if (HasQueueFilters) { <button class="vx-clear-filters" @onclick="ClearQueueFilters">Clear filters</button> }</div>
+    @if (FilteredQueue.Count == 0)
+    {
+        <div class="vx-empty-state">@(_queue.Count == 0 ? "No catalog sync items found." : "No catalog sync items match the selected filters.")</div>
+    }
+    else
+    {
     <div class="table-responsive">
         <table class="table align-middle sync-queue-table vx-table">
             <thead><tr><th>Product</th><th>Event</th><th>Status</th><th>Retries</th><th>Next</th><th>Error</th><th class="portal-actions-heading">Actions</th></tr><tr class="vx-table-filter-row"><th><input class="vx-table-filter-input" aria-label="Filter queue product" placeholder="Search product" @bind="_queueProductFilter" @bind:event="oninput" /></th><th><input class="vx-table-filter-input" aria-label="Filter event" placeholder="Event" @bind="_queueEventFilter" @bind:event="oninput" /></th><th><input class="vx-table-filter-input" aria-label="Filter queue status" placeholder="Status" @bind="_queueStatusFilter" @bind:event="oninput" /></th><th><input class="vx-table-filter-input" type="number" min="0" aria-label="Minimum retries" placeholder="Min" @bind="_minRetries" /></th><th></th><th><input class="vx-table-filter-input" aria-label="Filter error" placeholder="Search error" @bind="_queueErrorFilter" @bind:event="oninput" /></th><th></th></tr></thead>
@@ -123,10 +129,17 @@
             </tbody>
         </table>
     </div>
+    }
 </section>
 
 <section class="work-surface">
     <div class="surface-title"><div><h2>Logs</h2><p class="surface-description">Recent Meta catalog delivery attempts and responses.</p></div><span class="count-badge">@_logs.Count total · @FilteredLogs.Count shown</span>@if (HasLogFilters) { <button class="vx-clear-filters" @onclick="ClearLogFilters">Clear filters</button> }</div>
+    @if (FilteredLogs.Count == 0)
+    {
+        <div class="vx-empty-state">@(_logs.Count == 0 ? "No catalog sync logs found." : "No catalog sync logs match the selected filters.")</div>
+    }
+    else
+    {
     <div class="table-responsive">
         <table class="table align-middle sync-logs-table vx-table">
             <thead><tr><th>Time</th><th>Product</th><th>Event</th><th>Status</th><th>HTTP</th><th>Error</th></tr><tr class="vx-table-filter-row"><th><select class="vx-table-filter-select" aria-label="Filter log date" @bind="_logDateFilter"><option value="">All dates</option><option value="7">Last 7 days</option><option value="30">Last 30 days</option></select></th><th><input class="vx-table-filter-input" aria-label="Filter log product" placeholder="Product" @bind="_logProductFilter" @bind:event="oninput" /></th><th><input class="vx-table-filter-input" aria-label="Filter log event" placeholder="Event" @bind="_logEventFilter" @bind:event="oninput" /></th><th><input class="vx-table-filter-input" aria-label="Filter log status" placeholder="Status" @bind="_logStatusFilter" @bind:event="oninput" /></th><th></th><th><input class="vx-table-filter-input" aria-label="Filter log error" placeholder="Error" @bind="_logErrorFilter" @bind:event="oninput" /></th></tr></thead>
@@ -145,6 +158,7 @@
             </tbody>
         </table>
     </div>
+    }
 </section>
 
 @code {

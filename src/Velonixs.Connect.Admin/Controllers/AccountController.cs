@@ -13,12 +13,14 @@ namespace Velonixs.Connect.Admin.Controllers;
 [AllowAnonymous]
 public sealed class AccountController(UserManager<ApplicationUser> userManager) : Controller
 {
+    [HttpGet("")]
     [HttpGet("admin/login")]
     public IActionResult Login(string? returnUrl = null)
     {
         return View(new LoginViewModel { ReturnUrl = returnUrl });
     }
 
+    [HttpPost("")]
     [HttpPost("admin/login")]
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> Login(LoginViewModel model)
@@ -59,15 +61,20 @@ public sealed class AccountController(UserManager<ApplicationUser> userManager) 
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> Logout()
     {
-        await HttpContext.SignOutAsync(CookieAuthenticationDefaults.AuthenticationScheme);
-        return RedirectToAction(nameof(Login));
+        return await SignOutAndRedirectAsync();
     }
 
     [HttpGet("admin/logout")]
     public async Task<IActionResult> LogoutFromLink()
     {
+        return await SignOutAndRedirectAsync();
+    }
+
+    private async Task<IActionResult> SignOutAndRedirectAsync()
+    {
         await HttpContext.SignOutAsync(CookieAuthenticationDefaults.AuthenticationScheme);
-        return RedirectToAction(nameof(Login));
+        Response.Cookies.Delete("Velonixs.Connect.Admin", new CookieOptions { Path = "/" });
+        return LocalRedirect("/");
     }
 
     private async Task<ClaimsPrincipal> BuildPrincipalAsync(ApplicationUser user)

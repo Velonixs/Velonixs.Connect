@@ -25,9 +25,7 @@ else if (_restaurant is not null)
 {
     <header class="portal-blazor-page-head">
         <div>
-            <p class="portal-blazor-eyebrow">@_restaurant.Name</p>
             <h1>Order queue</h1>
-            <p class="text-muted mb-0">Update an order status to notify the customer through the established workflow.</p>
         </div>
         <button class="btn btn-outline-primary" @onclick="LoadAsync">Refresh</button>
     </header>
@@ -43,19 +41,23 @@ else if (_restaurant is not null)
                 <p class="portal-blazor-eyebrow">@_orders.Count total · @FilteredOrders.Count shown</p>
                 <h2>All orders</h2>
             </div>
-            <div class="portal-blazor-filter">
-                <label><span>Find order</span><input class="form-control" aria-label="Filter orders" placeholder="Order, customer or phone" @bind="_searchFilter" @bind:event="oninput" /></label>
-                <label><span>Status</span><select class="form-select" aria-label="Filter order status" @bind="_statusFilter">
+        </div>
+        @if (_orders.Count > 0)
+        {
+            <div class="portal-blazor-filter portal-blazor-filter-toolbar">
+                <input class="form-control" aria-label="Filter orders" placeholder="Search order, customer or phone" @bind="_searchFilter" @bind:event="oninput" />
+                <select class="form-select" aria-label="Filter order status" @bind="_statusFilter">
                     <option value="">All statuses</option>
                     @foreach (var status in KnownStatuses)
                     {
                         <option value="@status">@FormatStatus(status)</option>
                     }
-                </select></label>
-                <label><span>Date</span><select class="form-select" aria-label="Filter order date" @bind="_dateFilter"><option value="">All dates</option><option value="today">Today</option><option value="7">Last 7 days</option><option value="30">Last 30 days</option></select></label>
+                </select>
+                <select class="form-select" aria-label="Filter order date" @bind="_dateFilter"><option value="">All dates</option><option value="today">Today</option><option value="7">Last 7 days</option><option value="30">Last 30 days</option></select>
                 @if (HasActiveFilters) { <button class="vx-clear-filters" @onclick="ClearFilters">Clear filters</button> }
+                <span class="portal-filter-count">@_orders.Count total &middot; @FilteredOrders.Count shown</span>
             </div>
-        </div>
+        }
 
         @if (FilteredOrders.Count == 0)
         {
@@ -74,11 +76,11 @@ else if (_restaurant is not null)
                             <div>
                                 <p class="portal-blazor-order-number">@order.OrderNumber</p>
                                 <h3>@order.CustomerName</h3>
+                                <p class="portal-blazor-order-timestamp">@order.CustomerPhone <span aria-hidden="true">&middot;</span> @order.CreatedAt.LocalDateTime.ToString("dd MMM yyyy, HH:mm")</p>
                                 @if (IsWhatsAppCatalogOrder(order))
                                 {
-                                    <span class="portal-blazor-order-source">WhatsApp catalog order</span>
+                                    <span class="portal-blazor-order-source">WhatsApp catalog</span>
                                 }
-                                <span>@order.CustomerPhone · @order.CreatedAt.LocalDateTime.ToString("dd MMM yyyy, HH:mm")</span>
                             </div>
                             <div class="portal-blazor-order-total">
                                 <span class="portal-blazor-status">@FormatStatus(order.OrderStatus)</span>
@@ -86,18 +88,18 @@ else if (_restaurant is not null)
                             </div>
                         </header>
 
-                        <div class="portal-blazor-order-meta">
-                            <span><strong>Address:</strong> @order.Address</span>
-                            <span><strong>Source:</strong> @(IsWhatsAppCatalogOrder(order) ? "WhatsApp catalog" : order.Source)</span>
+                        <div class="portal-blazor-order-details">
+                            <div><span>Address</span><p>@order.Address</p></div>
+                            <div><span>Source</span><p>@(IsWhatsAppCatalogOrder(order) ? "WhatsApp Catalog" : order.Source)</p></div>
                             @if (order.EstimatedMinutes is not null)
                             {
-                                <span><strong>Estimate:</strong> @order.EstimatedMinutes min</span>
+                                <div><span>Estimate</span><p>@order.EstimatedMinutes min</p></div>
                             }
                         </div>
 
                         @if (!string.IsNullOrWhiteSpace(order.RestaurantComment))
                         {
-                            <p class="portal-blazor-order-comment"><strong>Last note:</strong> @order.RestaurantComment</p>
+                            <div class="portal-blazor-order-comment"><span>Last note</span><p>@order.RestaurantComment</p></div>
                         }
 
                         @if (allowedStatuses.Count > 0)
